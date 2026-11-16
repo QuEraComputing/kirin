@@ -309,9 +309,9 @@ fn no_rules() -> RuleSet<L> {
 
 /// `input`, parsed and printed back.
 fn printed(input: &str) -> String {
-    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    pipeline.parse(input).expect("the program parses");
-    pipeline.sprint()
+    let mut program: Program<StageInfo<L>> = Program::new();
+    program.parse(input).expect("the program parses");
+    program.sprint()
 }
 
 /// Run `rules` over `input` in order `O`: the printed result and the
@@ -320,18 +320,18 @@ fn run<O: WalkOrder>(
     rules: &RuleSet<L>,
     input: &str,
 ) -> Result<(String, RewriteSummary), DriverError> {
-    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    pipeline.parse(input).expect("the program parses");
-    let stage = pipeline.stage_by_name("arith").expect("the stage exists");
+    let mut program: Program<StageInfo<L>> = Program::new();
+    program.parse(input).expect("the program parses");
+    let stage = program.stage_by_name("arith").expect("the stage exists");
     let driver = RewriteDriver::new(rules);
     let mut outcome = None;
-    let _ = pipeline.run_pass(stage, |rewriter| {
+    let _ = program.run_pass(stage, |rewriter| {
         let result = driver.run::<O>(rewriter);
         outcome = Some(result.clone());
         result
     });
     let summary = outcome.expect("the pass ran")?;
-    Ok((pipeline.sprint(), summary))
+    Ok((program.sprint(), summary))
 }
 
 /// Duplicates within a block merge; the same value in another block does

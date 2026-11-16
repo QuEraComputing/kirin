@@ -1,15 +1,15 @@
 #[test]
-fn test_pipeline_function_print() {
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("foo").new().unwrap();
+fn test_program_function_print() {
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("foo").new().unwrap();
 
     // --- Stage A: a simple function with one constant ---
-    let stage0_id = pipeline
+    let stage0_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .name("A")
         .new();
-    let sf0 = pipeline
+    let sf0 = program
         .staged_function()
         .func(func)
         .stage(stage0_id)
@@ -21,7 +21,7 @@ fn test_pipeline_function_print() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage0_id).unwrap().with_builder(|ctx0| {
+    program.stage_mut(stage0_id).unwrap().with_builder(|ctx0| {
         let a = SimpleLanguage::op_constant(ctx0, 42i64);
         let ret = SimpleLanguage::op_return(ctx0, a.result);
         let block = ctx0.block().stmt(a).terminator(ret).new();
@@ -35,12 +35,12 @@ fn test_pipeline_function_print() {
     });
 
     // --- Stage B: a different version with two constants ---
-    let stage1_id = pipeline
+    let stage1_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .name("B")
         .new();
-    let sf1 = pipeline
+    let sf1 = program
         .staged_function()
         .func(func)
         .stage(stage1_id)
@@ -52,7 +52,7 @@ fn test_pipeline_function_print() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage1_id).unwrap().with_builder(|ctx1| {
+    program.stage_mut(stage1_id).unwrap().with_builder(|ctx1| {
         let a = SimpleLanguage::op_constant(ctx1, 10i64);
         let b = SimpleLanguage::op_constant(ctx1, 20i64);
         let c = SimpleLanguage::op_add(ctx1, a.result, b.result);
@@ -68,21 +68,21 @@ fn test_pipeline_function_print() {
     });
 
     // Print the function across both stages
-    let output = PrintExt::sprint(&func, &pipeline);
+    let output = PrintExt::sprint(&func, &program);
     insta::assert_snapshot!(output);
 }
 
 #[test]
-fn test_pipeline_unnamed_stage() {
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("bar").new().unwrap();
+fn test_program_unnamed_stage() {
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("bar").new().unwrap();
 
     // --- Unnamed stage (no .name() call) ---
-    let stage_id = pipeline
+    let stage_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .new();
-    let sf = pipeline
+    let sf = program
         .staged_function()
         .func(func)
         .stage(stage_id)
@@ -94,7 +94,7 @@ fn test_pipeline_unnamed_stage() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+    program.stage_mut(stage_id).unwrap().with_builder(|ctx| {
         let a = SimpleLanguage::op_constant(ctx, 7i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
@@ -108,22 +108,22 @@ fn test_pipeline_unnamed_stage() {
     });
 
     // Should fall back to numeric symbol form: "stage @0"
-    let output = PrintExt::sprint(&func, &pipeline);
+    let output = PrintExt::sprint(&func, &program);
     insta::assert_snapshot!(output);
 }
 
 #[test]
-fn test_pipeline_staged_function_no_specialization() {
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("extern_fn").new().unwrap();
+fn test_program_staged_function_no_specialization() {
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("extern_fn").new().unwrap();
 
     // Stage with a named stage but no specialization (declaration-only)
-    let stage_id = pipeline
+    let stage_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .name("host")
         .new();
-    let _sf = pipeline
+    let _sf = program
         .staged_function()
         .func(func)
         .stage(stage_id)
@@ -136,26 +136,26 @@ fn test_pipeline_staged_function_no_specialization() {
         .unwrap();
 
     // No specialize() call — staged function has no body / specializations
-    let output = PrintExt::sprint(&func, &pipeline);
+    let output = PrintExt::sprint(&func, &program);
     insta::assert_snapshot!(output);
 }
 
 /// A stage a failed rewrite pass poisoned is reported, not silently skipped.
 #[test]
-fn test_pipeline_marks_a_poisoned_stage_instead_of_dropping_it() {
+fn test_program_marks_a_poisoned_stage_instead_of_dropping_it() {
     use kirin_ir::RewriteError;
 
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("foo").new().unwrap();
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("foo").new().unwrap();
 
     let add_stage =
-        |pipeline: &mut Pipeline<kirin_ir::StageInfo<SimpleLanguage>>, name: &str, value: i64| {
-            let stage_id = pipeline
+        |program: &mut Program<kirin_ir::StageInfo<SimpleLanguage>>, name: &str, value: i64| {
+            let stage_id = program
                 .add_stage()
                 .stage(kirin_ir::StageInfo::default())
                 .name(name.to_string())
                 .new();
-            let sf = pipeline
+            let sf = program
                 .staged_function()
                 .func(func)
                 .stage(stage_id)
@@ -166,7 +166,7 @@ fn test_pipeline_marks_a_poisoned_stage_instead_of_dropping_it() {
                 ))
                 .new()
                 .unwrap();
-            pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+            program.stage_mut(stage_id).unwrap().with_builder(|ctx| {
                 let a = SimpleLanguage::op_constant(ctx, value);
                 let ret = SimpleLanguage::op_return(ctx, a.result);
                 let block = ctx.block().stmt(a).terminator(ret).new();
@@ -177,14 +177,14 @@ fn test_pipeline_marks_a_poisoned_stage_instead_of_dropping_it() {
             stage_id
         };
 
-    let stage_a = add_stage(&mut pipeline, "A", 42);
-    let _stage_b = add_stage(&mut pipeline, "B", 7);
+    let stage_a = add_stage(&mut program, "A", 42);
+    let _stage_b = add_stage(&mut program, "B", 7);
 
-    let _ = pipeline.run_pass::<SimpleLanguage, _, (), _>(stage_a, |_| {
+    let _ = program.run_pass::<SimpleLanguage, _, (), _>(stage_a, |_| {
         Err(RewriteError::UnexpectedTerminator)
     });
 
-    let output = PrintExt::sprint(&func, &pipeline);
+    let output = PrintExt::sprint(&func, &program);
     assert!(
         output.contains("unavailable"),
         "the poisoned stage must be named in the output, got:\n{output}"

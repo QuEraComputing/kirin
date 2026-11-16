@@ -30,9 +30,9 @@ specialize @test fn @second(i64, i64, i64) -> i64 cfg {{
 }}
 "#
         );
-        let mut pipeline: Pipeline<StageInfo<GraphFunctionLanguage>> = Pipeline::new();
-        ParsePipelineText::parse(&mut pipeline, &source).unwrap();
-        let analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
+        let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+        ParseProgramText::parse(&mut program, &source).unwrap();
+        let analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&program)
             .analyze_by_name("test", "second", [Demand::Live])
             .unwrap();
         let inputs = analysis.response(analysis.root()).unwrap();

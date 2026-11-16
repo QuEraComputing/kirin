@@ -2,7 +2,7 @@
 //! parsed programs, with transfer dispatched through the dialects'
 //! `Interpretable<I, StrongDemand>` rules.
 
-use kirin::prelude::{GetInfo, ParsePipelineText, Pipeline, SSAValue, StageInfo};
+use kirin::prelude::{GetInfo, ParseProgramText, Program, SSAValue, StageInfo};
 use kirin_arith::Arith;
 use kirin_demand::{Demand, DemandAnalysis};
 use kirin_interpreter::{AnalysisResults, Body, Callee};
@@ -42,19 +42,19 @@ specialize @test fn @main(i64, i64, i64) -> i64 cfg {
 }
 "#;
 
-fn parse(program: &str) -> Pipeline<StageInfo<ArithFunctionLanguage>> {
-    let mut pipeline: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
-    ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
-    pipeline
+fn parse(source: &str) -> Program<StageInfo<ArithFunctionLanguage>> {
+    let mut program: Program<StageInfo<ArithFunctionLanguage>> = Program::new();
+    ParseProgramText::parse(&mut program, source).expect("program parses");
+    program
 }
 
 /// The caller stage and canonical callable root for `function_name`.
 fn function_root(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     function_name: &str,
 ) -> (kirin::prelude::CompileStage, Callee) {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let function = pipeline
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let function = program
         .lookup_function_by_name(function_name)
         .unwrap_or_else(|| panic!("function @{function_name} exists"));
     (stage_id, Callee::Function(function))
@@ -62,12 +62,12 @@ fn function_root(
 
 /// The parameters of the `index`-th block of `cfg`, as SSA values.
 fn block_params(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     cfg: kirin_ir::CFG,
     index: usize,
 ) -> Vec<SSAValue> {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let stage = pipeline.stage(stage_id).expect("stage info");
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let stage = program.stage(stage_id).expect("stage info");
     let block = cfg.blocks(stage).nth(index).expect("block index in range");
     block
         .expect_info(stage)
@@ -81,12 +81,12 @@ fn block_params(
 /// Find an `Arith` statement in `cfg` matching `select`, returning what it
 /// selects (e.g. the result and operands of the one `add`).
 fn find_arith<R>(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     cfg: kirin_ir::CFG,
     select: impl Fn(&Arith<kirin_arith::ArithType>) -> Option<R>,
 ) -> R {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let stage = pipeline.stage(stage_id).expect("stage info");
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let stage = program.stage(stage_id).expect("stage info");
     for block in cfg.blocks(stage) {
         for stmt in block.statements(stage) {
             if let ArithFunctionLanguage::Arith(op) = stmt.definition(stage)
@@ -101,24 +101,24 @@ fn find_arith<R>(
 
 #[test]
 fn strong_liveness_over_branching_function() {
-    let pipeline = parse(PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DemandAnalysis::<_>::new(&pipeline)
+    let program = parse(PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DemandAnalysis::<_>::new(&program)
         .analyze(caller_stage, callee, [Demand::Live])
         .expect("analysis succeeds");
     let root = result.callable_of(result.root()).expect("root is reached");
-    let Ok(Body::CFG(cfg)) = root.body(&pipeline) else {
+    let Ok(Body::CFG(cfg)) = root.body(&program) else {
         panic!("@main resolves to a CFG body")
     };
 
-    let entry_params = block_params(&pipeline, cfg, 0);
+    let entry_params = block_params(&program, cfg, 0);
     let (x, cond) = (entry_params[0], entry_params[1]);
-    let then_param = block_params(&pipeline, cfg, 1)[0];
-    let else_param = block_params(&pipeline, cfg, 2)[0];
+    let then_param = block_params(&program, cfg, 1)[0];
+    let else_param = block_params(&program, cfg, 2)[0];
 
     // The dead `add` result is never demanded — its rule is purity-aware, so
     // it contributes no operand demand of its own.
-    let (dead, add_lhs) = find_arith(&pipeline, cfg, |op| match op {
+    let (dead, add_lhs) = find_arith(&program, cfg, |op| match op {
         Arith::Add { lhs, result, .. } => Some((SSAValue::from(*result), *lhs)),
         _ => None,
     });
@@ -144,7 +144,7 @@ fn strong_liveness_over_branching_function() {
         "both edges pass %x into demanded params"
     );
 
-    let neg = find_arith(&pipeline, cfg, |op| match op {
+    let neg = find_arith(&program, cfg, |op| match op {
         Arith::Neg { result, .. } => Some(SSAValue::from(*result)),
         _ => None,
     });
@@ -156,20 +156,20 @@ fn strong_liveness_over_branching_function() {
 
 #[test]
 fn unused_successor_block_argument_does_not_keep_edge_arg_live() {
-    let pipeline = parse(DEAD_EDGE_ARG_PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DemandAnalysis::<_>::new(&pipeline)
+    let program = parse(DEAD_EDGE_ARG_PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DemandAnalysis::<_>::new(&program)
         .analyze(caller_stage, callee, [Demand::Live])
         .expect("analysis succeeds");
     let root = result.callable_of(result.root()).expect("root is reached");
-    let Ok(Body::CFG(cfg)) = root.body(&pipeline) else {
+    let Ok(Body::CFG(cfg)) = root.body(&program) else {
         panic!("@main resolves to a CFG body")
     };
 
-    let entry_params = block_params(&pipeline, cfg, 0);
+    let entry_params = block_params(&program, cfg, 0);
     let (live, dead, cond) = (entry_params[0], entry_params[1], entry_params[2]);
-    let then_param = block_params(&pipeline, cfg, 1)[0];
-    let else_param = block_params(&pipeline, cfg, 2)[0];
+    let then_param = block_params(&program, cfg, 1)[0];
+    let else_param = block_params(&program, cfg, 2)[0];
 
     // `^else` returns `%live` directly (a dominated cross-block use), never
     // touching its own parameter — so the `%dead` edge argument stays dead.
@@ -225,34 +225,34 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
 
 #[test]
 fn terminator_operands_become_demanded() {
-    let pipeline = parse(RET_PARAM_PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DemandAnalysis::<_>::new(&pipeline)
+    let program = parse(RET_PARAM_PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DemandAnalysis::<_>::new(&program)
         .analyze(caller_stage, callee, [Demand::Live])
         .expect("analysis succeeds");
     let root = result.callable_of(result.root()).expect("root is reached");
-    let Ok(Body::CFG(cfg)) = root.body(&pipeline) else {
+    let Ok(Body::CFG(cfg)) = root.body(&program) else {
         panic!("@main resolves to a CFG body")
     };
 
-    let x = block_params(&pipeline, cfg, 0)[0];
+    let x = block_params(&program, cfg, 0)[0];
     assert!(result.is_demanded(result.root(), x));
 }
 
 #[test]
 fn demanded_result_marks_operands_demanded() {
-    let pipeline = parse(DEMANDED_RESULT_PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DemandAnalysis::<_>::new(&pipeline)
+    let program = parse(DEMANDED_RESULT_PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DemandAnalysis::<_>::new(&program)
         .analyze(caller_stage, callee, [Demand::Live])
         .expect("analysis succeeds");
     let root = result.callable_of(result.root()).expect("root is reached");
-    let Ok(Body::CFG(cfg)) = root.body(&pipeline) else {
+    let Ok(Body::CFG(cfg)) = root.body(&program) else {
         panic!("@main resolves to a CFG body")
     };
 
-    let params = block_params(&pipeline, cfg, 0);
-    let sum = find_arith(&pipeline, cfg, |op| match op {
+    let params = block_params(&program, cfg, 0);
+    let sum = find_arith(&program, cfg, |op| match op {
         Arith::Add { result, .. } => Some(SSAValue::from(*result)),
         _ => None,
     });
@@ -263,18 +263,18 @@ fn demanded_result_marks_operands_demanded() {
 
 #[test]
 fn dead_result_leaves_operands_dead() {
-    let pipeline = parse(DEAD_RESULT_PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DemandAnalysis::<_>::new(&pipeline)
+    let program = parse(DEAD_RESULT_PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DemandAnalysis::<_>::new(&program)
         .analyze(caller_stage, callee, [Demand::Live])
         .expect("analysis succeeds");
     let root = result.callable_of(result.root()).expect("root is reached");
-    let Ok(Body::CFG(cfg)) = root.body(&pipeline) else {
+    let Ok(Body::CFG(cfg)) = root.body(&program) else {
         panic!("@main resolves to a CFG body")
     };
 
-    let params = block_params(&pipeline, cfg, 0);
-    let sum = find_arith(&pipeline, cfg, |op| match op {
+    let params = block_params(&program, cfg, 0);
+    let sum = find_arith(&program, cfg, |op| match op {
         Arith::Add { result, .. } => Some(SSAValue::from(*result)),
         _ => None,
     });

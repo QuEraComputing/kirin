@@ -7,7 +7,7 @@ fn parse_error(body: &str) -> String {
     let text = format!(
         "stage @zx fn @f() -> Qubit;\nspecialize @zx fn @f() -> Qubit ungraph ^ug0 {{\n{body}\n}}\n"
     );
-    let mut ir: Pipeline<Stage> = Pipeline::new();
+    let mut ir: Program<Stage> = Program::new();
     let error = ir.parse(&text).expect_err("the body is invalid");
     format!("{error:?}")
 }

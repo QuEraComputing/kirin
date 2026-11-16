@@ -10,7 +10,7 @@
 <title>kirin</title>
 <polygon fill="white" stroke="none" points="-4,4 -4,-687 710,-687 710,4 -4,4"/>
 <text text-anchor="start" x="284.38" y="-661" font-family="Helvetica Neue" font-weight="bold" font-size="20.00">Kirin Hybrid IR</text>
-<text text-anchor="start" x="197.75" y="-642.65" font-family="Helvetica Neue" font-size="13.00" fill="#555555">Multi&#45;stage pipeline &#160;· &#160;SSA CFG + petgraph in one IR</text>
+<text text-anchor="start" x="197.75" y="-642.65" font-family="Helvetica Neue" font-size="13.00" fill="#555555">Multi&#45;stage program &#160;· &#160;SSA CFG + petgraph in one IR</text>
 <text text-anchor="start" x="351.12" y="-619.95" font-family="Helvetica Neue" font-size="14.00"> </text>
 <path fill="#f5f7ff" stroke="none" d="M107.12,-580.75C107.12,-580.75 163.62,-580.75 163.62,-580.75 168.62,-580.75 173.62,-585.75 173.62,-590.75 173.62,-590.75 173.62,-600.75 173.62,-600.75 173.62,-605.75 168.62,-610.75 163.62,-610.75 163.62,-610.75 107.12,-610.75 107.12,-610.75 102.12,-610.75 97.12,-605.75 97.12,-600.75 97.12,-600.75 97.12,-590.75 97.12,-590.75 97.12,-585.75 102.12,-580.75 107.12,-580.75"/>
 <path fill="none" stroke="#cccccc" d="M107.12,-580.75C107.12,-580.75 163.62,-580.75 163.62,-580.75 168.62,-580.75 173.62,-585.75 173.62,-590.75 173.62,-590.75 173.62,-600.75 173.62,-600.75 173.62,-605.75 168.62,-610.75 163.62,-610.75 163.62,-610.75 107.12,-610.75 107.12,-610.75 102.12,-610.75 97.12,-605.75 97.12,-600.75 97.12,-600.75 97.12,-590.75 97.12,-590.75 97.12,-585.75 102.12,-580.75 107.12,-580.75"/>
@@ -28,9 +28,9 @@
 <text text-anchor="start" x="501.12" y="-592.08" font-family="Helvetica Neue" font-size="14.00"> &#160;&#160;</text>
 <text text-anchor="start" x="512.38" y="-592.08" font-family="Helvetica Neue" font-size="14.00" fill="#137333">━→ data&#45;flow</text>
 <g id="clust1" class="cluster">
-<title>cluster_pipeline</title>
+<title>cluster_program</title>
 <path fill="#fafafa" stroke="#bbbbbb" stroke-width="1.5" d="M20,-8C20,-8 686,-8 686,-8 692,-8 698,-14 698,-20 698,-20 698,-556.75 698,-556.75 698,-562.75 692,-568.75 686,-568.75 686,-568.75 20,-568.75 20,-568.75 14,-568.75 8,-562.75 8,-556.75 8,-556.75 8,-20 8,-20 8,-14 14,-8 20,-8"/>
-<text text-anchor="start" x="328.62" y="-553.4" font-family="Helvetica Neue" font-weight="bold" font-size="13.00">Pipeline</text>
+<text text-anchor="start" x="328.62" y="-553.4" font-family="Helvetica Neue" font-weight="bold" font-size="13.00">Program</text>
 </g>
 <g id="clust2" class="cluster">
 <title>cluster_source</title>

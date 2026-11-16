@@ -27,16 +27,16 @@ No test for a compound node containing an inner ungraph body:
 
 **Files**: `tests/roundtrip/ungraph.rs` or `tests/roundtrip/digraph.rs`
 
-## Pipeline-level graph roundtrip
+## Program-level graph roundtrip
 
-No test for graph bodies as function bodies in the full pipeline parse:
+No test for graph bodies as function bodies in the full program parse:
 
 ```
 stage @A fn @f(f64) -> f64;
 specialize @A fn @f(f64) -> f64 digraph ^dg0(%p0: f64) { ... yield %r; }
 ```
 
-**What to test**: `roundtrip::assert_pipeline_roundtrip` with a language that has a graph-body function variant.
+**What to test**: `roundtrip::assert_program_roundtrip` with a language that has a graph-body function variant.
 
 **Files**: `tests/roundtrip/digraph.rs`
 

@@ -23,7 +23,7 @@ use kirin::prelude::*;
 ///   environment. The `captures` field is separate from the calling convention.
 ///
 /// - **`Function` needs `sig` for top-level resolution.** Functions defined
-///   at the pipeline level must declare their signature explicitly because the
+///   at the program level must declare their signature explicitly because the
 ///   caller resolves them by name, before seeing the body. Lambdas are inline
 ///   and their types flow from their definition site.
 ///

@@ -7,7 +7,7 @@ use kirin_test_utils::roundtrip;
 // NamespacedLanguage tests (arith.add, cf.br, func.ret prefixes)
 
 #[test]
-fn test_namespace_pipeline_roundtrip() {
+fn test_namespace_program_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
@@ -21,7 +21,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
 }
 "#;
 
-    roundtrip::assert_pipeline_roundtrip::<NamespacedLanguage>(input);
+    roundtrip::assert_program_roundtrip::<NamespacedLanguage>(input);
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn test_bare_statement_roundtrip_ret() {
 }
 
 #[test]
-fn test_bare_pipeline_roundtrip() {
+fn test_bare_program_roundtrip() {
     let input = r#"
 stage @test fn @compose(i64, i64) -> i64;
 
@@ -88,5 +88,5 @@ specialize @test fn @compose(i64, i64) -> i64 cfg {
 }
 "#;
 
-    roundtrip::assert_pipeline_roundtrip::<ArithFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ArithFunctionLanguage>(input);
 }

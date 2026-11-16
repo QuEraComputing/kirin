@@ -2,12 +2,12 @@ use std::collections::BTreeSet;
 
 use chumsky::prelude::*;
 use kirin_ir::{
-    CFG, Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
-    Placeholder, Signature, StageInfo, TypeLattice,
+    CFG, Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice,
+    Placeholder, Program, Signature, StageInfo, TypeLattice,
 };
 use kirin_prettyless::PrintExt;
 
-use crate::{BoxedParser, DirectlyParsable, ParsePipelineText, Token, TokenInput};
+use crate::{BoxedParser, DirectlyParsable, ParseProgramText, Token, TokenInput};
 
 use kirin_derive_chumsky::{HasParser, PrettyPrint};
 use kirin_derive_ir::{ParseDispatch, StageMeta};
@@ -137,15 +137,15 @@ fn unit_sig() -> Signature<UnitType> {
     Signature::new(vec![UnitType], UnitType, ())
 }
 
-fn function_name<S>(pipeline: &Pipeline<S>, function: Function) -> String {
-    let info: &FunctionInfo = pipeline.function_info(function).unwrap();
-    pipeline.resolve(info.name().unwrap()).unwrap().to_string()
+fn function_name<S>(program: &Program<S>, function: Function) -> String {
+    let info: &FunctionInfo = program.function_info(function).unwrap();
+    program.resolve(info.name().unwrap()).unwrap().to_string()
 }
 
-fn parsed_names<S>(pipeline: &Pipeline<S>, functions: Vec<Function>) -> BTreeSet<String> {
+fn parsed_names<S>(program: &Program<S>, functions: Vec<Function>) -> BTreeSet<String> {
     functions
         .into_iter()
-        .map(|f| function_name(pipeline, f))
+        .map(|f| function_name(program, f))
         .collect()
 }
 
@@ -154,29 +154,29 @@ fn parsed_names<S>(pipeline: &Pipeline<S>, functions: Vec<Function>) -> BTreeSet
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_pipeline_parse_accepts_mixed_function_names() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
+fn test_program_parse_accepts_mixed_function_names() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
     let input = format!(
         "stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY} \
          stage @B fn @bar(()) -> (); specialize @B fn @bar(()) -> () {BODY}"
     );
 
-    let parsed = pipeline.parse(&input).unwrap();
-    assert_eq!(pipeline.stages().count(), 2);
+    let parsed = program.parse(&input).unwrap();
+    assert_eq!(program.stages().count(), 2);
     assert_eq!(
-        parsed_names(&pipeline, parsed),
+        parsed_names(&program, parsed),
         BTreeSet::from(["bar".into(), "foo".into()])
     );
 }
 
 #[test]
-fn test_pipeline_parse_uses_pipeline_global_table() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
+fn test_program_parse_uses_program_global_table() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
     let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");
 
-    let parsed = pipeline.parse(&input).unwrap();
+    let parsed = program.parse(&input).unwrap();
     assert_eq!(parsed.len(), 1);
-    assert_eq!(function_name(&pipeline, parsed[0]), "foo");
+    assert_eq!(function_name(&program, parsed[0]), "foo");
 
     let mut external_globals: InternTable<String, GlobalSymbol> = InternTable::default();
     let bar = external_globals.intern("bar".to_string());
@@ -185,47 +185,47 @@ fn test_pipeline_parse_uses_pipeline_global_table() {
 }
 
 #[test]
-fn test_stage_enum_pipeline_parse_uses_stage_symbol_mapping() {
-    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
+fn test_stage_enum_program_parse_uses_stage_symbol_mapping() {
+    let mut program: Program<StageBucket> = Program::new();
     let input = format!(
         "stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY} \
          stage @B fn @bar(()) -> (); specialize @B fn @bar(()) -> () {BODY}"
     );
 
-    let parsed = pipeline.parse(&input).unwrap();
+    let parsed = program.parse(&input).unwrap();
     assert_eq!(parsed.len(), 2);
     assert!(matches!(
-        pipeline.stages().collect::<Vec<_>>().as_slice(),
+        program.stages().collect::<Vec<_>>().as_slice(),
         [StageBucket::Parse(_), StageBucket::Lower(_)]
     ));
 }
 
 #[test]
-fn test_stage_enum_pipeline_parse_rejects_unknown_stage_mapping() {
-    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
-    let err = pipeline.parse("stage @Z fn @foo(()) -> ();").unwrap_err();
+fn test_stage_enum_program_parse_rejects_unknown_stage_mapping() {
+    let mut program: Program<StageBucket> = Program::new();
+    let err = program.parse("stage @Z fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::UnknownStage);
 }
 
 #[test]
-fn test_stage_enum_pipeline_parse_suggests_declared_name() {
-    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
-    let err = pipeline.parse("stage @C fn @foo(()) -> ();").unwrap_err();
+fn test_stage_enum_program_parse_suggests_declared_name() {
+    let mut program: Program<StageBucket> = Program::new();
+    let err = program.parse("stage @C fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::UnknownStage);
     assert!(err.message.contains("@A"));
 }
 
 #[test]
 fn test_stage_requires_semicolon() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let err = pipeline.parse("stage @A fn @foo(()) -> ()").unwrap_err();
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let err = program.parse("stage @A fn @foo(()) -> ()").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
 
 #[test]
 fn test_specialize_requires_body() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let err = pipeline
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let err = program
         .parse("specialize @A fn @foo(()) -> ();")
         .unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
@@ -233,8 +233,8 @@ fn test_specialize_requires_body() {
 
 #[test]
 fn test_global_symbol_prefix_is_required() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let err = pipeline.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let err = program.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
 
@@ -242,14 +242,14 @@ fn test_global_symbol_prefix_is_required() {
 fn test_specialize_without_stage_auto_creates() {
     // With auto-creation, specialize without a prior stage declaration
     // succeeds by auto-creating the staged function.
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    pipeline
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    program
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
         .new();
     let input = format!("specialize @A fn @foo(()) -> () {BODY}");
-    let result = pipeline.parse(&input);
+    let result = program.parse(&input);
     assert!(
         result.is_ok(),
         "specialize without stage should auto-create: {:?}",
@@ -259,24 +259,24 @@ fn test_specialize_without_stage_auto_creates() {
 
 #[test]
 fn test_comments_and_whitespace_are_accepted() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
     let input = format!(
         "/* stage declaration */ stage @A fn @foo(()) -> (); \
          // specialization definition\n specialize @A fn @foo(()) -> () /* definition */ {BODY}"
     );
-    pipeline.parse(&input).unwrap();
+    program.parse(&input).unwrap();
 }
 
 #[test]
-fn test_pipeline_roundtrip_print_parse_print() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let stage_a = pipeline
+fn test_program_roundtrip_print_parse_print() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let stage_a = program
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
         .new();
-    let function = pipeline.function().name("foo").new().unwrap();
-    let staged_function = pipeline
+    let function = program.function().name("foo").new().unwrap();
+    let staged_function = program
         .staged_function()
         .func(function)
         .stage(stage_a)
@@ -284,7 +284,7 @@ fn test_pipeline_roundtrip_print_parse_print() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
+    program.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
         let cfg = b.cfg().add_block(block).new();
         let definition = FunctionDefinition::new(b, cfg, Signature::new(vec![], UnitType, ()));
@@ -296,22 +296,22 @@ fn test_pipeline_roundtrip_print_parse_print() {
             .unwrap();
     });
 
-    let rendered = function.sprint(&pipeline);
+    let rendered = function.sprint(&program);
 
-    let mut parsed_pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let parsed_functions = parsed_pipeline.parse(&rendered).unwrap();
+    let mut parsed_program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let parsed_functions = parsed_program.parse(&rendered).unwrap();
     let parsed_function = parsed_functions
         .into_iter()
-        .find(|id| function_name(&parsed_pipeline, *id) == "foo")
+        .find(|id| function_name(&parsed_program, *id) == "foo")
         .unwrap();
 
-    let rendered_again = parsed_function.sprint(&parsed_pipeline);
+    let rendered_again = parsed_function.sprint(&parsed_program);
     assert_eq!(rendered.trim_end(), rendered_again.trim_end());
 }
 
 #[test]
-fn test_pipeline_parse_uses_stage_language_dispatch() {
-    let mut pipeline: Pipeline<MixedStage> = Pipeline::new();
+fn test_program_parse_uses_stage_language_dispatch() {
+    let mut program: Program<MixedStage> = Program::new();
     let input = format!(
         "stage @A fn @foo(()) -> (); \
          specialize @A fn @foo(()) -> () {BODY} \
@@ -319,19 +319,19 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
          specialize @B fn @bar(i32) -> i32 {BODY}"
     );
 
-    let parsed = pipeline.parse(&input).unwrap();
+    let parsed = program.parse(&input).unwrap();
     assert_eq!(parsed.len(), 2);
     assert!(matches!(
-        pipeline.stages().collect::<Vec<_>>().as_slice(),
+        program.stages().collect::<Vec<_>>().as_slice(),
         [MixedStage::StageA(_), MixedStage::StageB(_)]
     ));
 
     assert_eq!(
-        parsed_names(&pipeline, parsed),
+        parsed_names(&program, parsed),
         BTreeSet::from(["bar".into(), "foo".into()])
     );
 
-    let stage_b = pipeline
+    let stage_b = program
         .stages()
         .find_map(|s| match s {
             MixedStage::StageB(stage) => Some(stage),
@@ -353,17 +353,17 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_pipeline_parse_empty_input() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let err = pipeline.parse("").unwrap_err();
+fn test_program_parse_empty_input() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let err = program.parse("").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
     assert!(err.message.contains("expected at least one declaration"));
 }
 
 #[test]
-fn test_pipeline_parse_whitespace_only() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let err = pipeline.parse("   \n\t  ").unwrap_err();
+fn test_program_parse_whitespace_only() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let err = program.parse("   \n\t  ").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
 
@@ -372,18 +372,18 @@ fn test_pipeline_parse_whitespace_only() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_pipeline_parse_numeric_stage_symbol_rejected() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
+fn test_program_parse_numeric_stage_symbol_rejected() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
     // Numeric tokens like `1` are not prefixed with `@`, so `stage 1` should fail
-    let err = pipeline.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
+    let err = program.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
 
 #[test]
-fn test_pipeline_numeric_stage_lookup_by_existing_id() {
-    // When a stage already exists in the pipeline, @<numeric> can find it by raw ID
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let stage_id = pipeline
+fn test_program_numeric_stage_lookup_by_existing_id() {
+    // When a stage already exists in the program, @<numeric> can find it by raw ID
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let stage_id = program
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
@@ -391,11 +391,11 @@ fn test_pipeline_numeric_stage_lookup_by_existing_id() {
 
     // First parse a normal declaration to set things up
     let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");
-    let result = pipeline.parse(&input);
+    let result = program.parse(&input);
     assert!(result.is_ok());
 
     // The stage exists with name "A" at some ID
-    assert_eq!(pipeline.stages().count(), 1);
+    assert_eq!(program.stages().count(), 1);
     let _ = stage_id; // stage was pre-created
 }
 
@@ -406,8 +406,8 @@ fn test_pipeline_numeric_stage_lookup_by_existing_id() {
 #[test]
 fn test_stage_suggestion_close_name() {
     // "C" vs declared names "A", "B" — distance 1, should get a suggestion
-    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
-    let err = pipeline.parse("stage @C fn @foo(()) -> ();").unwrap_err();
+    let mut program: Program<StageBucket> = Program::new();
+    let err = program.parse("stage @C fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::UnknownStage);
     // With Levenshtein distance <= 3, should suggest a known stage
     assert!(
@@ -422,8 +422,8 @@ fn test_stage_suggestion_close_name() {
 #[test]
 fn test_stage_suggestion_very_distant_name() {
     // "XYZXYZXYZ" vs declared names "A", "B" — distance > 3, should NOT suggest
-    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
-    let err = pipeline
+    let mut program: Program<StageBucket> = Program::new();
+    let err = program
         .parse("stage @XYZXYZXYZ fn @foo(()) -> ();")
         .unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::UnknownStage);
@@ -441,9 +441,9 @@ fn test_stage_suggestion_very_distant_name() {
 #[test]
 fn test_invalid_body_parse_has_source() {
     use std::error::Error;
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
     // Valid header but invalid body tokens
-    let err = pipeline
+    let err = program
         .parse("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () cfg { invalid }")
         .unwrap_err();
     // The body parse failure should chain a source error
@@ -457,13 +457,13 @@ fn test_invalid_body_parse_has_source() {
 
 #[test]
 fn test_duplicate_stage_declaration_same_signature() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
     let input = format!(
         "stage @A fn @foo(()) -> (); \
          stage @A fn @foo(()) -> (); \
          specialize @A fn @foo(()) -> () {BODY}"
     );
-    let result = pipeline.parse(&input);
+    let result = program.parse(&input);
     assert!(result.is_ok());
 }
 
@@ -473,8 +473,8 @@ fn test_duplicate_stage_declaration_same_signature() {
 
 #[test]
 fn test_invalid_declaration_keyword() {
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let err = pipeline.parse("define @A fn @foo(()) -> ();").unwrap_err();
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let err = program.parse("define @A fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
 
@@ -580,26 +580,26 @@ fn test_body_span_rejects_an_unclosed_brace() {
 fn test_parse_does_not_duplicate_a_poisoned_stage() {
     use kirin_ir::{RewriteError, StageStatus};
 
-    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
-    let stage_a = pipeline
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let stage_a = program
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
         .new();
 
-    let _ = pipeline.run_pass::<FunctionDefinition, _, (), _>(stage_a, |_| {
+    let _ = program.run_pass::<FunctionDefinition, _, (), _>(stage_a, |_| {
         Err(RewriteError::UnexpectedTerminator)
     });
     assert_eq!(
-        pipeline.stage_status(stage_a),
+        program.stage_status(stage_a),
         Some(StageStatus::Poisoned),
         "the pass should have poisoned @A"
     );
 
     let input = format!("specialize @A fn @foo(()) -> () {BODY}");
-    assert!(pipeline.parse(&input).is_err());
+    assert!(program.parse(&input).is_err());
     assert_eq!(
-        pipeline.stage_names().count(),
+        program.stage_names().count(),
         1,
         "@A must resolve to the existing position, not create a second one"
     );

@@ -120,7 +120,7 @@ specialize @A fn @main(i32) -> i32 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<CallableLanguage>(input);
+    roundtrip::assert_program_roundtrip::<CallableLanguage>(input);
 }
 
 // --- Tests from lambda_print.rs ---
@@ -159,12 +159,12 @@ fn test_lambda_parse_roundtrip_single_capture() {
     );
 }
 
-// --- Pipeline auto-creation tests (moved from digraph.rs) ---
+// --- Program auto-creation tests (moved from digraph.rs) ---
 
 #[test]
 fn test_specialize_without_stage_auto_creates() {
-    let mut pipeline: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
-    pipeline
+    let mut program: Program<StageInfo<CallableLanguage>> = Program::new();
+    program
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
@@ -172,7 +172,7 @@ fn test_specialize_without_stage_auto_creates() {
 
     // No `stage` declaration -- specialize auto-creates the staged function
     let input = "specialize @A fn @foo(i32) -> i32 cfg { ^bb0(%x: i32) { ret %x; } }";
-    let functions = pipeline
+    let functions = program
         .parse(input)
         .expect("should parse without stage declaration");
     assert_eq!(functions.len(), 1, "should create one function");
@@ -181,8 +181,8 @@ fn test_specialize_without_stage_auto_creates() {
 #[test]
 fn test_specialize_without_stage_roundtrip() {
     // First parse: with explicit stage declaration
-    let mut pipeline: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
-    pipeline
+    let mut program: Program<StageInfo<CallableLanguage>> = Program::new();
+    program
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
@@ -192,18 +192,18 @@ fn test_specialize_without_stage_roundtrip() {
 stage @A fn @foo(i32) -> i32;
 specialize @A fn @foo(i32) -> i32 cfg { ^bb0(%x: i32) { ret %x; } }
 "#;
-    pipeline.parse(input).expect("should parse");
+    program.parse(input).expect("should parse");
 
     // Print and reparse for stability
-    let printed = pipeline.sprint();
-    let mut pipeline2: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
-    pipeline2
+    let printed = program.sprint();
+    let mut program2: Program<StageInfo<CallableLanguage>> = Program::new();
+    program2
         .add_stage()
         .stage(StageInfo::default())
         .name("A")
         .new();
-    pipeline2.parse(printed.trim()).expect("should reparse");
-    let printed2 = pipeline2.sprint();
+    program2.parse(printed.trim()).expect("should reparse");
+    let printed2 = program2.sprint();
 
     assert_eq!(
         printed.trim(),
@@ -215,7 +215,7 @@ specialize @A fn @foo(i32) -> i32 cfg { ^bb0(%x: i32) { ret %x; } }
 // --- Split signature projection roundtrip tests ---
 
 #[test]
-fn test_split_sig_pipeline_multiple_params() {
+fn test_split_sig_program_multiple_params() {
     let input = r#"
 stage @A fn @main(i32, i64) -> i32;
 
@@ -225,11 +225,11 @@ specialize @A fn @main(i32, i64) -> i32 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<SplitSigLanguage>(input);
+    roundtrip::assert_program_roundtrip::<SplitSigLanguage>(input);
 }
 
 #[test]
-fn test_split_sig_pipeline_single_param() {
+fn test_split_sig_program_single_param() {
     let input = r#"
 stage @A fn @main(i32) -> i32;
 
@@ -239,11 +239,11 @@ specialize @A fn @main(i32) -> i32 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<SplitSigLanguage>(input);
+    roundtrip::assert_program_roundtrip::<SplitSigLanguage>(input);
 }
 
 #[test]
-fn test_split_sig_pipeline_many_params() {
+fn test_split_sig_program_many_params() {
     // Exercises split signature with three input types and a different return type
     let input = r#"
 stage @A fn @compute(i32, i64, f32) -> f64;
@@ -254,5 +254,5 @@ specialize @A fn @compute(i32, i64, f32) -> f64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<SplitSigLanguage>(input);
+    roundtrip::assert_program_roundtrip::<SplitSigLanguage>(input);
 }

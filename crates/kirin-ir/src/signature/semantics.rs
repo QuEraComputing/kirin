@@ -20,7 +20,7 @@ pub enum SignatureCmp {
 /// Trait defining specialization semantics for function signatures.
 ///
 /// When specifying a compilation pipeline (e.g., language A -> B -> C),
-/// all languages in the pipeline should use the same `SignatureSemantics`
+/// all languages in the program should use the same `SignatureSemantics`
 /// so that signatures are aligned across compilation stages.
 pub trait SignatureSemantics<T, C = ()> {
     /// Environment produced when a candidate is found applicable.

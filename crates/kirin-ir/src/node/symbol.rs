@@ -26,7 +26,7 @@ impl InternKey for Symbol {}
 /// A cross-stage interned symbol.
 ///
 /// Used for function names and other identifiers that must be consistent
-/// across multiple compilation stages. Interned via `Pipeline.global_symbols`.
+/// across multiple compilation stages. Interned via `Program.global_symbols`.
 ///
 /// Distinct from [`Symbol`] at the type level to prevent accidental mixing
 /// of global and stage-local symbols.

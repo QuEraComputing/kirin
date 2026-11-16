@@ -9,7 +9,7 @@ use crate::{Dialect, MutationEvent, QuarantineCause, Rewriter, StageInfo, verify
 /// contain an unwind, collect the mutation events, and check the derived
 /// metadata afterwards. Holding only a borrow, it *cannot* build a
 /// [`Quarantined`](crate::Quarantined). Choosing what to take custody of on failure belongs to
-/// whoever owns the stage, namely, [`Pipeline::run_pass`](crate::Pipeline::run_pass).
+/// whoever owns the stage, namely, [`Program::run_pass`](crate::Program::run_pass).
 ///
 /// The events come back on both paths: a failed pass needs them for its report,
 /// and a successful one may still want to know what it changed.

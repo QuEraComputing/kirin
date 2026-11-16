@@ -6,7 +6,7 @@ use crate::{
     HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut,
     HasResults, HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasSymbols,
     HasSymbolsMut, HasUngraphs, HasUngraphsMut, Id, IsConstant, IsEdge, IsPure, IsSpeculatable,
-    IsTerminator, Pipeline, ResultValue, SSAValue, StageInfo, StageMeta, StagedNamePolicy,
+    IsTerminator, Program, ResultValue, SSAValue, StageInfo, StageMeta, StagedNamePolicy,
     Successor, Symbol, UnGraph,
 };
 
@@ -466,35 +466,35 @@ impl StageActionMut<AOnlyStage, LangA> for SetPolicyAOnly {
 
 #[test]
 fn dispatch_stage_runs_matching_language_action() {
-    let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<TestStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("a")
         .new();
-    let b = pipeline
+    let b = program
         .add_stage()
         .stage(TestStage::B(StageInfo::default()))
         .name("b")
         .new();
 
     let mut action = IdentifyStage;
-    assert_eq!(pipeline.dispatch_stage(a, &mut action).unwrap(), Some("A"));
-    assert_eq!(pipeline.dispatch_stage(b, &mut action).unwrap(), Some("B"));
+    assert_eq!(program.dispatch_stage(a, &mut action).unwrap(), Some("A"));
+    assert_eq!(program.dispatch_stage(b, &mut action).unwrap(), Some("B"));
 
     let missing = CompileStage::new(Id(999));
-    assert_eq!(pipeline.dispatch_stage(missing, &mut action).unwrap(), None);
+    assert_eq!(program.dispatch_stage(missing, &mut action).unwrap(), None);
 }
 
 #[test]
 fn dispatch_stage_mut_runs_matching_language_action() {
-    let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<TestStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("a")
         .new();
-    let b = pipeline
+    let b = program
         .add_stage()
         .stage(TestStage::B(StageInfo::default()))
         .name("b")
@@ -502,19 +502,19 @@ fn dispatch_stage_mut_runs_matching_language_action() {
 
     let mut action = SetPolicy;
     assert_eq!(
-        pipeline.dispatch_stage_mut(a, &mut action).unwrap(),
+        program.dispatch_stage_mut(a, &mut action).unwrap(),
         Some("A")
     );
     assert_eq!(
-        pipeline.dispatch_stage_mut(b, &mut action).unwrap(),
+        program.dispatch_stage_mut(b, &mut action).unwrap(),
         Some("B")
     );
 
-    let a_policy = match pipeline.stage(a).unwrap() {
+    let a_policy = match program.stage(a).unwrap() {
         TestStage::A(stage) => stage.staged_name_policy(),
         TestStage::B(_) => panic!("expected stage A"),
     };
-    let b_policy = match pipeline.stage(b).unwrap() {
+    let b_policy = match program.stage(b).unwrap() {
         TestStage::A(_) => panic!("expected stage B"),
         TestStage::B(stage) => stage.staged_name_policy(),
     };
@@ -524,20 +524,20 @@ fn dispatch_stage_mut_runs_matching_language_action() {
 
     let missing = CompileStage::new(Id(999));
     assert_eq!(
-        pipeline.dispatch_stage_mut(missing, &mut action).unwrap(),
+        program.dispatch_stage_mut(missing, &mut action).unwrap(),
         None
     );
 }
 
 #[test]
 fn dispatch_stage_or_else_reports_miss_kind() {
-    let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<AOnlyStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(AOnlyStage::A(StageInfo::default()))
         .name("a")
         .new();
-    let b = pipeline
+    let b = program
         .add_stage()
         .stage(AOnlyStage::B(StageInfo::default()))
         .name("b")
@@ -545,30 +545,30 @@ fn dispatch_stage_or_else_reports_miss_kind() {
 
     let mut action = IdentifyAOnly;
     assert_eq!(
-        pipeline.dispatch_stage_or_else(a, &mut action, |miss| miss),
+        program.dispatch_stage_or_else(a, &mut action, |miss| miss),
         Ok("A")
     );
     assert_eq!(
-        pipeline.dispatch_stage_or_else(b, &mut action, |miss| miss),
+        program.dispatch_stage_or_else(b, &mut action, |miss| miss),
         Err(StageDispatchMiss::MissingDialect)
     );
 
     let missing = CompileStage::new(Id(999));
     assert_eq!(
-        pipeline.dispatch_stage_or_else(missing, &mut action, |miss| miss),
+        program.dispatch_stage_or_else(missing, &mut action, |miss| miss),
         Err(StageDispatchMiss::MissingStage)
     );
 }
 
 #[test]
 fn dispatch_stage_mut_or_else_reports_miss_kind() {
-    let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<AOnlyStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(AOnlyStage::A(StageInfo::default()))
         .name("a")
         .new();
-    let b = pipeline
+    let b = program
         .add_stage()
         .stage(AOnlyStage::B(StageInfo::default()))
         .name("b")
@@ -576,39 +576,39 @@ fn dispatch_stage_mut_or_else_reports_miss_kind() {
 
     let mut action = SetPolicyAOnly;
     assert_eq!(
-        pipeline.dispatch_stage_mut_or_else(a, &mut action, |miss| miss),
+        program.dispatch_stage_mut_or_else(a, &mut action, |miss| miss),
         Ok("A")
     );
     assert_eq!(
-        pipeline.dispatch_stage_mut_or_else(b, &mut action, |miss| miss),
+        program.dispatch_stage_mut_or_else(b, &mut action, |miss| miss),
         Err(StageDispatchMiss::MissingDialect)
     );
 
     let missing = CompileStage::new(Id(999));
     assert_eq!(
-        pipeline.dispatch_stage_mut_or_else(missing, &mut action, |miss| miss),
+        program.dispatch_stage_mut_or_else(missing, &mut action, |miss| miss),
         Err(StageDispatchMiss::MissingStage)
     );
 }
 
 #[test]
 fn dispatch_stage_required_reports_miss_kind() {
-    let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<AOnlyStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(AOnlyStage::A(StageInfo::default()))
         .name("a")
         .new();
-    let b = pipeline
+    let b = program
         .add_stage()
         .stage(AOnlyStage::B(StageInfo::default()))
         .name("b")
         .new();
 
     let mut action = IdentifyAOnly;
-    assert_eq!(pipeline.dispatch_stage_required(a, &mut action), Ok("A"));
+    assert_eq!(program.dispatch_stage_required(a, &mut action), Ok("A"));
     assert!(matches!(
-        pipeline.dispatch_stage_required(b, &mut action),
+        program.dispatch_stage_required(b, &mut action),
         Err(StageDispatchRequiredError::Miss(
             StageDispatchMiss::MissingDialect
         ))
@@ -616,7 +616,7 @@ fn dispatch_stage_required_reports_miss_kind() {
 
     let missing = CompileStage::new(Id(999));
     assert!(matches!(
-        pipeline.dispatch_stage_required(missing, &mut action),
+        program.dispatch_stage_required(missing, &mut action),
         Err(StageDispatchRequiredError::Miss(
             StageDispatchMiss::MissingStage
         ))
@@ -625,25 +625,22 @@ fn dispatch_stage_required_reports_miss_kind() {
 
 #[test]
 fn dispatch_stage_mut_required_reports_miss_kind() {
-    let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<AOnlyStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(AOnlyStage::A(StageInfo::default()))
         .name("a")
         .new();
-    let b = pipeline
+    let b = program
         .add_stage()
         .stage(AOnlyStage::B(StageInfo::default()))
         .name("b")
         .new();
 
     let mut action = SetPolicyAOnly;
-    assert_eq!(
-        pipeline.dispatch_stage_mut_required(a, &mut action),
-        Ok("A")
-    );
+    assert_eq!(program.dispatch_stage_mut_required(a, &mut action), Ok("A"));
     assert!(matches!(
-        pipeline.dispatch_stage_mut_required(b, &mut action),
+        program.dispatch_stage_mut_required(b, &mut action),
         Err(StageDispatchRequiredError::Miss(
             StageDispatchMiss::MissingDialect
         ))
@@ -651,7 +648,7 @@ fn dispatch_stage_mut_required_reports_miss_kind() {
 
     let missing = CompileStage::new(Id(999));
     assert!(matches!(
-        pipeline.dispatch_stage_mut_required(missing, &mut action),
+        program.dispatch_stage_mut_required(missing, &mut action),
         Err(StageDispatchRequiredError::Miss(
             StageDispatchMiss::MissingStage
         ))
@@ -659,7 +656,7 @@ fn dispatch_stage_mut_required_reports_miss_kind() {
 }
 
 /// `Quarantined::from_stage` renders from the stage info inside the stage, not
-/// from the stage itself — a pipeline slot holds the whole stage enum, so that
+/// from the stage itself — a program slot holds the whole stage enum, so that
 /// is what must be taken custody of, but only a `StageInfo` can be dumped.
 #[test]
 fn from_stage_renders_the_stage_info_inside_the_stage() {
@@ -705,143 +702,143 @@ fn from_stage_falls_back_when_the_dialect_does_not_match() {
 }
 
 // ---------------------------------------------------------------------------
-// `Pipeline::run_pass`
+// `Program::run_pass`
 //
 // The wrapper's own job is the slot state machine around the pass: which
-// outcomes leave the pipeline untouched, and which one kills a position. The
+// outcomes leave the program untouched, and which one kills a position. The
 // pass mechanics it delegates to are covered by `tests/pass.rs`.
 // ---------------------------------------------------------------------------
 
 use crate::{RewriteError, StagePassError};
 
-/// A pipeline whose only position holds a `LangA` stage.
-fn lang_a_pipeline() -> (Pipeline<TestStage>, CompileStage) {
-    let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let id = pipeline
+/// A program whose only position holds a `LangA` stage.
+fn lang_a_program() -> (Program<TestStage>, CompileStage) {
+    let mut program: Program<TestStage> = Program::new();
+    let id = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("source")
         .new();
-    (pipeline, id)
+    (program, id)
 }
 
 #[test]
 fn run_pass_returns_the_pass_value_and_leaves_the_stage_usable() {
-    let (mut pipeline, id) = lang_a_pipeline();
+    let (mut program, id) = lang_a_program();
 
-    let output = pipeline
+    let output = program
         .run_pass::<LangA, _, _, RewriteError>(id, |_rewriter| Ok(7))
         .expect("a pass that succeeds hands its stage back");
 
     assert_eq!(output, 7);
     assert!(
-        pipeline.stage(id).is_some(),
+        program.stage(id).is_some(),
         "the stage returned to its slot"
     );
-    assert!(pipeline.quarantined(id).is_none());
+    assert!(program.quarantined(id).is_none());
 }
 
 #[test]
 fn run_pass_poisons_the_position_when_the_pass_fails() {
-    let (mut pipeline, id) = lang_a_pipeline();
+    let (mut program, id) = lang_a_program();
 
-    let error = pipeline
+    let error = program
         .run_pass::<LangA, _, (), _>(id, |_rewriter| Err(RewriteError::UnexpectedTerminator))
         .expect_err("a failing pass must not hand back a usable stage");
 
     assert_eq!(error, StagePassError::PassFailed);
     assert!(
-        pipeline.stage(id).is_none(),
+        program.stage(id).is_none(),
         "a poisoned position must not lend its stage out again"
     );
     assert!(
-        pipeline.quarantined(id).is_some(),
+        program.quarantined(id).is_some(),
         "the failure artifact stays readable at that position"
     );
 }
 
 #[test]
 fn a_poisoned_position_keeps_its_name_and_id() {
-    let (mut pipeline, id) = lang_a_pipeline();
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
+    let (mut program, id) = lang_a_program();
+    let _ = program.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
 
     // `CompileStage` is a raw index, so poisoning must not renumber anything.
-    assert_eq!(pipeline.stage_by_name("source"), Some(id));
+    assert_eq!(program.stage_by_name("source"), Some(id));
 }
 
-/// A `lang_a_pipeline` whose stage was renamed from `source` to `lowered`.
-fn renamed_lang_a_pipeline() -> (Pipeline<TestStage>, CompileStage) {
-    let (mut pipeline, id) = lang_a_pipeline();
-    let renamed = pipeline.intern("lowered");
-    pipeline
+/// A `lang_a_program` whose stage was renamed from `source` to `lowered`.
+fn renamed_lang_a_program() -> (Program<TestStage>, CompileStage) {
+    let (mut program, id) = lang_a_program();
+    let renamed = program.intern("lowered");
+    program
         .stage_mut(id)
         .expect("the stage is present")
         .set_stage_name(Some(renamed));
-    (pipeline, id)
+    (program, id)
 }
 
 #[test]
 fn renaming_a_present_stage_renames_its_position() {
-    let (pipeline, id) = renamed_lang_a_pipeline();
+    let (program, id) = renamed_lang_a_program();
 
     // The printer reads the stage's own name, so lookup must follow it rather
     // than a copy taken when the stage was added.
-    assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
-    assert_eq!(pipeline.stage_by_name("source"), None);
+    assert_eq!(program.stage_by_name("lowered"), Some(id));
+    assert_eq!(program.stage_by_name("source"), None);
     assert_eq!(
-        pipeline.stage_names().collect::<Vec<_>>(),
-        vec![(id, pipeline.lookup_symbol("lowered"))]
+        program.stage_names().collect::<Vec<_>>(),
+        vec![(id, program.lookup_symbol("lowered"))]
     );
 }
 
 #[test]
 fn a_transferred_position_answers_to_the_name_its_stage_left_with() {
-    let (mut pipeline, id) = renamed_lang_a_pipeline();
+    let (mut program, id) = renamed_lang_a_program();
 
     // Only an unwind outside `run_pass`'s catch strands a slot like this.
-    let _lost = pipeline
+    let _lost = program
         .slot_mut(id)
         .and_then(StageSlot::take)
         .expect("the stage is present");
 
-    assert_eq!(pipeline.stage_status(id), Some(StageStatus::Transferred));
-    assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
-    assert_eq!(pipeline.stage_by_name("source"), None);
+    assert_eq!(program.stage_status(id), Some(StageStatus::Transferred));
+    assert_eq!(program.stage_by_name("lowered"), Some(id));
+    assert_eq!(program.stage_by_name("source"), None);
 }
 
 #[test]
 fn a_poisoned_position_answers_to_the_name_its_stage_left_with() {
-    let (mut pipeline, id) = renamed_lang_a_pipeline();
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
+    let (mut program, id) = renamed_lang_a_program();
+    let _ = program.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
 
-    assert_eq!(pipeline.stage_status(id), Some(StageStatus::Poisoned));
-    assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
-    assert_eq!(pipeline.stage_by_name("source"), None);
+    assert_eq!(program.stage_status(id), Some(StageStatus::Poisoned));
+    assert_eq!(program.stage_by_name("lowered"), Some(id));
+    assert_eq!(program.stage_by_name("source"), None);
 }
 
 #[test]
 fn run_pass_restores_the_stage_when_the_dialect_does_not_match() {
-    let (mut pipeline, id) = lang_a_pipeline();
+    let (mut program, id) = lang_a_program();
 
     // The position holds a `LangA` stage, so a `LangB` pass cannot run on it.
-    let error = pipeline
+    let error = program
         .run_pass::<LangB, _, (), RewriteError>(id, |_rewriter| Ok(()))
         .expect_err("a pass for the wrong dialect cannot run");
 
     assert_eq!(error, StagePassError::DialectMismatch);
     assert!(
-        pipeline.stage(id).is_some(),
+        program.stage(id).is_some(),
         "nothing ran, so the stage must go back rather than strand the slot"
     );
-    assert!(pipeline.quarantined(id).is_none());
+    assert!(program.quarantined(id).is_none());
 }
 
 #[test]
 fn run_pass_refuses_an_unknown_position() {
-    let (mut pipeline, _) = lang_a_pipeline();
+    let (mut program, _) = lang_a_program();
     let missing = CompileStage::new(Id(999));
 
-    let error = pipeline
+    let error = program
         .run_pass::<LangA, _, (), RewriteError>(missing, |_| Ok(()))
         .expect_err("there is no such position");
 
@@ -850,10 +847,10 @@ fn run_pass_refuses_an_unknown_position() {
 
 #[test]
 fn run_pass_refuses_a_position_an_earlier_pass_poisoned() {
-    let (mut pipeline, id) = lang_a_pipeline();
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
+    let (mut program, id) = lang_a_program();
+    let _ = program.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
 
-    let error = pipeline
+    let error = program
         .run_pass::<LangA, _, (), RewriteError>(id, |_| Ok(()))
         .expect_err("a dead stage is refused, not rewritten again");
 
@@ -862,62 +859,61 @@ fn run_pass_refuses_a_position_an_earlier_pass_poisoned() {
 
 #[test]
 fn poisoning_one_position_leaves_the_others_usable() {
-    let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let first = pipeline
+    let mut program: Program<TestStage> = Program::new();
+    let first = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("first")
         .new();
-    let second = pipeline
+    let second = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("second")
         .new();
 
-    let _ =
-        pipeline.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::UnexpectedTerminator));
+    let _ = program.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::UnexpectedTerminator));
 
-    assert!(pipeline.stage(first).is_none(), "only `first` is dead");
-    assert!(pipeline.stage(second).is_some());
+    assert!(program.stage(first).is_none(), "only `first` is dead");
+    assert!(program.stage(second).is_some());
     assert_eq!(
-        pipeline.run_pass::<LangA, _, _, RewriteError>(second, |_| Ok(1)),
+        program.run_pass::<LangA, _, _, RewriteError>(second, |_| Ok(1)),
         Ok(1)
     );
 }
 
 #[test]
 fn stage_status_names_all_three_states() {
-    let (mut pipeline, id) = lang_a_pipeline();
-    assert_eq!(pipeline.stage_status(id), Some(StageStatus::Present));
+    let (mut program, id) = lang_a_program();
+    assert_eq!(program.stage_status(id), Some(StageStatus::Present));
 
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
-    assert_eq!(pipeline.stage_status(id), Some(StageStatus::Poisoned));
+    let _ = program.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
+    assert_eq!(program.stage_status(id), Some(StageStatus::Poisoned));
 
     let missing = CompileStage::new(Id(999));
-    assert_eq!(pipeline.stage_status(missing), None);
+    assert_eq!(program.stage_status(missing), None);
 }
 
 #[test]
 fn dispatch_distinguishes_a_poisoned_position_from_a_missing_one() {
-    let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
+    let mut program: Program<AOnlyStage> = Program::new();
+    let a = program
         .add_stage()
         .stage(AOnlyStage::A(StageInfo::default()))
         .name("a")
         .new();
 
-    let _ = pipeline.run_pass::<LangA, _, (), _>(a, |_| Err(RewriteError::UnexpectedTerminator));
+    let _ = program.run_pass::<LangA, _, (), _>(a, |_| Err(RewriteError::UnexpectedTerminator));
 
     // The position is real and still named; only its stage is gone. Reporting
     // `MissingStage` would send someone looking for a bad stage id instead of
     // the pass that killed this one.
     let mut action = IdentifyAOnly;
     assert_eq!(
-        pipeline.dispatch_stage_or_else(a, &mut action, |miss| miss),
+        program.dispatch_stage_or_else(a, &mut action, |miss| miss),
         Err(StageDispatchMiss::StageUnavailable)
     );
     assert_eq!(
-        pipeline.dispatch_stage_required(a, &mut action),
+        program.dispatch_stage_required(a, &mut action),
         Err(StageDispatchRequiredError::Miss(
             StageDispatchMiss::StageUnavailable
         ))
@@ -925,32 +921,31 @@ fn dispatch_distinguishes_a_poisoned_position_from_a_missing_one() {
 
     let missing = CompileStage::new(Id(999));
     assert_eq!(
-        pipeline.dispatch_stage_or_else(missing, &mut action, |miss| miss),
+        program.dispatch_stage_or_else(missing, &mut action, |miss| miss),
         Err(StageDispatchMiss::MissingStage)
     );
 }
 
 #[test]
 fn stage_names_lists_every_position_including_poisoned_ones() {
-    let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let first = pipeline
+    let mut program: Program<TestStage> = Program::new();
+    let first = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("first")
         .new();
-    let second = pipeline
+    let second = program
         .add_stage()
         .stage(TestStage::A(StageInfo::default()))
         .name("second")
         .new();
 
-    let _ =
-        pipeline.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::UnexpectedTerminator));
+    let _ = program.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::UnexpectedTerminator));
 
     // `stages()` skips the poisoned position; `stage_names()` must not, or
     // every id derived from its iteration order is off by one.
-    assert_eq!(pipeline.stages().count(), 1);
-    let listed: Vec<CompileStage> = pipeline.stage_names().map(|(id, _)| id).collect();
+    assert_eq!(program.stages().count(), 1);
+    let listed: Vec<CompileStage> = program.stage_names().map(|(id, _)| id).collect();
     assert_eq!(listed, vec![first, second]);
 }
 

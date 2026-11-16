@@ -41,7 +41,7 @@ specialize @test fn @main() -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ConstantLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ConstantLanguage>(input);
 }
 
 #[test]
@@ -56,7 +56,7 @@ specialize @test fn @main() -> f64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ConstantLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ConstantLanguage>(input);
 }
 
 #[test]
@@ -73,5 +73,5 @@ specialize @test fn @main() -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ConstantLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ConstantLanguage>(input);
 }

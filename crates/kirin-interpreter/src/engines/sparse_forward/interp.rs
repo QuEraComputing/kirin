@@ -7,7 +7,7 @@
 //! [`SparseForwardTransfer`]:
 //!
 //! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate and the target
-//!   of rule dispatch: pipeline, linker, the [`EnvStore`] container (one
+//!   of rule dispatch: program, linker, the [`EnvStore`] container (one
 //!   environment per analysis context, addressed by the policy's context key,
 //!   holding SSA facts), the contexts (entry, return, and callers), analysis
 //!   policy, and the SSA facts that changed; it provides the dialect-dispatch
@@ -36,7 +36,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
+    Block, CFG, CompileStage, HasBottom, Product, Program, SSAValue, StageMeta, Statement, Symbol,
     Widen,
 };
 
@@ -172,7 +172,7 @@ type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
 // SparseForwardTransfer — facts, metadata, and rule dispatch
 // ===========================================================================
 
-/// The transfer of the forward abstract interpreter: pipeline, linker, the
+/// The transfer of the forward abstract interpreter: program, linker, the
 /// facts of every selected context, their metadata, the analysis policy, and
 /// the per-walk logs. Dialect rules dispatch on it.
 pub struct SparseForwardTransfer<
@@ -188,7 +188,7 @@ pub struct SparseForwardTransfer<
     P: CallContext<V>,
     Sem: SparseForwardSemantic,
 {
-    pipeline: &'ir Pipeline<S>,
+    program: &'ir Program<S>,
     linker: Lk,
     /// One environment per analysis context, addressed by the policy's context
     /// key. Blocks of the same context share it (so direct dominated
@@ -214,8 +214,8 @@ where
     P: CallContext<V> + Default,
     Sem: SparseForwardSemantic,
 {
-    fn new(pipeline: &'ir Pipeline<S>) -> Self {
-        Self::with_parts(pipeline, SameStageLinker, P::default())
+    fn new(program: &'ir Program<S>) -> Self {
+        Self::with_parts(program, SameStageLinker, P::default())
     }
 }
 
@@ -224,9 +224,9 @@ where
     P: CallContext<V>,
     Sem: SparseForwardSemantic,
 {
-    fn with_parts(pipeline: &'ir Pipeline<S>, linker: Lk, analysis: P) -> Self {
+    fn with_parts(program: &'ir Program<S>, linker: Lk, analysis: P) -> Self {
         Self {
-            pipeline,
+            program,
             linker,
             env: EnvStore::new(),
             contexts: HashMap::new(),
@@ -241,7 +241,7 @@ where
 
     /// Swap the linker, resetting the analysis state.
     fn with_linker<Lk2>(self, linker: Lk2) -> SparseForwardTransfer<'ir, S, V, E, Lk2, P, F, Sem> {
-        let mut transfer = SparseForwardTransfer::with_parts(self.pipeline, linker, self.analysis);
+        let mut transfer = SparseForwardTransfer::with_parts(self.program, linker, self.analysis);
         transfer.max_iterations = self.max_iterations;
         transfer
     }
@@ -256,20 +256,20 @@ where
     where
         P2: CallContext<V>,
     {
-        let mut transfer = SparseForwardTransfer::with_parts(self.pipeline, self.linker, analysis);
+        let mut transfer = SparseForwardTransfer::with_parts(self.program, self.linker, analysis);
         transfer.max_iterations = self.max_iterations;
         transfer
     }
 
     /// Replace the policy value, resetting the analysis state.
     fn with_policy(self, analysis: P) -> Self {
-        let mut transfer = Self::with_parts(self.pipeline, self.linker, analysis);
+        let mut transfer = Self::with_parts(self.program, self.linker, analysis);
         transfer.max_iterations = self.max_iterations;
         transfer
     }
 
-    fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
+    fn program(&self) -> &'ir Program<S> {
+        self.program
     }
 
     /// A selected context's metadata.
@@ -306,8 +306,8 @@ where
     /// graph's boundary ports.
     fn entry_params(&self, stage: CompileStage, body: Body) -> Result<Vec<SSAValue>, E> {
         match body {
-            Body::Block(block) => Ok(query::block_params(self.pipeline, stage, block)?),
-            Body::DiGraph(graph) => Ok(query::digraph_walk_plan(self.pipeline, stage, graph)?
+            Body::Block(block) => Ok(query::block_params(self.program, stage, block)?),
+            Body::DiGraph(graph) => Ok(query::digraph_walk_plan(self.program, stage, graph)?
                 .ports
                 .into_iter()
                 .map(SSAValue::from)
@@ -432,12 +432,12 @@ where
 
     fn resolve_callee(&self, lookup_stage: CompileStage, callee: &Callee) -> Result<LinkTarget, E> {
         self.linker
-            .resolve(self.pipeline, lookup_stage, callee)
+            .resolve(self.program, lookup_stage, callee)
             .map_err(E::from)
     }
 
     fn discover_body(&self, target: &LinkTarget) -> Result<Body, E> {
-        target.body(self.pipeline).map_err(E::from)
+        target.body(self.program).map_err(E::from)
     }
 }
 
@@ -457,8 +457,8 @@ where
         statement: Statement,
         index: EnvIndex,
     ) -> Result<Self::Effect, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
+        let program = self.program;
+        let info = program
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         let previous = self.location.replace(InterpLocation {
@@ -483,11 +483,11 @@ where
     Sem: SparseForwardSemantic,
 {
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
-        query::block_params(self.pipeline, stage, block).map_err(E::from)
+        query::block_params(self.program, stage, block).map_err(E::from)
     }
 
     fn first_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
-        query::first_statement(self.pipeline, stage, block).map_err(E::from)
+        query::first_statement(self.program, stage, block).map_err(E::from)
     }
 
     fn next_statement(
@@ -496,7 +496,7 @@ where
         block: Block,
         after: Statement,
     ) -> Result<Option<Statement>, E> {
-        query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
+        query::next_statement(self.program, stage, block, after).map_err(E::from)
     }
 }
 
@@ -510,7 +510,7 @@ where
     Sem: SparseForwardSemantic,
 {
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
-        query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
+        query::cfg_entry(self.program, stage, cfg).map_err(E::from)
     }
 }
 
@@ -529,7 +529,7 @@ where
         stage: CompileStage,
         graph: kirin_ir::DiGraph,
     ) -> Result<crate::GraphWalkPlan, E> {
-        query::digraph_walk_plan(self.pipeline, stage, graph).map_err(E::from)
+        query::digraph_walk_plan(self.program, stage, graph).map_err(E::from)
     }
 }
 
@@ -740,7 +740,7 @@ where
         args: Product<V>,
     ) -> Result<EnvIndex, E> {
         let target = self.inner().resolve_callee(lookup_stage, callee)?;
-        let body = target.body(self.inner().pipeline()).map_err(E::from)?;
+        let body = target.body(self.inner().program()).map_err(E::from)?;
         let key = self.inner_mut().key(&target, &args);
         let env = self.inner_mut().env.get_or_allocate(key);
         if !self.inner().contexts.contains_key(&env) {
@@ -860,7 +860,7 @@ where
         let mut woken = HashSet::new();
         for (env, value) in std::mem::take(&mut self.inner_mut().changed) {
             let stage = self.inner().context(env)?.target.stage;
-            let (def, uses) = query::value_units(self.inner().pipeline(), stage, value)?;
+            let (def, uses) = query::value_units(self.inner().program(), stage, value)?;
             let def = self.inner().reached(env, &def);
             for units in uses {
                 if let Some(unit) = self.inner().reached(env, &units)
@@ -991,7 +991,7 @@ where
 /// another root takes another engine.
 ///
 /// ```ignore
-/// let analyzed = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&pipeline)
+/// let analyzed = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&program)
 ///     .with_linker(CrossStageLinker)
 ///     .analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
 /// let result = analyzed.response(analyzed.root());
@@ -1024,9 +1024,9 @@ where
     P: CallContext<V> + Default,
     Sem: SparseForwardSemantic,
 {
-    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+    pub fn new(program: &'ir Program<S>) -> Self {
         Self {
-            driver: StandardFixpointInterpreter::new(SparseForwardTransfer::new(pipeline), ()),
+            driver: StandardFixpointInterpreter::new(SparseForwardTransfer::new(program), ()),
             root: None,
         }
     }
@@ -1080,8 +1080,8 @@ where
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.driver.inner().pipeline()
+    pub fn program(&self) -> &'ir Program<S> {
+        self.driver.inner().program()
     }
 
     /// A selected context's environment and metadata.
@@ -1130,13 +1130,13 @@ where
         let stage = self
             .driver
             .inner()
-            .pipeline()
+            .program()
             .stage_by_name(stage_name)
             .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
             .driver
             .inner()
-            .pipeline()
+            .program()
             .lookup_function_by_name(function_name)
             .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
         self.analyze(stage, Callee::Function(function), args)

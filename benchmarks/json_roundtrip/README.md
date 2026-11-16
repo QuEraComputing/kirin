@@ -23,7 +23,7 @@ time execution of the arithmetic programs.
 | `rust/tests.rs`, `test_workloads.py` | Original/decoded execution and validity regressions, including deliberately incorrect arithmetic |
 
 There is no shared text parser. Rust generates its native text and parses it
-once into a finalized pipeline before timing. Python constructs its native IR
+once into a finalized program before timing. Python constructs its native IR
 objects directly, without Python-source lowering or optimization passes. Both
 builders use the common path specification, then serialize their own complete
 native IR payloads. Python's required Method/self metadata has no decorative
@@ -138,8 +138,8 @@ ratios validate the harness; they are not performance thresholds or QBI results.
 
 ## Exact timed boundary
 
-- Rust: `serde_json::to_string(&pipeline)`, then
-  `serde_json::from_str::<Pipeline<_>>`.
+- Rust: `serde_json::to_string(&program)`, then
+  `serde_json::from_str::<Program<_>>`.
 - Python: `basic.encode_json(method)`, then `basic.decode_json(payload)`,
   including semantic serialization-unit conversion and usable IR reconstruction.
 
@@ -170,7 +170,7 @@ Malformed types, branch arities and SSA dominance are also tested locally.
 
 Enable `serde` on `kirin` and each built-in dialect crate; derive Serialize/
 Deserialize on the language/type/value definitions and heterogeneous stage enum
-if used. Finalized `StageInfo` and full `Pipeline` preserve arena IDs/tombstones,
+if used. Finalized `StageInfo` and full `Program` preserve arena IDs/tombstones,
 symbols, operation attributes, SSA/CFG links and metadata, graph connectivity,
 function/stage/specialization links, invalidation flags and backedges. Symbol
 and function-name lookup indexes are reconstructed on decode. `ArithValue`

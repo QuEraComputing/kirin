@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-prettyless/src/tests/pipeline.rs
+source: crates/kirin-prettyless/src/tests/program.rs
 expression: output
 ---
 stage @A fn @foo(i64) -> i64;

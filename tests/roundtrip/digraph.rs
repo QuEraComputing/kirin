@@ -2,15 +2,15 @@ use kirin::prelude::*;
 use kirin_test_languages::SimpleType;
 use kirin_test_utils::roundtrip;
 
-/// Create a test pipeline with a single stage named "test".
-fn make_test_pipeline<L: Dialect>() -> Pipeline<StageInfo<L>> {
-    let mut pipeline = Pipeline::new();
-    pipeline
+/// Create a test program with a single stage named "test".
+fn make_test_program<L: Dialect>() -> Program<StageInfo<L>> {
+    let mut program = Program::new();
+    program
         .add_stage()
         .stage(StageInfo::default())
         .name("test")
         .new();
-    pipeline
+    program
 }
 
 /// A simple digraph language for roundtrip testing.
@@ -152,7 +152,7 @@ fn test_digraph_json_restores_graph_mirror() {
     kirin::ir::verify_derived(&restored).unwrap();
 }
 
-// --- Pipeline-level projected format e2e test ---
+// --- Program-level projected format e2e test ---
 
 /// A dialect where the function definition uses projected DiGraph format.
 /// The body format is `({body:ports}) {{ {body:body} }}` — ports and body
@@ -185,45 +185,43 @@ enum ProjectedFuncLang {
 }
 
 #[test]
-fn test_projected_func_pipeline_parse() {
-    let mut pipeline = make_test_pipeline::<ProjectedFuncLang>();
+fn test_projected_func_program_parse() {
+    let mut program = make_test_program::<ProjectedFuncLang>();
 
     // Framework parses fn @foo(f64) -> f64, signature is Some.
     // Auto-creates staged function. Body text is `(%p0: f64) { ... }` parsed by dialect.
     let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
-    let functions = pipeline
-        .parse(input)
-        .expect("should parse projected format");
+    let functions = program.parse(input).expect("should parse projected format");
     assert_eq!(functions.len(), 1);
 }
 
 #[test]
-fn test_projected_func_pipeline_roundtrip() {
-    let mut pipeline = make_test_pipeline::<ProjectedFuncLang>();
+fn test_projected_func_program_roundtrip() {
+    let mut program = make_test_program::<ProjectedFuncLang>();
 
     // With explicit stage -- standard flow
     let input = r#"
 stage @test fn @foo(f64) -> f64;
 specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }
 "#;
-    pipeline.parse(input).expect("should parse");
+    program.parse(input).expect("should parse");
 
     // Roundtrip: print -> reparse -> reprint
-    let printed = pipeline.sprint();
-    let mut pipeline2 = make_test_pipeline::<ProjectedFuncLang>();
-    pipeline2
+    let printed = program.sprint();
+    let mut program2 = make_test_program::<ProjectedFuncLang>();
+    program2
         .parse(printed.trim())
         .expect("should reparse printed output");
-    let printed2 = pipeline2.sprint();
+    let printed2 = program2.sprint();
 
     assert_eq!(
         printed.trim(),
         printed2.trim(),
-        "projected pipeline roundtrip should be stable"
+        "projected program roundtrip should be stable"
     );
 }
 
-// --- Use Case 5: Block projections pipeline test ---
+// --- Use Case 5: Block projections program test ---
 
 /// A dialect using Block projections for the function definition.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
@@ -249,32 +247,32 @@ enum BlockProjectedLang {
 }
 
 #[test]
-fn test_block_projected_pipeline_roundtrip() {
-    let mut pipeline = make_test_pipeline::<BlockProjectedLang>();
+fn test_block_projected_program_roundtrip() {
+    let mut program = make_test_program::<BlockProjectedLang>();
 
     let input = r#"
 stage @test fn @foo(f64) -> f64;
 specialize @test fn @foo(f64) -> f64 (%x: f64) { %r = add %x, %x; ret %r; }
 "#;
-    pipeline
+    program
         .parse(input)
         .expect("should parse block projection format");
 
-    let printed = pipeline.sprint();
-    let mut pipeline2 = make_test_pipeline::<BlockProjectedLang>();
-    pipeline2
+    let printed = program.sprint();
+    let mut program2 = make_test_program::<BlockProjectedLang>();
+    program2
         .parse(printed.trim())
         .expect("should reparse block projection format");
-    let printed2 = pipeline2.sprint();
+    let printed2 = program2.sprint();
 
     assert_eq!(
         printed.trim(),
         printed2.trim(),
-        "block projection pipeline roundtrip should be stable"
+        "block projection program roundtrip should be stable"
     );
 }
 
-// --- Use Case 6: CFG body-only projection pipeline test ---
+// --- Use Case 6: CFG body-only projection program test ---
 
 /// A dialect using CFG body-only projection.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
@@ -300,32 +298,32 @@ enum CFGProjectedLang {
 }
 
 #[test]
-fn test_cfg_projected_pipeline_roundtrip() {
-    let mut pipeline = make_test_pipeline::<CFGProjectedLang>();
+fn test_cfg_projected_program_roundtrip() {
+    let mut program = make_test_program::<CFGProjectedLang>();
 
     let input = r#"
 stage @test fn @foo(f64) -> f64;
 specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r; } }
 "#;
-    pipeline
+    program
         .parse(input)
         .expect("should parse cfg projection format");
 
-    let printed = pipeline.sprint();
-    let mut pipeline2 = make_test_pipeline::<CFGProjectedLang>();
-    pipeline2
+    let printed = program.sprint();
+    let mut program2 = make_test_program::<CFGProjectedLang>();
+    program2
         .parse(printed.trim())
         .expect("should reparse cfg projection format");
-    let printed2 = pipeline2.sprint();
+    let printed2 = program2.sprint();
 
     assert_eq!(
         printed.trim(),
         printed2.trim(),
-        "cfg projection pipeline roundtrip should be stable"
+        "cfg projection program roundtrip should be stable"
     );
 }
 
-// --- Use Case 3: Full dialect control pipeline test ---
+// --- Use Case 3: Full dialect control program test ---
 
 /// A dialect with whole-signature format (migrated from old dialect-controlled format).
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
@@ -355,37 +353,37 @@ enum DialectControlledLang {
 }
 
 #[test]
-fn test_dialect_controlled_pipeline_parse() {
-    let mut pipeline = make_test_pipeline::<DialectControlledLang>();
+fn test_dialect_controlled_program_parse() {
+    let mut program = make_test_program::<DialectControlledLang>();
 
     // Whole-signature format: {sig} parses (f64) -> f64, {graph:ports} parses the port bindings.
     let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
-    let functions = pipeline
+    let functions = program
         .parse(input)
         .expect("should parse dialect-controlled format");
     assert_eq!(functions.len(), 1);
 }
 
 #[test]
-fn test_dialect_controlled_pipeline_roundtrip() {
-    let mut pipeline = make_test_pipeline::<DialectControlledLang>();
+fn test_dialect_controlled_program_roundtrip() {
+    let mut program = make_test_program::<DialectControlledLang>();
 
     let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
-    pipeline
+    program
         .parse(input)
         .expect("should parse dialect-controlled format");
 
-    let printed = pipeline.sprint();
-    let mut pipeline2 = make_test_pipeline::<DialectControlledLang>();
-    pipeline2
+    let printed = program.sprint();
+    let mut program2 = make_test_program::<DialectControlledLang>();
+    program2
         .parse(printed.trim())
         .expect("should reparse dialect-controlled format");
-    let printed2 = pipeline2.sprint();
+    let printed2 = program2.sprint();
 
     assert_eq!(
         printed.trim(),
         printed2.trim(),
-        "dialect-controlled pipeline roundtrip should be stable"
+        "dialect-controlled program roundtrip should be stable"
     );
 }
 
@@ -501,9 +499,9 @@ specialize @test fn @g(i64, i64) -> i64 digraph ^g0(%x: i64, %y: i64) {
   yield %s;
 }
 "#;
-    let mut pipeline: Pipeline<StageInfo<kirin_test_languages::GraphFunctionLanguage>> =
-        Pipeline::new();
-    let error = pipeline
+    let mut program: Program<StageInfo<kirin_test_languages::GraphFunctionLanguage>> =
+        Program::new();
+    let error = program
         .parse(input)
         .expect_err("a terminator is not a digraph node");
     assert!(

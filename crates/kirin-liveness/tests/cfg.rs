@@ -6,7 +6,7 @@
 //! (`kirin-demand`) drops values no root needs; that filter over-approximates
 //! per-point strong liveness.
 
-use kirin::prelude::{GetInfo, ParsePipelineText, Pipeline, SSAValue, StageInfo};
+use kirin::prelude::{GetInfo, ParseProgramText, Program, SSAValue, StageInfo};
 use kirin_arith::Arith;
 use kirin_demand::{Demand, DemandAnalysis};
 use kirin_interpreter::{AnalysisResults, Body, Callee, ProgramPoint};
@@ -42,19 +42,19 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
 }
 "#;
 
-fn parse(program: &str) -> Pipeline<StageInfo<ArithFunctionLanguage>> {
-    let mut pipeline: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
-    ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
-    pipeline
+fn parse(source: &str) -> Program<StageInfo<ArithFunctionLanguage>> {
+    let mut program: Program<StageInfo<ArithFunctionLanguage>> = Program::new();
+    ParseProgramText::parse(&mut program, source).expect("program parses");
+    program
 }
 
 /// The caller stage and canonical callable root for `function_name`.
 fn function_root(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     function_name: &str,
 ) -> (kirin::prelude::CompileStage, Callee) {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let function = pipeline
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let function = program
         .lookup_function_by_name(function_name)
         .unwrap_or_else(|| panic!("function @{function_name} exists"));
     (stage_id, Callee::Function(function))
@@ -62,12 +62,12 @@ fn function_root(
 
 /// The parameters of the `index`-th block of `cfg`, as SSA values.
 fn block_params(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     cfg: kirin_ir::CFG,
     index: usize,
 ) -> Vec<SSAValue> {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let stage = pipeline.stage(stage_id).expect("stage info");
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let stage = program.stage(stage_id).expect("stage info");
     let block = cfg.blocks(stage).nth(index).expect("block index in range");
     block
         .expect_info(stage)
@@ -80,23 +80,23 @@ fn block_params(
 
 /// The `index`-th block of `cfg`.
 fn nth_block(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     cfg: kirin_ir::CFG,
     index: usize,
 ) -> kirin_ir::Block {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let stage = pipeline.stage(stage_id).expect("stage info");
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let stage = program.stage(stage_id).expect("stage info");
     cfg.blocks(stage).nth(index).expect("block index in range")
 }
 
 /// The statement whose definition matches `select`.
 fn find_stmt(
-    pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
+    program: &Program<StageInfo<ArithFunctionLanguage>>,
     cfg: kirin_ir::CFG,
     select: impl Fn(&ArithFunctionLanguage) -> bool,
 ) -> kirin_ir::Statement {
-    let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let stage = pipeline.stage(stage_id).expect("stage info");
+    let stage_id = program.stage_by_name("test").expect("stage @test exists");
+    let stage = program.stage(stage_id).expect("stage info");
     for block in cfg.blocks(stage) {
         for stmt in block.statements(stage) {
             if select(stmt.definition(stage)) {
@@ -118,23 +118,23 @@ fn live_set(values: &[SSAValue]) -> LiveSet {
 
 #[test]
 fn classic_liveness_boundary_sets() {
-    let pipeline = parse(PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DenseLiveness::<_>::new(&pipeline)
+    let program = parse(PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DenseLiveness::<_>::new(&program)
         .analyze(caller_stage, callee)
         .expect("analysis succeeds");
     let root = result.root();
-    let Body::CFG(cfg) = root.body(&pipeline).expect("@main has a body") else {
+    let Body::CFG(cfg) = root.body(&program).expect("@main has a body") else {
         panic!("@main resolves to a CFG body")
     };
 
-    let entry_params = block_params(&pipeline, cfg, 0);
+    let entry_params = block_params(&program, cfg, 0);
     let (x, cond) = (entry_params[0], entry_params[1]);
-    let then_param = block_params(&pipeline, cfg, 1)[0];
-    let else_param = block_params(&pipeline, cfg, 2)[0];
-    let entry = nth_block(&pipeline, cfg, 0);
-    let then_block = nth_block(&pipeline, cfg, 1);
-    let else_block = nth_block(&pipeline, cfg, 2);
+    let then_param = block_params(&program, cfg, 1)[0];
+    let else_param = block_params(&program, cfg, 2)[0];
+    let entry = nth_block(&program, cfg, 0);
+    let then_block = nth_block(&program, cfg, 1);
+    let else_block = nth_block(&program, cfg, 2);
 
     // live_in(entry): %x (used by add and both edges) and %cond (branch use).
     assert_eq!(
@@ -168,19 +168,19 @@ fn classic_liveness_boundary_sets() {
 
 #[test]
 fn classic_per_point_sets_gen_dead_uses() {
-    let pipeline = parse(DEAD_RESULT_PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = DenseLiveness::<_>::new(&pipeline)
+    let program = parse(DEAD_RESULT_PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let result = DenseLiveness::<_>::new(&program)
         .analyze(caller_stage, callee)
         .expect("analysis succeeds");
     let root = result.root();
-    let Body::CFG(cfg) = root.body(&pipeline).expect("@main has a body") else {
+    let Body::CFG(cfg) = root.body(&program).expect("@main has a body") else {
         panic!("@main resolves to a CFG body")
     };
 
-    let params = block_params(&pipeline, cfg, 0);
+    let params = block_params(&program, cfg, 0);
     let (a, b) = (params[0], params[1]);
-    let add = find_stmt(&pipeline, cfg, |definition| {
+    let add = find_stmt(&program, cfg, |definition| {
         matches!(definition, ArithFunctionLanguage::Arith(Arith::Add { .. }))
     });
     // Classic semantics: the dead add still GENS its operands, so %b is live
@@ -198,23 +198,23 @@ fn classic_per_point_sets_gen_dead_uses() {
 
 #[test]
 fn classic_sets_filtered_by_demand_drop_unneeded_values() {
-    let pipeline = parse(DEAD_RESULT_PROGRAM);
-    let (caller_stage, callee) = function_root(&pipeline, "main");
-    let dense = DenseLiveness::<_>::new(&pipeline)
+    let program = parse(DEAD_RESULT_PROGRAM);
+    let (caller_stage, callee) = function_root(&program, "main");
+    let dense = DenseLiveness::<_>::new(&program)
         .analyze(caller_stage, callee)
         .expect("dense analysis succeeds");
-    let demand = DemandAnalysis::<_>::new(&pipeline)
+    let demand = DemandAnalysis::<_>::new(&program)
         .analyze(caller_stage, callee, [Demand::Live])
         .expect("demand analysis succeeds");
     let root = dense.root();
     assert_eq!(*root, demand.root().0);
-    let Body::CFG(cfg) = root.body(&pipeline).expect("@main has a body") else {
+    let Body::CFG(cfg) = root.body(&program).expect("@main has a body") else {
         panic!("@main resolves to a CFG body")
     };
 
-    let params = block_params(&pipeline, cfg, 0);
+    let params = block_params(&program, cfg, 0);
     let (a, b) = (params[0], params[1]);
-    let add = find_stmt(&pipeline, cfg, |definition| {
+    let add = find_stmt(&program, cfg, |definition| {
         matches!(definition, ArithFunctionLanguage::Arith(Arith::Add { .. }))
     });
 

@@ -10,7 +10,7 @@ use crate::Body;
 use crate::InterpreterError;
 use kirin_ir::{
     Block, BlockParent, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG,
-    HasCallableBody, HasDigraphs, HasStageInfo, HasUngraphs, Pipeline, PortParent, SSAKind,
+    HasCallableBody, HasDigraphs, HasStageInfo, HasUngraphs, PortParent, Program, SSAKind,
     SSAValue, SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
     StatementParent, SupportsStageDispatch, Symbol, UniqueLiveSpecializationError, Use,
 };
@@ -700,16 +700,16 @@ impl<S> StageQuery for S where
 // TODO: add caching (with red-green tree) to avoid repeated queries for the same stage and block/statement.
 // Run a stage action against the stage with id `stage`.
 pub(crate) fn dispatch<S, A, R>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     mut action: A,
 ) -> Result<R, InterpreterError>
 where
     S: StageMeta + SupportsStageDispatch<A, R, InterpreterError>,
 {
-    let info = pipeline
+    let info = program
         .stage(stage)
-        .ok_or_else(|| match pipeline.stage_status(stage) {
+        .ok_or_else(|| match program.stage_status(stage) {
             Some(status) => InterpreterError::UnavailableStage(stage, status),
             None => InterpreterError::MissingStage(stage),
         })?;
@@ -718,147 +718,147 @@ where
 }
 
 pub(crate) fn block_params<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
 ) -> Result<Vec<SSAValue>, InterpreterError> {
-    dispatch(pipeline, stage, BlockParams(block))
+    dispatch(program, stage, BlockParams(block))
 }
 
 pub(crate) fn first_statement<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
 ) -> Result<Option<Statement>, InterpreterError> {
-    dispatch(pipeline, stage, FirstStatement(block))
+    dispatch(program, stage, FirstStatement(block))
 }
 
 pub(crate) fn next_statement<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
     after: Statement,
 ) -> Result<Option<Statement>, InterpreterError> {
-    dispatch(pipeline, stage, NextStatement { block, after })
+    dispatch(program, stage, NextStatement { block, after })
 }
 
 pub(crate) fn last_statement<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
 ) -> Result<Option<Statement>, InterpreterError> {
-    dispatch(pipeline, stage, LastStatement(block))
+    dispatch(program, stage, LastStatement(block))
 }
 
 pub(crate) fn previous_statement<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
     before: Statement,
 ) -> Result<Option<Statement>, InterpreterError> {
-    dispatch(pipeline, stage, PreviousStatement { block, before })
+    dispatch(program, stage, PreviousStatement { block, before })
 }
 
 pub(crate) fn cfg_entry<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     cfg: CFG,
 ) -> Result<Option<Block>, InterpreterError> {
-    dispatch(pipeline, stage, CFGEntry(cfg))
+    dispatch(program, stage, CFGEntry(cfg))
 }
 
 pub(crate) fn unique_specialization<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     staged: StagedFunction,
 ) -> Result<SpecializedFunction, InterpreterError> {
-    dispatch(pipeline, stage, UniqueSpecialization(staged))?
+    dispatch(program, stage, UniqueSpecialization(staged))?
 }
 
 pub(crate) fn validate_specialization<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     specialized: SpecializedFunction,
 ) -> Result<(), InterpreterError> {
-    dispatch(pipeline, stage, ValidateSpecialization(specialized))
+    dispatch(program, stage, ValidateSpecialization(specialized))
 }
 
 pub(crate) fn callable_body<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     specialized: SpecializedFunction,
 ) -> Result<Body, InterpreterError> {
-    dispatch(pipeline, stage, CallableBodyQuery(specialized))
+    dispatch(program, stage, CallableBodyQuery(specialized))
 }
 
 pub(crate) fn resolve_symbol_name<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     symbol: Symbol,
 ) -> Result<Option<String>, InterpreterError> {
-    dispatch(pipeline, stage, ResolveSymbolName(symbol))
+    dispatch(program, stage, ResolveSymbolName(symbol))
 }
 
 pub(crate) fn value_kind<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     value: SSAValue,
 ) -> Result<SSAKind, InterpreterError> {
-    dispatch(pipeline, stage, ValueKind(value))
+    dispatch(program, stage, ValueKind(value))
 }
 
 pub(crate) fn terminator_arguments<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
 ) -> Result<TerminatorArgs, InterpreterError> {
-    dispatch(pipeline, stage, TerminatorArguments(block))
+    dispatch(program, stage, TerminatorArguments(block))
 }
 
 pub(crate) fn block_argument_predecessors<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     block: Block,
 ) -> Result<BlockArgumentPredecessorStatements, InterpreterError> {
-    dispatch(pipeline, stage, BlockArgumentPredecessors(block))
+    dispatch(program, stage, BlockArgumentPredecessors(block))
 }
 
 pub(crate) fn graph_port_owner<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     parent: PortParent,
 ) -> Result<Statement, InterpreterError> {
-    dispatch(pipeline, stage, GraphPortOwner(parent))
+    dispatch(program, stage, GraphPortOwner(parent))
 }
 
 pub(crate) fn value_units<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     value: SSAValue,
 ) -> Result<(UnitChain, Vec<UnitChain>), InterpreterError> {
-    dispatch(pipeline, stage, ValueUnits(value))
+    dispatch(program, stage, ValueUnits(value))
 }
 
 pub(crate) fn digraph_walk_plan<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     graph: kirin_ir::DiGraph,
 ) -> Result<GraphWalkPlan, InterpreterError> {
-    dispatch(pipeline, stage, DiGraphWalkQuery(graph))
+    dispatch(program, stage, DiGraphWalkQuery(graph))
 }
 
 pub(crate) fn direct_body_blocks<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     body: Body,
 ) -> Result<Vec<Block>, InterpreterError> {
-    dispatch(pipeline, stage, DirectBodyBlocks(body))
+    dispatch(program, stage, DirectBodyBlocks(body))
 }
 
 pub(crate) fn body_contents<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     body: Body,
 ) -> Result<BodyContents, InterpreterError> {
-    dispatch(pipeline, stage, BodyContentsQuery(body))
+    dispatch(program, stage, BodyContentsQuery(body))
 }

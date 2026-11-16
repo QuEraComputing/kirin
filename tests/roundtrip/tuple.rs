@@ -4,7 +4,7 @@ use kirin_function::Return;
 use kirin_test_utils::roundtrip;
 use kirin_tuple::Tuple;
 
-/// Language with Tuple + Function + Return for pipeline roundtrip tests.
+/// Language with Tuple + Function + Return for program roundtrip tests.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
@@ -55,10 +55,10 @@ fn test_unpack_single_result_roundtrip() {
     );
 }
 
-// --- Pipeline-level roundtrip tests ---
+// --- Program-level roundtrip tests ---
 
 #[test]
-fn test_new_tuple_pipeline_roundtrip() {
+fn test_new_tuple_program_roundtrip() {
     let input = r#"
 stage @test fn @main(i32, i32) -> i32;
 
@@ -69,11 +69,11 @@ specialize @test fn @main(i32, i32) -> i32 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<TupleLanguage>(input);
+    roundtrip::assert_program_roundtrip::<TupleLanguage>(input);
 }
 
 #[test]
-fn test_unpack_pipeline_roundtrip() {
+fn test_unpack_program_roundtrip() {
     let input = r#"
 stage @test fn @main(i32) -> i32;
 
@@ -84,11 +84,11 @@ specialize @test fn @main(i32) -> i32 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<TupleLanguage>(input);
+    roundtrip::assert_program_roundtrip::<TupleLanguage>(input);
 }
 
 #[test]
-fn test_new_tuple_then_unpack_pipeline_roundtrip() {
+fn test_new_tuple_then_unpack_program_roundtrip() {
     let input = r#"
 stage @test fn @main(i32, i32) -> i32;
 
@@ -100,5 +100,5 @@ specialize @test fn @main(i32, i32) -> i32 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<TupleLanguage>(input);
+    roundtrip::assert_program_roundtrip::<TupleLanguage>(input);
 }

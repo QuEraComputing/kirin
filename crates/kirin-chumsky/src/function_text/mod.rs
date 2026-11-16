@@ -6,7 +6,7 @@ mod syntax;
 pub use dispatch::ParseDispatch;
 pub use error::{FunctionParseError, FunctionParseErrorKind};
 pub use parse_text::{
-    FirstPassCtx, FirstPassDispatchResult, ParsePipelineText, ParseState, SecondPassCtx, StagedKey,
+    FirstPassCtx, FirstPassDispatchResult, ParseProgramText, ParseState, SecondPassCtx, StagedKey,
     first_pass_concrete, second_pass_concrete,
 };
 

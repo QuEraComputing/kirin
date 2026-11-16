@@ -5,7 +5,7 @@ mod error;
 mod helpers;
 pub(crate) mod info;
 mod meta;
-mod pipeline_impl;
+mod program_impl;
 mod slot;
 
 pub use action::{StageAction, StageActionMut};

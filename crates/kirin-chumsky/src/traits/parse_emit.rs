@@ -58,7 +58,7 @@ impl From<EmitError> for ChumskyError {
 ///
 /// This replaces the old `HasParserEmitIR` + `HasDialectEmitIR` witness traits.
 /// Downstream developers implement this trait to plug into `ParseStatementText`
-/// and `ParsePipelineText` without needing `#[derive(HasParser)]`.
+/// and `ParseProgramText` without needing `#[derive(HasParser)]`.
 ///
 /// # Three implementation paths
 ///

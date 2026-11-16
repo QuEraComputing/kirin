@@ -19,13 +19,13 @@
 //!   let stmt = stage.parse_statement("%res = add %a, %b")?;
 //!   ```
 //!
-//! - **File-level** — [`ParsePipelineText::parse`] on `Pipeline<StageInfo<L>>`:
+//! - **File-level** — [`ParseProgramText::parse`] on `Program<StageInfo<L>>`:
 //!
 //!   ```ignore
 //!   use kirin_chumsky::prelude::*;
 //!
-//!   let mut pipeline: Pipeline<StageInfo<MyLang>> = Pipeline::new();
-//!   let functions = pipeline.parse(src)?;
+//!   let mut program: Program<StageInfo<MyLang>> = Program::new();
+//!   let functions = program.parse(src)?;
 //!   ```
 //!
 //! For lower-level control, [`parse_ast`] still parses text into an AST without
@@ -78,7 +78,7 @@ pub use kirin_derive_chumsky::PrettyPrint;
 pub mod prelude {
     pub use crate::ast;
     pub use crate::function_text::{
-        FunctionParseError, FunctionParseErrorKind, ParseDispatch, ParsePipelineText,
+        FunctionParseError, FunctionParseErrorKind, ParseDispatch, ParseProgramText,
     };
     pub use crate::parsers::*;
     pub use crate::traits::{

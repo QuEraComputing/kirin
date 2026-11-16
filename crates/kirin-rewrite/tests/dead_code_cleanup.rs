@@ -26,11 +26,11 @@ fn graph_program(body: &str, yielded: &str) -> String {
     )
 }
 
-fn parse(input: &str) -> (Pipeline<StageInfo<L>>, CompileStage) {
-    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    pipeline.parse(input).expect("the program parses");
-    let stage = pipeline.stage_by_name("g").expect("the stage exists");
-    (pipeline, stage)
+fn parse(input: &str) -> (Program<StageInfo<L>>, CompileStage) {
+    let mut program: Program<StageInfo<L>> = Program::new();
+    program.parse(input).expect("the program parses");
+    let stage = program.stage_by_name("g").expect("the stage exists");
+    (program, stage)
 }
 
 fn printed(input: &str) -> String {
@@ -39,12 +39,12 @@ fn printed(input: &str) -> String {
 
 /// Run `rules` over `input`, returning the printed result.
 fn rewrite(rules: &RuleSet<L>, input: &str) -> (String, RewriteSummary) {
-    let (mut pipeline, stage) = parse(input);
+    let (mut program, stage) = parse(input);
     let driver = RewriteDriver::new(rules);
-    let summary = pipeline
+    let summary = program
         .run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))
         .expect("the pass succeeds");
-    (pipeline.sprint(), summary)
+    (program.sprint(), summary)
 }
 
 #[test]

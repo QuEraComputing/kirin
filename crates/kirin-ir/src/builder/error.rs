@@ -6,60 +6,60 @@ use crate::node::stmt::Statement;
 use crate::node::symbol::GlobalSymbol;
 use crate::signature::Signature;
 
-/// Error returned by [`crate::Pipeline`] mutation methods that previously panicked.
+/// Error returned by [`crate::Program`] mutation methods that previously panicked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PipelineError {
-    /// The [`Function`] ID does not exist in the pipeline's arena.
+pub enum ProgramError {
+    /// The [`Function`] ID does not exist in the program's arena.
     UnknownFunction(Function),
     /// A function with the same name has already been allocated.
     DuplicateFunctionName(GlobalSymbol),
 }
 
-impl std::fmt::Display for PipelineError {
+impl std::fmt::Display for ProgramError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PipelineError::UnknownFunction(func) => write!(f, "unknown function: {func:?}"),
-            PipelineError::DuplicateFunctionName(sym) => {
+            ProgramError::UnknownFunction(func) => write!(f, "unknown function: {func:?}"),
+            ProgramError::DuplicateFunctionName(sym) => {
                 write!(f, "duplicate function name: {sym:?}")
             }
         }
     }
 }
 
-impl std::error::Error for PipelineError {}
+impl std::error::Error for ProgramError {}
 
-/// Error returned by [`crate::Pipeline::staged_function`] and
-/// [`crate::Pipeline::define_function`], which can fail either at the
-/// pipeline level ([`PipelineError`]) or at the stage level
+/// Error returned by [`crate::Program::staged_function`] and
+/// [`crate::Program::define_function`], which can fail either at the
+/// program level ([`ProgramError`]) or at the stage level
 /// ([`StagedFunctionError`]).
 #[derive(Debug)]
-pub enum PipelineStagedError<L: Dialect> {
-    /// A pipeline-level error (unknown function, invalid stage, etc.).
-    Pipeline(PipelineError),
+pub enum ProgramStagedError<L: Dialect> {
+    /// A program-level error (unknown function, invalid stage, etc.).
+    Program(ProgramError),
     /// A stage-level conflict when creating the staged function.
     StagedFunction(StagedFunctionError<L>),
 }
 
-impl<L: Dialect> std::fmt::Display for PipelineStagedError<L> {
+impl<L: Dialect> std::fmt::Display for ProgramStagedError<L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PipelineStagedError::Pipeline(e) => e.fmt(f),
-            PipelineStagedError::StagedFunction(e) => e.fmt(f),
+            ProgramStagedError::Program(e) => e.fmt(f),
+            ProgramStagedError::StagedFunction(e) => e.fmt(f),
         }
     }
 }
 
-impl<L: Dialect> std::error::Error for PipelineStagedError<L> {}
+impl<L: Dialect> std::error::Error for ProgramStagedError<L> {}
 
-impl<L: Dialect> From<PipelineError> for PipelineStagedError<L> {
-    fn from(e: PipelineError) -> Self {
-        PipelineStagedError::Pipeline(e)
+impl<L: Dialect> From<ProgramError> for ProgramStagedError<L> {
+    fn from(e: ProgramError) -> Self {
+        ProgramStagedError::Program(e)
     }
 }
 
-impl<L: Dialect> From<StagedFunctionError<L>> for PipelineStagedError<L> {
+impl<L: Dialect> From<StagedFunctionError<L>> for ProgramStagedError<L> {
     fn from(e: StagedFunctionError<L>) -> Self {
-        PipelineStagedError::StagedFunction(e)
+        ProgramStagedError::StagedFunction(e)
     }
 }
 

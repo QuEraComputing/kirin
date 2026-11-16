@@ -275,18 +275,18 @@ specialize @arith fn @f(i64) -> i64 cfg {
 /// Run `rules` over [`FOUR_NEGS`] in pre-order: the printed result and the
 /// summary, or the error.
 fn run(rules: &RuleSet<L>) -> Result<(String, RewriteSummary), DriverError> {
-    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    pipeline.parse(FOUR_NEGS).expect("the program parses");
-    let stage = pipeline.stage_by_name("arith").expect("the stage exists");
+    let mut program: Program<StageInfo<L>> = Program::new();
+    program.parse(FOUR_NEGS).expect("the program parses");
+    let stage = program.stage_by_name("arith").expect("the stage exists");
     let driver = RewriteDriver::new(rules);
     let mut outcome = None;
-    let _ = pipeline.run_pass(stage, |rewriter| {
+    let _ = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PreOrder>(rewriter);
         outcome = Some(result.clone());
         result
     });
     let summary = outcome.expect("the pass ran")?;
-    Ok((pipeline.sprint(), summary))
+    Ok((program.sprint(), summary))
 }
 
 /// The rule set of the one rule `build` builds.

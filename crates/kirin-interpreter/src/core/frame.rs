@@ -358,7 +358,7 @@ pub trait DiGraphQueries: Interp {
 /// Built-in engines delegate discovery to [`LinkTarget::body`]; custom
 /// implementations must preserve the same lookup contract. The trait does not
 /// enforce that relationship. [`CallFrame`](crate::CallFrame) reaches the IR
-/// through these services without needing direct pipeline access.
+/// through these services without needing direct program access.
 ///
 /// Notably *not* required by abstract dataflow: forward abstract interpretation
 /// summarizes a call instead of descending into it, so

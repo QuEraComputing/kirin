@@ -7,8 +7,8 @@ mod intern;
 mod language;
 mod lattice;
 mod node;
-mod pipeline;
 mod product;
+mod program;
 mod project;
 mod rewrite;
 mod signature;
@@ -25,7 +25,7 @@ pub use rewrite::walk;
 pub use arena::{Arena, GetInfo, Id, Identifier, Item};
 pub use body::{Body, HasCallableBody};
 pub use builder::error::{
-    DuplicateSpecialization, PipelineError, PipelineStagedError, SpecializeError,
+    DuplicateSpecialization, ProgramError, ProgramStagedError, SpecializeError,
     StagedFunctionConflictKind, StagedFunctionError,
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
@@ -51,8 +51,8 @@ pub use node::{
     StatementInfo, StatementParent, Successor, Symbol, TestSSAValue, UnGraph, UnGraphExtra,
     UnGraphInfo, UniqueLiveSpecializationError, Use,
 };
-pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
+pub use program::Program;
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
 pub use rewrite::{MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter};
 pub use signature::{
@@ -68,7 +68,7 @@ pub use stage::{
 pub mod prelude {
     pub use crate::{
         Block, Body, BranchOp, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo,
-        HasCallableBody, HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature,
+        HasCallableBody, HasSignature, HasStageInfo, Program, ResultValue, SSAValue, Signature,
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{

@@ -341,19 +341,19 @@ fn staged_function_unique_live_specialization_rejects_ambiguous_live_set() {
 }
 
 #[test]
-fn pipeline_resolve_function_uses_stage_local_symbol_table() {
-    let mut pipeline: Pipeline<StageInfo<BuilderDialect>> = Pipeline::new();
-    let stage_id = pipeline
+fn program_resolve_function_uses_stage_local_symbol_table() {
+    let mut program: Program<StageInfo<BuilderDialect>> = Program::new();
+    let stage_id = program
         .add_stage()
         .stage(StageInfo::default())
         .name("test")
         .new();
-    let func = pipeline.function().name("target").new().unwrap();
+    let func = program.function().name("target").new().unwrap();
     let target = {
-        let stage = pipeline.stage_mut(stage_id).unwrap();
+        let stage = program.stage_mut(stage_id).unwrap();
         stage.symbol_table_mut().intern("target".to_string())
     };
 
-    let stage = pipeline.stage(stage_id).unwrap();
-    assert_eq!(pipeline.resolve_function(stage, target), Some(func));
+    let stage = program.stage(stage_id).unwrap();
+    assert_eq!(program.resolve_function(stage, target), Some(func));
 }

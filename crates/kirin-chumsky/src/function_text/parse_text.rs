@@ -1,7 +1,7 @@
-//! Stage-dispatched pipeline parser for textual function declarations.
+//! Stage-dispatched program parser for textual function declarations.
 //!
 //! This module parses a sequence of `stage` and `specialize` declarations into
-//! a [`Pipeline`](kirin_ir::Pipeline). Each declaration starts with a symbolic
+//! a [`Program`](kirin_ir::Program). Each declaration starts with a symbolic
 //! stage (for example `@A`), and the concrete dialect parser is chosen at
 //! runtime by dispatching on that stage's actual `StageInfo<L>` variant.
 //!
@@ -26,7 +26,7 @@
 //!
 //! ## Why stage dispatch is central
 //!
-//! A pipeline can contain different dialects per stage (for example stage `A`
+//! A program can contain different dialects per stage (for example stage `A`
 //! with `FunctionDefinition`, stage `B` with `LowerDefinition`). The parser does not guess
 //! which dialect to use from text alone. Instead it:
 //!
@@ -83,7 +83,7 @@ use rustc_hash::FxHashMap;
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
-    CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Pipeline, Signature, StageInfo,
+    CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Program, Signature, StageInfo,
     StageMeta, StageStatus, StagedFunction,
 };
 use kirin_lexer::Token;
@@ -96,13 +96,13 @@ use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
 use super::syntax::{Declaration, Header, RichError, parse_one_declaration, tokenize};
 use crate::ast::SymbolName;
 
-/// Parse function text into a pipeline using stage-driven dialect dispatch.
-pub trait ParsePipelineText {
+/// Parse function text into a program using stage-driven dialect dispatch.
+pub trait ParseProgramText {
     fn parse(&mut self, src: &str) -> Result<Vec<Function>, FunctionParseError>;
 }
 
 // ---------------------------------------------------------------------------
-// Internal types used by both the pipeline impl and the concrete helpers.
+// Internal types used by both the program impl and the concrete helpers.
 // Made pub(crate) so the dispatch module and derive-generated code can see them.
 // ---------------------------------------------------------------------------
 
@@ -136,7 +136,7 @@ pub(super) struct FirstPassOutcome {
 
 /// Result of a first-pass dispatch for a single declaration.
 ///
-/// Returned by [`first_pass_concrete`] and consumed by the pipeline parsing loop.
+/// Returned by [`first_pass_concrete`] and consumed by the program parsing loop.
 #[derive(Clone, Copy, Debug)]
 pub struct FirstPassDispatchResult {
     pub(super) outcome: FirstPassOutcome,
@@ -146,7 +146,7 @@ pub struct FirstPassDispatchResult {
 /// Shared mutable state threaded through both parse passes.
 ///
 /// This type is opaque to external callers; it is only constructed inside the
-/// pipeline parsing loop and passed through context structs.
+/// program parsing loop and passed through context structs.
 pub struct ParseState {
     touched_functions: Vec<Function>,
     touched_function_set: HashSet<Function>,
@@ -172,7 +172,7 @@ impl ParseState {
 // Context types for concrete dispatch helpers
 // ---------------------------------------------------------------------------
 
-/// Bundled state for first-pass dispatch. Created by the pipeline impl and
+/// Bundled state for first-pass dispatch. Created by the program impl and
 /// passed to [`ParseDispatch::dispatch_first_pass`] or [`first_pass_concrete`].
 pub struct FirstPassCtx<'t> {
     pub tokens: &'t [(Token<'t>, SimpleSpan)],
@@ -183,7 +183,7 @@ pub struct FirstPassCtx<'t> {
     pub state: &'t mut ParseState,
 }
 
-/// Bundled state for second-pass dispatch. Created by the pipeline impl and
+/// Bundled state for second-pass dispatch. Created by the program impl and
 /// passed to [`ParseDispatch::dispatch_second_pass`] or [`second_pass_concrete`].
 pub struct SecondPassCtx<'t> {
     pub tokens: &'t [(Token<'t>, SimpleSpan)],
@@ -196,7 +196,7 @@ pub struct SecondPassCtx<'t> {
     pub function_symbol: GlobalSymbol,
     /// The function name (from parse_declaration_head, always available).
     pub function_name: &'t str,
-    /// Link info for the pipeline to connect function ↔ staged function.
+    /// Link info for the program to connect function ↔ staged function.
     /// Set by second_pass_concrete after apply_specialize_declaration.
     pub link: Option<(Function, StagedFunction)>,
 }
@@ -208,7 +208,7 @@ pub struct SecondPassCtx<'t> {
 /// First-pass concrete helper for a single dialect `L`.
 ///
 /// The lifetime `'t` is the lifetime of the token slice, NOT an HRTB — this is
-/// called with a concrete lifetime from within the pipeline `parse` method.
+/// called with a concrete lifetime from within the program `parse` method.
 pub fn first_pass_concrete<'t, L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,
@@ -259,7 +259,7 @@ where
 
 /// Second-pass concrete helper for a single dialect `L`.
 ///
-/// Called with a concrete lifetime from within the pipeline `parse` method.
+/// Called with a concrete lifetime from within the program `parse` method.
 pub fn second_pass_concrete<'t, L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,
@@ -307,17 +307,17 @@ where
         ctx.state,
     )?;
 
-    // Return link info for the pipeline to connect function ↔ staged function
+    // Return link info for the program to connect function ↔ staged function
     ctx.link = Some((function, staged_function));
 
     Ok(next_index)
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline impl using ParseDispatch
+// Program impl using ParseDispatch
 // ---------------------------------------------------------------------------
 
-impl<S> ParsePipelineText for Pipeline<S>
+impl<S> ParseProgramText for Program<S>
 where
     S: StageMeta + ParseDispatch,
 {
@@ -785,15 +785,15 @@ fn parse_error_from_chumsky(errors: Vec<RichError<'_>>) -> FunctionParseError {
         .with_source(DiagnosticError::new(diagnostics))
 }
 
-/// Build a `function-name -> function` lookup from existing pipeline state.
-fn collect_function_lookup<S>(pipeline: &Pipeline<S>) -> FxHashMap<String, Function> {
+/// Build a `function-name -> function` lookup from existing program state.
+fn collect_function_lookup<S>(program: &Program<S>) -> FxHashMap<String, Function> {
     let mut lookup = FxHashMap::default();
-    for info in pipeline.function_arena().iter() {
+    for info in program.function_arena().iter() {
         let function = Function::from(info.clone().unwrap());
         let Some(symbol) = info.name() else {
             continue;
         };
-        let Some(name) = pipeline.resolve(symbol) else {
+        let Some(name) = program.resolve(symbol) else {
             continue;
         };
         lookup.insert(name.to_string(), function);
@@ -803,27 +803,27 @@ fn collect_function_lookup<S>(pipeline: &Pipeline<S>) -> FxHashMap<String, Funct
 
 /// Resolve an abstract function by name, creating it if it does not exist.
 fn get_or_create_function_by_name<S>(
-    pipeline: &mut Pipeline<S>,
+    program: &mut Program<S>,
     function_lookup: &mut FxHashMap<String, Function>,
     name: &str,
 ) -> Function {
     if let Some(existing) = function_lookup.get(name).copied() {
         return existing;
     }
-    let function = pipeline
+    let function = program
         .function()
         .name(name.to_string())
         .new()
-        .expect("failed to create function in pipeline");
+        .expect("failed to create function in program");
     function_lookup.insert(name.to_string(), function);
     function
 }
 
 fn fn_symbol<S>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     function: Function,
 ) -> Result<GlobalSymbol, FunctionParseError> {
-    pipeline
+    program
         .function_info(function)
         .and_then(|info| info.name())
         .ok_or_else(|| {
@@ -835,10 +835,10 @@ fn fn_symbol<S>(
         })
 }
 
-/// Build a `(stage, function) -> staged function` lookup from existing pipeline state.
-fn collect_staged_lookup<S>(pipeline: &Pipeline<S>) -> FxHashMap<StagedKey, StagedFunction> {
+/// Build a `(stage, function) -> staged function` lookup from existing program state.
+fn collect_staged_lookup<S>(program: &Program<S>) -> FxHashMap<StagedKey, StagedFunction> {
     let mut lookup = FxHashMap::default();
-    for info in pipeline.function_arena().iter() {
+    for info in program.function_arena().iter() {
         let function = Function::from(info.clone().unwrap());
         for (&stage, &staged_function) in info.staged_functions() {
             lookup.insert(StagedKey { stage, function }, staged_function);
@@ -849,13 +849,13 @@ fn collect_staged_lookup<S>(pipeline: &Pipeline<S>) -> FxHashMap<StagedKey, Stag
 
 /// Resolve a stage symbol to a stage ID, creating a named stage when missing.
 fn resolve_or_create_stage_symbol<'src, S>(
-    pipeline: &mut Pipeline<S>,
+    program: &mut Program<S>,
     stage_symbol: &SymbolName<'src>,
 ) -> Result<CompileStage, FunctionParseError>
 where
     S: StageMeta,
 {
-    if let Some(stage_id) = find_stage_symbol(pipeline, stage_symbol.name) {
+    if let Some(stage_id) = find_stage_symbol(program, stage_symbol.name) {
         return Ok(stage_id);
     }
 
@@ -863,11 +863,11 @@ where
         FunctionParseError::new(
             FunctionParseErrorKind::UnknownStage,
             Some(stage_symbol.span),
-            stage_creation_error_message::<S>(pipeline, stage_symbol.name, message),
+            stage_creation_error_message::<S>(program, stage_symbol.name, message),
         )
     })?;
 
-    Ok(pipeline
+    Ok(program
         .add_stage()
         .stage(stage)
         .name(stage_symbol.name.to_string())
@@ -875,7 +875,7 @@ where
 }
 
 fn stage_creation_error_message<S>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage_symbol: &str,
     message: String,
 ) -> String
@@ -883,7 +883,7 @@ where
     S: StageMeta,
 {
     let mut output = message;
-    let mut candidates = stage_candidates(pipeline);
+    let mut candidates = stage_candidates(program);
     for name in S::declared_stage_names() {
         candidates.push((*name).to_string());
     }
@@ -899,28 +899,28 @@ where
 }
 
 /// Lookup a stage by symbolic name (`@A`) or numeric symbol (`@1`).
-fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<CompileStage>
+fn find_stage_symbol<S>(program: &Program<S>, stage_symbol: &str) -> Option<CompileStage>
 where
     S: StageMeta,
 {
-    if let Some(stage_id) = pipeline.stage_by_name(stage_symbol) {
+    if let Some(stage_id) = program.stage_by_name(stage_symbol) {
         return Some(stage_id);
     }
 
     let raw_id = stage_symbol.parse::<usize>().ok()?;
-    pipeline
+    program
         .stage_names()
         .map(|(stage_id, _)| stage_id)
         .find(|stage_id| Id::from(*stage_id).raw() == raw_id)
 }
 
-fn stage_candidates<S>(pipeline: &Pipeline<S>) -> Vec<String>
+fn stage_candidates<S>(program: &Program<S>) -> Vec<String>
 where
     S: StageMeta,
 {
     let mut names = Vec::new();
-    for (stage_id, name) in pipeline.stage_names() {
-        match name.and_then(|symbol| pipeline.resolve(symbol).map(str::to_string)) {
+    for (stage_id, name) in program.stage_names() {
+        match name.and_then(|symbol| program.resolve(symbol).map(str::to_string)) {
             Some(name) => names.push(name),
             None => names.push(Id::from(stage_id).raw().to_string()),
         }
@@ -979,7 +979,7 @@ fn stage_missing_error(
 ) -> FunctionParseError {
     let message = match status {
         None | Some(StageStatus::Present) => {
-            format!("stage '@{stage_symbol}' does not exist in the pipeline")
+            format!("stage '@{stage_symbol}' does not exist in the program")
         }
         Some(StageStatus::Transferred) => {
             format!("stage '@{stage_symbol}' is on loan to a rewrite pass that never returned it")

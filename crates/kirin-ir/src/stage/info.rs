@@ -42,12 +42,12 @@ use super::arenas::Arenas;
 ///
 /// # Constructing new functions on an existing `StageInfo`
 ///
-/// When working through a [`Pipeline`](crate::Pipeline), stages are stored as
+/// When working through a [`Program`](crate::Program), stages are stored as
 /// `StageInfo`. To add new functions, use [`with_builder`](Self::with_builder)
 /// which temporarily converts to a [`BuilderStageInfo`]:
 ///
 /// ```ignore
-/// let stage: &mut StageInfo<MyDialect> = pipeline.stage_mut(stage_id).unwrap();
+/// let stage: &mut StageInfo<MyDialect> = program.stage_mut(stage_id).unwrap();
 /// stage.with_builder(|b| {
 ///     // b is &mut BuilderStageInfo<MyDialect>
 ///     let sf = b.staged_function().name(func_name).new().unwrap();
@@ -133,7 +133,7 @@ impl<L: Dialect> StageInfo<L> {
     /// convert back.
     ///
     /// This is the bridge for code that holds `&mut StageInfo<L>` (e.g. via
-    /// [`Pipeline::stage_mut`](crate::Pipeline::stage_mut) or
+    /// [`Program::stage_mut`](crate::Program::stage_mut) or
     /// [`HasStageInfo`](crate::HasStageInfo)) but needs builder methods.
     ///
     /// The SSA arena is converted in each direction (O(n)), so prefer

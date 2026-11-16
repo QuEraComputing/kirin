@@ -18,7 +18,7 @@ use frame::ToyFrame;
 
 use std::hash::Hash;
 
-use kirin::prelude::{CFG, CompileStage, Pipeline};
+use kirin::prelude::{CFG, CompileStage, Program};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_demand::DemandAnalysis;
 use kirin_interpreter::engine::{
@@ -42,17 +42,17 @@ pub struct ToyInterpreter<'ir, Lk = CrossStageLinker> {
 }
 
 impl<'ir> ToyInterpreter<'ir, CrossStageLinker> {
-    pub fn new(pipeline: &'ir Pipeline<Stage>) -> Self {
+    pub fn new(program: &'ir Program<Stage>) -> Self {
         Self {
-            inner: ConcreteInterpreterCore::new(pipeline).with_linker(CrossStageLinker),
+            inner: ConcreteInterpreterCore::new(program).with_linker(CrossStageLinker),
         }
     }
 }
 
 impl<'ir> ToyInterpreter<'ir, SameStageLinker> {
-    fn same_stage(pipeline: &'ir Pipeline<Stage>) -> Self {
+    fn same_stage(program: &'ir Program<Stage>) -> Self {
         Self {
-            inner: ConcreteInterpreterCore::new(pipeline),
+            inner: ConcreteInterpreterCore::new(program),
         }
     }
 }
@@ -98,40 +98,40 @@ pub(crate) type ToyDenseLiveness<'ir, Lk = SameStageLinker> = DenseLiveness<
 /// Execute `function_name` starting at `stage_name`, following calls across
 /// language boundaries.
 pub fn run_i64(
-    pipeline: &Pipeline<Stage>,
+    program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
     args: &[i64],
 ) -> Result<i64, ToyError> {
-    let mut interp = ToyInterpreter::new(pipeline);
+    let mut interp = ToyInterpreter::new(program);
     expect_single(interp.call_by_name(stage_name, function_name, args.iter().copied())?)
 }
 
 /// Execute within the source stage only.
 pub fn run_source_i64(
-    pipeline: &Pipeline<Stage>,
+    program: &Program<Stage>,
     function_name: &str,
     args: &[i64],
 ) -> Result<i64, ToyError> {
-    run_same_stage_i64(pipeline, "source", function_name, args)
+    run_same_stage_i64(program, "source", function_name, args)
 }
 
 /// Execute within the lowered stage only.
 pub fn run_lowered_i64(
-    pipeline: &Pipeline<Stage>,
+    program: &Program<Stage>,
     function_name: &str,
     args: &[i64],
 ) -> Result<i64, ToyError> {
-    run_same_stage_i64(pipeline, "lowered", function_name, args)
+    run_same_stage_i64(program, "lowered", function_name, args)
 }
 
 fn run_same_stage_i64(
-    pipeline: &Pipeline<Stage>,
+    program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
     args: &[i64],
 ) -> Result<i64, ToyError> {
-    let mut interp = ToyInterpreter::same_stage(pipeline);
+    let mut interp = ToyInterpreter::same_stage(program);
     expect_single(interp.call_by_name(stage_name, function_name, args.iter().copied())?)
 }
 
@@ -139,7 +139,7 @@ fn run_same_stage_i64(
 /// calls across language boundaries. Returns the function's inferred return
 /// value at the fixpoint.
 pub fn analyze_constprop<'ir, C>(
-    pipeline: &'ir Pipeline<Stage>,
+    program: &'ir Program<Stage>,
     stage_name: &str,
     function_name: &str,
     args: &[ConstPropValue<C>],
@@ -158,7 +158,7 @@ where
         >,
     >,
 {
-    let analysis: ToyConstProp<'_, C> = ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
+    let analysis: ToyConstProp<'_, C> = ToyConstProp::new(program).with_linker(CrossStageLinker);
     let analyzed = analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?;
     // A function that never returns has no response: no value to report.
     expect_single(analyzed.response(analyzed.root()).unwrap_or_default())
@@ -172,14 +172,14 @@ where
 /// Stage-pinned: a `function_name` with no live specialization at `stage_name`
 /// is an error, not a cue to analyze some other stage's body.
 pub fn analyze_classic_liveness<'ir>(
-    pipeline: &'ir Pipeline<Stage>,
+    program: &'ir Program<Stage>,
     stage_name: &str,
     function_name: &str,
 ) -> Result<(CompileStage, CFG, Analyzed<ToyDenseLiveness<'ir>>), InterpreterError> {
-    let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(pipeline);
+    let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
     let analyzed = analysis.analyze_by_name(stage_name, function_name)?;
     let root = *analyzed.root();
-    let Body::CFG(cfg) = root.body(pipeline)? else {
+    let Body::CFG(cfg) = root.body(program)? else {
         return Err(InterpreterError::Custom(
             "classic liveness target is not a CFG function",
         ));
@@ -191,17 +191,17 @@ pub fn analyze_classic_liveness<'ir>(
 /// at `stage_name`. Independent of [`analyze_classic_liveness`], and
 /// stage-pinned in the same way.
 pub fn analyze_demand<'ir>(
-    pipeline: &'ir Pipeline<Stage>,
+    program: &'ir Program<Stage>,
     stage_name: &str,
     function_name: &str,
 ) -> Result<Analyzed<DemandAnalysis<'ir, Stage>>, InterpreterError> {
-    let stage = pipeline
+    let stage = program
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
-    let function = pipeline
+    let function = program
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    DemandAnalysis::<_>::new(pipeline).analyze(
+    DemandAnalysis::<_>::new(program).analyze(
         stage,
         Callee::Function(function),
         [kirin_demand::Demand::Live],

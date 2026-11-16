@@ -4,7 +4,7 @@ mod stage;
 
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
-use kirin::pretty::PipelinePrintExt;
+use kirin::pretty::ProgramPrintExt;
 use kirin_interpreter::{AnalysisResults, ProgramPoint};
 
 use stage::Stage;
@@ -63,9 +63,9 @@ fn main() -> anyhow::Result<()> {
     match cli.command {
         Command::Parse { file } => {
             let src = std::fs::read_to_string(&file)?;
-            let mut pipeline: Pipeline<Stage> = Pipeline::new();
-            ParsePipelineText::parse(&mut pipeline, &src)?;
-            let rendered = pipeline.sprint();
+            let mut program: Program<Stage> = Program::new();
+            ParseProgramText::parse(&mut program, &src)?;
+            let rendered = program.sprint();
             print!("{rendered}");
             Ok(())
         }
@@ -103,8 +103,8 @@ fn run_program(
     per_language: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
-    let mut pipeline: Pipeline<Stage> = Pipeline::new();
-    ParsePipelineText::parse(&mut pipeline, &src)?;
+    let mut program: Program<Stage> = Program::new();
+    ParseProgramText::parse(&mut program, &src)?;
 
     let args: Vec<i64> = cli_args
         .iter()
@@ -121,7 +121,7 @@ fn run_program(
     }
 
     if demand {
-        let result = interpreter::analyze_demand(&pipeline, stage_name, func_name)?;
+        let result = interpreter::analyze_demand(&program, stage_name, func_name)?;
         let root = result.root();
         let stage = result
             .callable_of(root)
@@ -131,7 +131,7 @@ fn run_program(
             .facts(root)
             .filter(|(_, fact)| fact.is_live())
             .map(|(value, _)| value);
-        let demanded = match pipeline
+        let demanded = match program
             .stage(stage)
             .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
         {
@@ -144,8 +144,8 @@ fn run_program(
 
     if liveness {
         let (stage, cfg, dense) =
-            interpreter::analyze_classic_liveness(&pipeline, stage_name, func_name)?;
-        match pipeline
+            interpreter::analyze_classic_liveness(&program, stage_name, func_name)?;
+        match program
             .stage(stage)
             .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
         {
@@ -162,19 +162,19 @@ fn run_program(
             .map(kirin_constprop::ConstPropValue::Const)
             .collect::<Vec<_>>();
         let result =
-            interpreter::analyze_constprop(&pipeline, stage_name, func_name, &abstract_args)?;
+            interpreter::analyze_constprop(&program, stage_name, func_name, &abstract_args)?;
         println!("{result:?}");
         return Ok(());
     }
 
     let result = if per_language {
         match stage_name {
-            "source" => interpreter::run_source_i64(&pipeline, func_name, &args)?,
-            "lowered" => interpreter::run_lowered_i64(&pipeline, func_name, &args)?,
+            "source" => interpreter::run_source_i64(&program, func_name, &args)?,
+            "lowered" => interpreter::run_lowered_i64(&program, func_name, &args)?,
             other => anyhow::bail!("unknown stage '{}'", other),
         }
     } else {
-        interpreter::run_i64(&pipeline, stage_name, func_name, &args)?
+        interpreter::run_i64(&program, stage_name, func_name, &args)?
     };
     println!("{result}");
     Ok(())

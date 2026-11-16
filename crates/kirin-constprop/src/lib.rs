@@ -1,4 +1,4 @@
-//! Constant propagation for Kirin pipelines.
+//! Constant propagation for Kirin programs.
 //!
 //! This crate is intentionally small: it provides the constant-propagation
 //! *lattice* ([`ConstPropValue`]) and a ready-to-run analysis alias
@@ -17,7 +17,7 @@
 //!
 //! use kirin_interpreter::engine::AnalysisResults;
 //!
-//! let analyzed = ConstProp::<Stage, MyConst, MyError>::new(&pipeline)
+//! let analyzed = ConstProp::<Stage, MyConst, MyError>::new(&program)
 //!     .with_linker(CrossStageLinker)
 //!     .analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
 //! let result = analyzed.response(analyzed.root());

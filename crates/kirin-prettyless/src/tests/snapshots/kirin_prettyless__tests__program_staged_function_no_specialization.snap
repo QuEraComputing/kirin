@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-prettyless/src/tests/pipeline.rs
+source: crates/kirin-prettyless/src/tests/program.rs
 expression: output
 ---
 stage @host fn @extern_fn(i64) -> f64;

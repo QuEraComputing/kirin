@@ -28,15 +28,15 @@ specialize @test fn @identity(i64) -> i64 cfg {{
 }}
 "#
         );
-        let mut pipeline: Pipeline<StageInfo<GraphFunctionLanguage>> = Pipeline::new();
-        ParsePipelineText::parse(&mut pipeline, &source).unwrap();
-        let stage = pipeline.stage_by_name("test").unwrap();
-        let callee = Callee::Function(pipeline.lookup_function_by_name("main").unwrap());
-        let target = SameStageLinker.resolve(&pipeline, stage, &callee).unwrap();
-        let Body::CFG(cfg) = target.body(&pipeline).unwrap() else {
+        let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+        ParseProgramText::parse(&mut program, &source).unwrap();
+        let stage = program.stage_by_name("test").unwrap();
+        let callee = Callee::Function(program.lookup_function_by_name("main").unwrap());
+        let target = SameStageLinker.resolve(&program, stage, &callee).unwrap();
+        let Body::CFG(cfg) = target.body(&program).unwrap() else {
             panic!("expected CFG")
         };
-        let info = pipeline.stage(stage).unwrap();
+        let info = program.stage(stage).unwrap();
         let blocks: Vec<_> = cfg.blocks(info).collect();
         let (choose, calculate) = if choose_first { (1, 2) } else { (2, 1) };
         let branch = blocks[choose].terminator(info).unwrap();
@@ -44,11 +44,11 @@ specialize @test fn @identity(i64) -> i64 cfg {{
         let result = *call.definition(info).results().next().unwrap();
         // The parser requires definitions before uses in text. Build the
         // dominated cross-block use through the rewriter for either order.
-        kirin_ir::Rewriter::new(pipeline.stage_mut(stage).unwrap())
+        kirin_ir::Rewriter::new(program.stage_mut(stage).unwrap())
             .replace_operand(branch, 0, result)
             .unwrap();
 
-        let analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
+        let analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&program)
             .analyze(stage, callee, [Demand::Dead])
             .unwrap();
         let inputs = analysis.response(analysis.root()).unwrap();

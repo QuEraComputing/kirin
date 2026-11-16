@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use kirin_chumsky::{ParsePipelineText, ParseStatementTextExt, PrettyPrint};
-use kirin_ir::{BuilderSSAKind, Dialect, Pipeline, StageInfo, Statement};
-use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderDispatch};
+use kirin_chumsky::{ParseProgramText, ParseStatementTextExt, PrettyPrint};
+use kirin_ir::{BuilderSSAKind, Dialect, Program, StageInfo, Statement};
+use kirin_prettyless::{Config, Document, ProgramPrintExt, RenderDispatch};
 
 /// Parse a single statement with pre-registered operands.
 pub fn emit_statement<L>(input: &str, operands: &[(&str, L::Type)]) -> (StageInfo<L>, Statement)
@@ -66,26 +66,26 @@ where
     assert_eq!(rendered.trim(), rendered_again.trim());
 }
 
-/// Assert that a pipeline roundtrips: parse → render → reparse → render → compare.
-pub fn assert_pipeline_roundtrip<L>(input: &str)
+/// Assert that a program roundtrips: parse → render → reparse → render → compare.
+pub fn assert_program_roundtrip<L>(input: &str)
 where
-    Pipeline<StageInfo<L>>: ParsePipelineText,
+    Program<StageInfo<L>>: ParseProgramText,
     StageInfo<L>: RenderDispatch,
     L: Dialect + RoundtripSerde,
     L::Type: RoundtripSerde,
 {
-    let mut parsed_pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    let parsed_functions = parsed_pipeline
+    let mut parsed_program: Program<StageInfo<L>> = Program::new();
+    let parsed_functions = parsed_program
         .parse(input)
-        .expect("pipeline parse should succeed");
+        .expect("program parse should succeed");
     assert!(
         !parsed_functions.is_empty(),
         "expected at least one parsed function"
     );
-    let rendered = parsed_pipeline.sprint();
+    let rendered = parsed_program.sprint();
     #[cfg(feature = "serde")]
     {
-        let restored = json_roundtrip(&parsed_pipeline);
+        let restored = json_roundtrip(&parsed_program);
         assert_eq!(rendered, restored.sprint());
         for stage in restored.stages() {
             kirin_ir::verify_derived(stage).expect("restored metadata is valid");
@@ -97,16 +97,16 @@ where
         }
     }
 
-    let mut reparsed_pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    let reparsed_functions = reparsed_pipeline
+    let mut reparsed_program: Program<StageInfo<L>> = Program::new();
+    let reparsed_functions = reparsed_program
         .parse(&rendered)
-        .expect("rendered pipeline should reparse");
+        .expect("rendered program should reparse");
     assert_eq!(
         reparsed_functions.len(),
         parsed_functions.len(),
         "expected same number of parsed functions"
     );
-    let rendered_again = reparsed_pipeline.sprint();
+    let rendered_again = reparsed_program.sprint();
     assert_eq!(rendered.trim_end(), rendered_again.trim_end());
 }
 

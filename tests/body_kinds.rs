@@ -80,21 +80,21 @@ impl From<std::convert::Infallible> for TestError {
 type L = StageInfo<GraphFunctionLanguage>;
 type Engine<'ir> = ConcreteInterpreter<'ir, L, i64, TestError, SameStageLinker>;
 
-fn parse(program: &str) -> Pipeline<L> {
-    let mut pipeline: Pipeline<L> = Pipeline::new();
-    ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
-    pipeline
+fn parse(source: &str) -> Program<L> {
+    let mut program: Program<L> = Program::new();
+    ParseProgramText::parse(&mut program, source).expect("program parses");
+    program
 }
 
 fn local_function_symbol(
-    pipeline: &Pipeline<L>,
+    program: &Program<L>,
     stage_name: &str,
     function_name: &str,
 ) -> (CompileStage, Symbol) {
-    let stage = pipeline
+    let stage = program
         .stage_by_name(stage_name)
         .expect("named stage exists");
-    let symbol = pipeline
+    let symbol = program
         .stage(stage)
         .expect("stage info exists")
         .symbol_table()
@@ -103,18 +103,18 @@ fn local_function_symbol(
     (stage, symbol)
 }
 
-fn run(pipeline: &Pipeline<L>, function: &str, args: &[i64]) -> Result<i64, TestError> {
-    expect_single(run_product(pipeline, function, args)?)
+fn run(program: &Program<L>, function: &str, args: &[i64]) -> Result<i64, TestError> {
+    expect_single(run_product(program, function, args)?)
 }
 
 /// `run`, keeping the whole returned product — for callables that return more
 /// than one value.
 fn run_product(
-    pipeline: &Pipeline<L>,
+    program: &Program<L>,
     function: &str,
     args: &[i64],
 ) -> Result<Product<i64>, TestError> {
-    let mut interp: Engine<'_> = ConcreteInterpreter::new(pipeline).with_linker(SameStageLinker);
+    let mut interp: Engine<'_> = ConcreteInterpreter::new(program).with_linker(SameStageLinker);
     interp.call_by_name("test", function, args.iter().copied())
 }
 
@@ -150,8 +150,8 @@ specialize @test fn @main() -> i64 cfg {
 
 #[test]
 fn cfg_main_calls_digraph_function() {
-    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
-    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 5);
+    let program = parse(DIGRAPH_CALLABLE_PROGRAM);
+    assert_eq!(run(&program, "main", &[]).unwrap(), 5);
 }
 
 // ===========================================================================
@@ -183,8 +183,8 @@ specialize @test fn @main() -> i64 cfg {
 
 #[test]
 fn cfg_statement_pushes_digraph_body() {
-    let pipeline = parse(NESTED_DIGRAPH_PROGRAM);
-    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 42);
+    let program = parse(NESTED_DIGRAPH_PROGRAM);
+    assert_eq!(run(&program, "main", &[]).unwrap(), 42);
 }
 
 // ===========================================================================
@@ -218,8 +218,8 @@ specialize @test fn @main() -> i64 cfg {
 
 #[test]
 fn linear_block_callable() {
-    let pipeline = parse(BLOCK_CALLABLE_PROGRAM);
-    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 42);
+    let program = parse(BLOCK_CALLABLE_PROGRAM);
+    assert_eq!(run(&program, "main", &[]).unwrap(), 42);
 }
 
 // ===========================================================================
@@ -259,10 +259,10 @@ specialize @test fn @main() -> i64 cfg {
 
 #[test]
 fn digraph_runs_in_topological_order() {
-    let pipeline = parse(DIGRAPH_TOPO_PROGRAM);
+    let program = parse(DIGRAPH_TOPO_PROGRAM);
     // (3 + 3) * (3 + 1) = 24 — requires running both `add`s (and the
     // constant) before the `mul` despite the textual order.
-    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 24);
+    assert_eq!(run(&program, "main", &[]).unwrap(), 24);
 }
 
 // ===========================================================================
@@ -402,14 +402,14 @@ type ScfEngine<'ir> = ConcreteInterpreterCore<
     FrameStackItem<i64, TestError>,
 >;
 
-fn parse_scf(program: &str) -> Pipeline<ScfL> {
-    let mut pipeline: Pipeline<ScfL> = Pipeline::new();
-    ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
-    pipeline
+fn parse_scf(source: &str) -> Program<ScfL> {
+    let mut program: Program<ScfL> = Program::new();
+    ParseProgramText::parse(&mut program, source).expect("program parses");
+    program
 }
 
-fn run_scf(pipeline: &Pipeline<ScfL>, function: &str, args: &[i64]) -> Result<i64, TestError> {
-    let mut interp: ScfEngine<'_> = ConcreteInterpreterCore::new(pipeline);
+fn run_scf(program: &Program<ScfL>, function: &str, args: &[i64]) -> Result<i64, TestError> {
+    let mut interp: ScfEngine<'_> = ConcreteInterpreterCore::new(program);
     expect_single(interp.call_by_name("test", function, args.iter().copied())?)
 }
 
@@ -440,9 +440,9 @@ specialize @test fn @abs(i64) -> i64 cfg {
 
 #[test]
 fn scf_if_arm_yields_to_dialect_frame() {
-    let pipeline = parse_scf(SCF_ABS_PROGRAM);
-    assert_eq!(run_scf(&pipeline, "abs", &[-7]).unwrap(), 7);
-    assert_eq!(run_scf(&pipeline, "abs", &[4]).unwrap(), 4);
+    let program = parse_scf(SCF_ABS_PROGRAM);
+    assert_eq!(run_scf(&program, "abs", &[-7]).unwrap(), 7);
+    assert_eq!(run_scf(&program, "abs", &[4]).unwrap(), 4);
 }
 
 /// `scf.for` re-pushes the framework `BlockFrame` per iteration; each
@@ -450,7 +450,7 @@ fn scf_if_arm_yields_to_dialect_frame() {
 /// and loop exit completes `Finished` to the pusher.
 #[test]
 fn scf_for_loop_carries_yielded_values() {
-    let pipeline = parse_scf(
+    let program = parse_scf(
         r#"
 stage @test fn @sum_below(i64) -> i64;
 
@@ -468,9 +468,9 @@ specialize @test fn @sum_below(i64) -> i64 cfg {
 "#,
     );
     // 0 + 1 + 2 + 3 + 4 = 10.
-    assert_eq!(run_scf(&pipeline, "sum_below", &[5]).unwrap(), 10);
+    assert_eq!(run_scf(&program, "sum_below", &[5]).unwrap(), 10);
     // Zero iterations: the initial carried value flows through.
-    assert_eq!(run_scf(&pipeline, "sum_below", &[0]).unwrap(), 0);
+    assert_eq!(run_scf(&program, "sum_below", &[0]).unwrap(), 0);
 }
 
 // ===========================================================================
@@ -485,7 +485,7 @@ specialize @test fn @sum_below(i64) -> i64 cfg {
 /// return: the statements below the `if` never run on the early-return path.
 #[test]
 fn return_bubbles_through_scf_frames_to_call_frame() {
-    let pipeline = parse_scf(
+    let program = parse_scf(
         r#"
 stage @test fn @clamp0(i64) -> i64;
 stage @test fn @twice(i64) -> i64;
@@ -516,14 +516,14 @@ specialize @test fn @twice(i64) -> i64 cfg {
 "#,
     );
     // Early return: 0, not 0 + 1 — the add after the `if` did not run.
-    assert_eq!(run_scf(&pipeline, "clamp0", &[-5]).unwrap(), 0);
+    assert_eq!(run_scf(&program, "clamp0", &[-5]).unwrap(), 0);
     // Normal path: the arm yields, execution continues after the `if`.
-    assert_eq!(run_scf(&pipeline, "clamp0", &[5]).unwrap(), 6);
+    assert_eq!(run_scf(&program, "clamp0", &[5]).unwrap(), 6);
     // Two nested calls taking the early-return path in one run: each callee
     // activation is freed exactly once and the caller's activation survives,
     // otherwise the second call (or the final add) would read freed state.
-    assert_eq!(run_scf(&pipeline, "twice", &[-5]).unwrap(), 0);
-    assert_eq!(run_scf(&pipeline, "twice", &[5]).unwrap(), 12);
+    assert_eq!(run_scf(&program, "twice", &[-5]).unwrap(), 0);
+    assert_eq!(run_scf(&program, "twice", &[5]).unwrap(), 12);
 }
 
 const UNGRAPH_PROGRAM: &str = r#"
@@ -554,8 +554,8 @@ specialize @test fn @main() -> i64 cfg {
 /// node order.
 #[test]
 fn ungraph_without_traversal_reports_no_default_walker() {
-    let pipeline = parse(UNGRAPH_PROGRAM);
-    let error = run(&pipeline, "main", &[]).unwrap_err();
+    let program = parse(UNGRAPH_PROGRAM);
+    let error = run(&program, "main", &[]).unwrap_err();
     assert!(
         matches!(
             error,
@@ -694,12 +694,12 @@ type TestValue = ConstPropValue<i64>;
 /// Run constant propagation from `function` and return its inferred return
 /// value at the fixpoint.
 fn analyze(
-    pipeline: &Pipeline<L>,
+    program: &Program<L>,
     function: &str,
     args: &[TestValue],
 ) -> Result<TestValue, TestError> {
     let analysis: AbstractEngine<'_> =
-        SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
+        SparseForwardInterpreter::new(program).with_linker(SameStageLinker);
     let analyzed = analysis.analyze_by_name("test", function, args.iter().cloned())?;
     expect_single(analyzed.response(analyzed.root()).unwrap_or_default())
 }
@@ -718,33 +718,33 @@ type InsensitiveEngine<'ir> = SparseForwardInterpreter<
 /// collapse onto one owner, so entry arguments must join and the owner must be
 /// re-analyzed when they rise.
 fn analyze_insensitive(
-    pipeline: &Pipeline<L>,
+    program: &Program<L>,
     function: &str,
     args: &[TestValue],
 ) -> Result<TestValue, TestError> {
     let analysis: InsensitiveEngine<'_> =
-        SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
+        SparseForwardInterpreter::new(program).with_linker(SameStageLinker);
     let analyzed = analysis.analyze_by_name("test", function, args.iter().cloned())?;
     expect_single(analyzed.response(analyzed.root()).unwrap_or_default())
 }
 
 #[test]
 fn concrete_symbol_entry_matches_name_and_direct_callee() {
-    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
-    let (stage, symbol) = local_function_symbol(&pipeline, "test", "gadd");
+    let program = parse(DIGRAPH_CALLABLE_PROGRAM);
+    let (stage, symbol) = local_function_symbol(&program, "test", "gadd");
     assert_eq!(Callee::from(symbol), Callee::Named(symbol));
 
-    let mut by_name: Engine<'_> = ConcreteInterpreter::new(&pipeline);
+    let mut by_name: Engine<'_> = ConcreteInterpreter::new(&program);
     let by_name =
         expect_single::<i64, TestError>(by_name.call_by_name("test", "gadd", [2, 3]).unwrap())
             .unwrap();
 
-    let mut by_symbol: Engine<'_> = ConcreteInterpreter::new(&pipeline);
+    let mut by_symbol: Engine<'_> = ConcreteInterpreter::new(&program);
     let by_symbol =
         expect_single::<i64, TestError>(by_symbol.call_by_symbol(stage, symbol, [2, 3]).unwrap())
             .unwrap();
 
-    let mut by_callee: Engine<'_> = ConcreteInterpreter::new(&pipeline);
+    let mut by_callee: Engine<'_> = ConcreteInterpreter::new(&program);
     let by_callee = expect_single::<i64, TestError>(
         by_callee
             .call(stage, Callee::Named(symbol), [2, 3])
@@ -757,22 +757,22 @@ fn concrete_symbol_entry_matches_name_and_direct_callee() {
 
 #[test]
 fn sparse_forward_symbol_entry_matches_name_and_direct_callee() {
-    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
-    let (stage, symbol) = local_function_symbol(&pipeline, "test", "gadd");
+    let program = parse(DIGRAPH_CALLABLE_PROGRAM);
+    let (stage, symbol) = local_function_symbol(&program, "test", "gadd");
     let args = || [ConstPropValue::Const(2), ConstPropValue::Const(3)];
 
-    let by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&program);
     let by_name = by_name.analyze_by_name("test", "gadd", args()).unwrap();
     let by_name =
         expect_single::<TestValue, TestError>(by_name.response(by_name.root()).unwrap()).unwrap();
 
-    let by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&program);
     let by_symbol = by_symbol.analyze_by_symbol(stage, symbol, args()).unwrap();
     let by_symbol =
         expect_single::<TestValue, TestError>(by_symbol.response(by_symbol.root()).unwrap())
             .unwrap();
 
-    let by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&program);
     let by_callee = by_callee
         .analyze(stage, Callee::Named(symbol), args())
         .unwrap();
@@ -836,17 +836,17 @@ specialize @test fn @caller(i64) -> i64 cfg {
 /// undecided `cond_br` explores both successors, and the returns are joined.
 #[test]
 fn abstract_cfg_body_joins_branch_arms() {
-    let pipeline = parse(CFG_BRANCH_PROGRAM);
+    let program = parse(CFG_BRANCH_PROGRAM);
     // Both arms return the same constant, so the join stays precise even
     // though the condition is unknown.
     assert_eq!(
-        analyze(&pipeline, "same", &[ConstPropValue::Top]).unwrap(),
+        analyze(&program, "same", &[ConstPropValue::Top]).unwrap(),
         ConstPropValue::Const(7)
     );
     // Differing arms join to Top — evidence both were actually explored
     // rather than one being picked.
     assert_eq!(
-        analyze(&pipeline, "diff", &[ConstPropValue::Top]).unwrap(),
+        analyze(&program, "diff", &[ConstPropValue::Top]).unwrap(),
         ConstPropValue::Top
     );
 }
@@ -855,9 +855,9 @@ fn abstract_cfg_body_joins_branch_arms() {
 /// callee and folds the returned summary into its own arithmetic.
 #[test]
 fn abstract_cfg_body_summarizes_call() {
-    let pipeline = parse(CFG_BRANCH_PROGRAM);
+    let program = parse(CFG_BRANCH_PROGRAM);
     assert_eq!(
-        analyze(&pipeline, "caller", &[ConstPropValue::Top]).unwrap(),
+        analyze(&program, "caller", &[ConstPropValue::Top]).unwrap(),
         ConstPropValue::Const(8)
     );
 }
@@ -867,10 +867,10 @@ fn abstract_cfg_body_summarizes_call() {
 /// as an analysis root and as a summarized callee.
 #[test]
 fn abstract_block_body_callable() {
-    let pipeline = parse(BLOCK_CALLABLE_PROGRAM);
+    let program = parse(BLOCK_CALLABLE_PROGRAM);
     assert_eq!(
         analyze(
-            &pipeline,
+            &program,
             "ladd",
             &[ConstPropValue::Const(40), ConstPropValue::Const(2)]
         )
@@ -879,13 +879,13 @@ fn abstract_block_body_callable() {
     );
     // Same body, reached through a call from a CFG-bodied caller.
     assert_eq!(
-        analyze(&pipeline, "main", &[]).unwrap(),
+        analyze(&program, "main", &[]).unwrap(),
         ConstPropValue::Const(42)
     );
     // An unknown operand propagates through the block body to Top.
     assert_eq!(
         analyze(
-            &pipeline,
+            &program,
             "ladd",
             &[ConstPropValue::Top, ConstPropValue::Const(2)]
         )
@@ -901,10 +901,10 @@ fn abstract_block_body_callable() {
 /// summarized callee.
 #[test]
 fn abstract_digraph_callable_analyzes() {
-    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
+    let program = parse(DIGRAPH_CALLABLE_PROGRAM);
     assert_eq!(
         analyze(
-            &pipeline,
+            &program,
             "gadd",
             &[ConstPropValue::Const(2), ConstPropValue::Const(3)]
         )
@@ -914,13 +914,13 @@ fn abstract_digraph_callable_analyzes() {
     // Same body, reached through a call from a CFG-bodied caller: the graph
     // owner's yields flow back as the callee's return summary.
     assert_eq!(
-        analyze(&pipeline, "main", &[]).unwrap(),
+        analyze(&program, "main", &[]).unwrap(),
         ConstPropValue::Const(5)
     );
     // An unknown port value propagates through the graph to Top.
     assert_eq!(
         analyze(
-            &pipeline,
+            &program,
             "gadd",
             &[ConstPropValue::Top, ConstPropValue::Const(3)]
         )
@@ -934,14 +934,14 @@ fn abstract_digraph_callable_analyzes() {
 /// would read unbound operands.
 #[test]
 fn abstract_digraph_follows_dependency_order() {
-    let pipeline = parse(DIGRAPH_TOPO_PROGRAM);
+    let program = parse(DIGRAPH_TOPO_PROGRAM);
     // (3 + 3) * (3 + 1) = 24, matching `digraph_runs_in_topological_order`.
     assert_eq!(
-        analyze(&pipeline, "g", &[ConstPropValue::Const(3)]).unwrap(),
+        analyze(&program, "g", &[ConstPropValue::Const(3)]).unwrap(),
         ConstPropValue::Const(24)
     );
     assert_eq!(
-        analyze(&pipeline, "main", &[]).unwrap(),
+        analyze(&program, "main", &[]).unwrap(),
         ConstPropValue::Const(24)
     );
 }
@@ -950,8 +950,8 @@ fn abstract_digraph_follows_dependency_order() {
 /// call-body traversal does not apply under abstract interpretation.
 #[test]
 fn abstract_ungraph_callable_reports_no_default_walker() {
-    let pipeline = parse(UNGRAPH_PROGRAM);
-    let error = analyze(&pipeline, "main", &[]).unwrap_err();
+    let program = parse(UNGRAPH_PROGRAM);
+    let error = analyze(&program, "main", &[]).unwrap_err();
     assert!(
         matches!(
             error,
@@ -967,8 +967,8 @@ fn abstract_ungraph_callable_reports_no_default_walker() {
 /// covering the pushed path.
 #[test]
 fn abstract_nested_digraph_reports_no_walker() {
-    let pipeline = parse(NESTED_DIGRAPH_PROGRAM);
-    let error = analyze(&pipeline, "main", &[]).unwrap_err();
+    let program = parse(NESTED_DIGRAPH_PROGRAM);
+    let error = analyze(&program, "main", &[]).unwrap_err();
     assert!(
         matches!(
             error,
@@ -1018,9 +1018,9 @@ specialize @test fn @main() -> i64 cfg {
 /// dependency order (`%a` before `%b` despite the textual order).
 #[test]
 fn digraph_node_calls_run_in_dependency_order() {
-    let pipeline = parse(DIGRAPH_CALLS_PROGRAM);
-    assert_eq!(run(&pipeline, "gcall", &[5]).unwrap(), 7);
-    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 7);
+    let program = parse(DIGRAPH_CALLS_PROGRAM);
+    assert_eq!(run(&program, "gcall", &[5]).unwrap(), 7);
+    assert_eq!(run(&program, "main", &[]).unwrap(), 7);
 }
 
 /// Abstractly the same graph must route each call through
@@ -1030,18 +1030,18 @@ fn digraph_node_calls_run_in_dependency_order() {
 /// substantively from the concrete walker.
 #[test]
 fn abstract_digraph_node_calls_are_summarized() {
-    let pipeline = parse(DIGRAPH_CALLS_PROGRAM);
+    let program = parse(DIGRAPH_CALLS_PROGRAM);
     assert_eq!(
-        analyze(&pipeline, "gcall", &[ConstPropValue::Const(5)]).unwrap(),
+        analyze(&program, "gcall", &[ConstPropValue::Const(5)]).unwrap(),
         ConstPropValue::Const(7)
     );
     assert_eq!(
-        analyze(&pipeline, "main", &[]).unwrap(),
+        analyze(&program, "main", &[]).unwrap(),
         ConstPropValue::Const(7)
     );
     // An unknown port flows through both summarized calls to Top.
     assert_eq!(
-        analyze(&pipeline, "gcall", &[ConstPropValue::Top]).unwrap(),
+        analyze(&program, "gcall", &[ConstPropValue::Top]).unwrap(),
         ConstPropValue::Top
     );
 }
@@ -1063,11 +1063,11 @@ specialize @test fn @grec(i64) -> i64 digraph ^g0(%x: i64) {
 
 #[test]
 fn abstract_digraph_self_recursion_converges() {
-    let pipeline = parse(DIGRAPH_RECURSION_PROGRAM);
+    let program = parse(DIGRAPH_RECURSION_PROGRAM);
     // Never returns, so the sound fixpoint is `bottom` — and, crucially, the
     // analysis reaches it instead of diverging.
     assert_eq!(
-        analyze(&pipeline, "grec", &[ConstPropValue::Const(1)]).unwrap(),
+        analyze(&program, "grec", &[ConstPropValue::Const(1)]).unwrap(),
         ConstPropValue::Bottom
     );
 }
@@ -1113,15 +1113,15 @@ specialize @test fn @twocalls() -> i64 cfg {
 /// graph).
 #[test]
 fn abstract_digraph_owner_joins_two_call_sites() {
-    let pipeline = parse(DIGRAPH_TWO_CALLERS_PROGRAM);
+    let program = parse(DIGRAPH_TWO_CALLERS_PROGRAM);
     // Shared owner: entry joins to Top, the graph re-runs, both results are Top.
     assert_eq!(
-        analyze_insensitive(&pipeline, "twocalls", &[]).unwrap(),
+        analyze_insensitive(&program, "twocalls", &[]).unwrap(),
         ConstPropValue::Top
     );
     // Distinct keys: 1+1 = 2 and 2+2 = 4, so 2 + 4 = 6.
     assert_eq!(
-        analyze(&pipeline, "twocalls", &[]).unwrap(),
+        analyze(&program, "twocalls", &[]).unwrap(),
         ConstPropValue::Const(6)
     );
 }
@@ -1154,9 +1154,9 @@ specialize @test fn @gcycle(i64) -> i64 digraph ^g0(%x: i64) {
 /// `Owner::Graph`'s single exact pass.
 #[test]
 fn cyclic_digraph_is_rejected_by_both_engines() {
-    let pipeline = parse(DIGRAPH_CYCLE_PROGRAM);
+    let program = parse(DIGRAPH_CYCLE_PROGRAM);
 
-    let concrete = run(&pipeline, "gcycle", &[1]).unwrap_err();
+    let concrete = run(&program, "gcycle", &[1]).unwrap_err();
     assert!(
         matches!(
             concrete,
@@ -1165,7 +1165,7 @@ fn cyclic_digraph_is_rejected_by_both_engines() {
         "expected GraphHasCycle concretely, got {concrete:?}"
     );
 
-    let abstract_ = analyze(&pipeline, "gcycle", &[ConstPropValue::Const(1)]).unwrap_err();
+    let abstract_ = analyze(&program, "gcycle", &[ConstPropValue::Const(1)]).unwrap_err();
     assert!(
         matches!(
             abstract_,
@@ -1212,8 +1212,8 @@ specialize @test fn @main() -> i64 cfg {
 /// that mapping.
 #[test]
 fn digraph_yields_multiple_values() {
-    let pipeline = parse(DIGRAPH_MULTIYIELD_PROGRAM);
-    let values: Vec<i64> = run_product(&pipeline, "gpair", &[3])
+    let program = parse(DIGRAPH_MULTIYIELD_PROGRAM);
+    let values: Vec<i64> = run_product(&program, "gpair", &[3])
         .unwrap()
         .iter()
         .copied()
@@ -1221,22 +1221,22 @@ fn digraph_yields_multiple_values() {
     // 3 + 3 = 6 and 3 * 3 = 9, in yield order.
     assert_eq!(values, vec![6, 9]);
     // Both land in the caller's two result slots: 6 + 9.
-    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 15);
+    assert_eq!(run(&program, "main", &[]).unwrap(), 15);
 }
 
 /// The abstract walker collects the same product, so a multi-result callee's
 /// return summary carries both slots.
 #[test]
 fn abstract_digraph_yields_multiple_values() {
-    let pipeline = parse(DIGRAPH_MULTIYIELD_PROGRAM);
+    let program = parse(DIGRAPH_MULTIYIELD_PROGRAM);
     assert_eq!(
-        analyze(&pipeline, "main", &[]).unwrap(),
+        analyze(&program, "main", &[]).unwrap(),
         ConstPropValue::Const(15)
     );
 }
 
 /// A graph whose boundary ports outnumber the call's arguments. Nothing earlier
-/// in the pipeline cross-checks the declared signature against the port list, so
+/// in the program cross-checks the declared signature against the port list, so
 /// the graph walkers arity-check when binding the ports — the same check, and
 /// the same error, in both engines.
 const DIGRAPH_PORT_ARITY_PROGRAM: &str = r#"
@@ -1259,9 +1259,9 @@ specialize @test fn @main() -> i64 cfg {
 
 #[test]
 fn digraph_port_arity_mismatch_is_reported() {
-    let pipeline = parse(DIGRAPH_PORT_ARITY_PROGRAM);
+    let program = parse(DIGRAPH_PORT_ARITY_PROGRAM);
 
-    let concrete = run(&pipeline, "main", &[]).unwrap_err();
+    let concrete = run(&program, "main", &[]).unwrap_err();
     assert!(
         matches!(
             concrete,
@@ -1273,7 +1273,7 @@ fn digraph_port_arity_mismatch_is_reported() {
         "expected a port arity mismatch concretely, got {concrete:?}"
     );
 
-    let abstract_ = analyze(&pipeline, "main", &[]).unwrap_err();
+    let abstract_ = analyze(&program, "main", &[]).unwrap_err();
     assert!(
         matches!(
             abstract_,

@@ -11,7 +11,7 @@
 //! ```ignore
 //! use kirin_interpreter::AnalysisResults;
 //!
-//! let analyzed = DenseLiveness::<Stage>::new(&pipeline).analyze(stage, callee)?;
+//! let analyzed = DenseLiveness::<Stage>::new(&program).analyze(stage, callee)?;
 //! let live = analyzed.fact(analyzed.root(), point);
 //! ```
 

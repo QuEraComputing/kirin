@@ -64,10 +64,10 @@ enum LowLevel {
 }
 
 // ---------------------------------------------------------------------------
-// Two-stage pipeline
+// Two-stage program
 // ---------------------------------------------------------------------------
 
-/// A compilation pipeline with two stages backed by different dialects.
+/// A program with two stages backed by different dialects.
 ///
 /// `@source` uses the higher-level IR (structured control flow, lambdas).
 /// `@lowered` uses the lower-level IR (unstructured control flow, bind).
@@ -80,7 +80,7 @@ enum Stage {
 }
 
 // ---------------------------------------------------------------------------
-// Program text: both stages in a single pipeline
+// Program text: both stages in a single program
 // ---------------------------------------------------------------------------
 
 /// A full two-stage program.
@@ -137,22 +137,22 @@ specialize @lowered fn @main(i64, i64) -> i64 cfg {
 // ---------------------------------------------------------------------------
 
 fn main() {
-    // Parse the full two-stage program into a single pipeline.
-    let mut pipeline: Pipeline<Stage> = Pipeline::new();
-    pipeline.parse(PROGRAM).expect("parse failed");
+    // Parse the full two-stage program into a single program.
+    let mut program: Program<Stage> = Program::new();
+    program.parse(PROGRAM).expect("parse failed");
 
     // Render every function across all its stages.
-    let rendered = pipeline.sprint();
+    let rendered = program.sprint();
 
     println!("{rendered}");
 
     // Re-parse the rendered text and render again.
-    let mut pipeline2: Pipeline<Stage> = Pipeline::new();
-    pipeline2
+    let mut program2: Program<Stage> = Program::new();
+    program2
         .parse(&rendered)
         .expect("re-parse of rendered output failed");
 
-    let rendered2 = pipeline2.sprint();
+    let rendered2 = program2.sprint();
 
     assert_eq!(
         rendered.trim_end(),

@@ -39,7 +39,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }
 
 #[test]
@@ -57,7 +57,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }
 
 #[test]
@@ -76,7 +76,7 @@ specialize @test fn @main(i64, i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }
 
 #[test]
@@ -93,7 +93,7 @@ specialize @test fn @main(i64, i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }
 
 #[test]
@@ -111,7 +111,7 @@ specialize @test fn @main(i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }
 
 #[test]
@@ -129,7 +129,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }
 
 #[test]
@@ -149,5 +149,5 @@ specialize @test fn @main(i64, i64, i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ScfLanguage>(input);
 }

@@ -12,7 +12,7 @@ pub enum RenderError {
     Io(io::Error),
     /// A formatting error occurred during document rendering.
     Fmt(fmt::Error),
-    /// The requested function ID was not found in the pipeline.
+    /// The requested function ID was not found in the program.
     UnknownFunction(Function),
 }
 
@@ -22,7 +22,7 @@ impl fmt::Display for RenderError {
             RenderError::Io(err) => write!(f, "I/O error during rendering: {err}"),
             RenderError::Fmt(err) => write!(f, "formatting error during rendering: {err}"),
             RenderError::UnknownFunction(func) => {
-                write!(f, "function {func:?} not found in pipeline")
+                write!(f, "function {func:?} not found in program")
             }
         }
     }

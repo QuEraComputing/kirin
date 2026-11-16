@@ -16,7 +16,7 @@
 //! wrapper over a [`StandardFixpointInterpreter`] driving a
 //! [`DenseBackwardTransfer`]:
 //!
-//! - **[`DenseBackwardTransfer`]** is the [`Interp`] delegate: pipeline access,
+//! - **[`DenseBackwardTransfer`]** is the [`Interp`] delegate: program access,
 //!   the point facts (one [`EnvStore`] environment for the analyzed callable),
 //!   the real dispatch location, and the *current point state* the dialect
 //!   rules transform through the shape-generic
@@ -50,7 +50,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, Product, SSAValue,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Product, Program, SSAValue,
     StageMeta, Statement, Symbol,
 };
 
@@ -173,11 +173,11 @@ impl<I> ClassicLivenessInterp for I where
 // DenseBackwardTransfer — point facts, dispatch location, and walk state
 // ===========================================================================
 
-/// The transfer of the dense backward engine: pipeline access, the point
+/// The transfer of the dense backward engine: program access, the point
 /// facts of the analyzed callable, the real dispatch location, and the
 /// current point state.
 pub struct DenseBackwardTransfer<'ir, S: StageMeta, V, E, F, Sem = ClassicLiveness> {
-    pipeline: &'ir Pipeline<S>,
+    program: &'ir Program<S>,
     location: Option<InterpLocation>,
     /// Point facts, one environment for the analyzed callable.
     env: EnvStore<LinkTarget, ProgramPoint, V>,
@@ -197,9 +197,9 @@ impl<'ir, S: StageMeta, V, E, F, Sem> DenseBackwardTransfer<'ir, S, V, E, F, Sem
 where
     V: HasBottom,
 {
-    fn new(pipeline: &'ir Pipeline<S>) -> Self {
+    fn new(program: &'ir Program<S>) -> Self {
         Self {
-            pipeline,
+            program,
             location: None,
             env: EnvStore::new(),
             root: None,
@@ -211,8 +211,8 @@ where
 }
 
 impl<'ir, S: StageMeta, V, E, F, Sem> DenseBackwardTransfer<'ir, S, V, E, F, Sem> {
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
+    pub fn program(&self) -> &'ir Program<S> {
+        self.program
     }
 
     /// The analyzed callable and its environment.
@@ -259,7 +259,7 @@ where
         index: EnvIndex,
     ) -> Result<DenseBackwardEffect<F>, E> {
         let info = self
-            .pipeline
+            .program
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         let previous = self.location.replace(InterpLocation {
@@ -480,11 +480,11 @@ where
     Sem: DenseBackwardSemantic,
 {
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
-        query::block_params(self.inner().pipeline(), stage, block).map_err(E::from)
+        query::block_params(self.inner().program(), stage, block).map_err(E::from)
     }
 
     fn first_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
-        query::first_statement(self.inner().pipeline(), stage, block).map_err(E::from)
+        query::first_statement(self.inner().program(), stage, block).map_err(E::from)
     }
 
     fn next_statement(
@@ -493,7 +493,7 @@ where
         block: Block,
         after: Statement,
     ) -> Result<Option<Statement>, E> {
-        query::next_statement(self.inner().pipeline(), stage, block, after).map_err(E::from)
+        query::next_statement(self.inner().program(), stage, block, after).map_err(E::from)
     }
 }
 
@@ -507,7 +507,7 @@ where
     type Frame = F;
 
     fn last_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
-        query::last_statement(self.inner().pipeline(), stage, block).map_err(E::from)
+        query::last_statement(self.inner().program(), stage, block).map_err(E::from)
     }
 
     fn previous_statement(
@@ -516,11 +516,11 @@ where
         block: Block,
         before: Statement,
     ) -> Result<Option<Statement>, E> {
-        query::previous_statement(self.inner().pipeline(), stage, block, before).map_err(E::from)
+        query::previous_statement(self.inner().program(), stage, block, before).map_err(E::from)
     }
 
     fn terminator_args(&self, stage: CompileStage, block: Block) -> Result<TerminatorArgs, E> {
-        query::terminator_arguments(self.inner().pipeline(), stage, block).map_err(E::from)
+        query::terminator_arguments(self.inner().program(), stage, block).map_err(E::from)
     }
 
     fn state(&self) -> V {
@@ -553,7 +553,7 @@ where
             let Some(live_in) = self.inner().env.read(env, entry)? else {
                 continue;
             };
-            let params = query::block_params(self.inner().pipeline(), stage, edge.target)?;
+            let params = query::block_params(self.inner().program(), stage, edge.target)?;
             let mut mapped = V::bottom();
             for value in live_in.values() {
                 match params.iter().position(|param| *param == value) {
@@ -647,7 +647,7 @@ where
 /// Dense backward liveness engine (classic per-program-point liveness).
 ///
 /// ```ignore
-/// let analyzed = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline)
+/// let analyzed = DenseBackwardInterpreter::<Stage, LiveSet>::new(&program)
 ///     .analyze(stage, callee)?;
 /// let live_in = analyzed.fact(analyzed.root(), ProgramPoint::BlockEntry(block));
 /// ```
@@ -676,10 +676,10 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+    pub fn new(program: &'ir Program<S>) -> Self {
         Self {
             driver: StandardFixpointInterpreter::new(
-                DenseBackwardTransfer::new(pipeline),
+                DenseBackwardTransfer::new(program),
                 DenseReaders::new(),
             ),
             linker: SameStageLinker,
@@ -705,8 +705,8 @@ where
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.driver.inner().pipeline()
+    pub fn program(&self) -> &'ir Program<S> {
+        self.driver.inner().program()
     }
 }
 
@@ -728,7 +728,7 @@ where
         stage: CompileStage,
         body: impl Into<Body>,
     ) -> Result<Vec<Block>, E> {
-        query::direct_body_blocks(self.driver.inner().pipeline(), stage, body.into())
+        query::direct_body_blocks(self.driver.inner().program(), stage, body.into())
             .map_err(E::from)
     }
 
@@ -741,13 +741,13 @@ where
         let stage = self
             .driver
             .inner()
-            .pipeline()
+            .program()
             .stage_by_name(stage_name)
             .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
             .driver
             .inner()
-            .pipeline()
+            .program()
             .lookup_function_by_name(function_name)
             .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
         self.analyze(stage, Callee::Function(function))
@@ -769,12 +769,12 @@ where
     /// It consumes the engine and returns the converged [`Analyzed`] state,
     /// like the other analysis engines; an error drops the engine.
     pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<Analyzed<Self>, E> {
-        let pipeline = self.driver.inner().pipeline();
-        let target = self.linker.resolve(pipeline, stage, &callee)?;
-        let body = target.body(pipeline)?;
+        let program = self.driver.inner().program();
+        let target = self.linker.resolve(program, stage, &callee)?;
+        let body = target.body(program)?;
         let blocks = self.direct_body_blocks(target.stage, body)?;
 
-        let mut transfer = DenseBackwardTransfer::new(pipeline);
+        let mut transfer = DenseBackwardTransfer::new(program);
         let env = transfer.env.get_or_allocate(target);
         transfer.root = Some((target, env));
         self.driver = StandardFixpointInterpreter::new(transfer, DenseReaders::new());

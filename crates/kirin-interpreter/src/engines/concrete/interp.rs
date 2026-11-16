@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
+    Block, CFG, CompileStage, Product, Program, SSAValue, StageMeta, Statement, Symbol,
 };
 
 use crate::core::query;
@@ -29,7 +29,7 @@ type ConcreteEnv<V> = EnvStore<Infallible, SSAValue, V>;
 /// [`ConcreteInterpreter`] does for the framework-default composition. Member
 /// frames stay generic over `F` and never name or construct its variants.
 pub struct ConcreteInterpreterCore<'ir, S: StageMeta, V, E, Lk, F> {
-    pipeline: &'ir Pipeline<S>,
+    program: &'ir Program<S>,
     linker: Lk,
     env: ConcreteEnv<V>,
     frames: Vec<F>,
@@ -54,9 +54,9 @@ pub struct ConcreteInterpreter<'ir, S: StageMeta, V, E, Lk = SameStageLinker> {
 }
 
 impl<'ir, S: StageMeta, V, E> ConcreteInterpreter<'ir, S, V, E, SameStageLinker> {
-    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+    pub fn new(program: &'ir Program<S>) -> Self {
         Self {
-            inner: ConcreteInterpreterCore::new(pipeline),
+            inner: ConcreteInterpreterCore::new(program),
         }
     }
 }
@@ -68,15 +68,15 @@ impl<'ir, S: StageMeta, V, E, Lk> ConcreteInterpreter<'ir, S, V, E, Lk> {
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.inner.pipeline()
+    pub fn program(&self) -> &'ir Program<S> {
+        self.inner.program()
     }
 }
 
 impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreterCore<'ir, S, V, E, SameStageLinker, F> {
-    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+    pub fn new(program: &'ir Program<S>) -> Self {
         Self {
-            pipeline,
+            program,
             linker: SameStageLinker,
             env: EnvStore::new(),
             frames: Vec::new(),
@@ -90,7 +90,7 @@ impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreterCore<'ir, S, V, E, Lk, F
     /// Swap the calling-convention component (the [`Linker`]).
     pub fn with_linker<Lk2>(self, linker: Lk2) -> ConcreteInterpreterCore<'ir, S, V, E, Lk2, F> {
         ConcreteInterpreterCore {
-            pipeline: self.pipeline,
+            program: self.program,
             linker,
             env: self.env,
             frames: self.frames,
@@ -99,8 +99,8 @@ impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreterCore<'ir, S, V, E, Lk, F
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
+    pub fn program(&self) -> &'ir Program<S> {
+        self.program
     }
 }
 
@@ -173,12 +173,12 @@ where
 
     fn resolve_callee(&self, lookup_stage: CompileStage, callee: &Callee) -> Result<LinkTarget, E> {
         self.linker
-            .resolve(self.pipeline, lookup_stage, callee)
+            .resolve(self.program, lookup_stage, callee)
             .map_err(E::from)
     }
 
     fn discover_body(&self, target: &LinkTarget) -> Result<Body, E> {
-        target.body(self.pipeline).map_err(E::from)
+        target.body(self.program).map_err(E::from)
     }
 }
 
@@ -195,8 +195,8 @@ where
         statement: Statement,
         index: EnvIndex,
     ) -> Result<Self::Effect, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
+        let program = self.program;
+        let info = program
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         let previous = self.location.replace(InterpLocation {
@@ -218,11 +218,11 @@ where
     Lk: Linker<S>,
 {
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
-        query::block_params(self.pipeline, stage, block).map_err(E::from)
+        query::block_params(self.program, stage, block).map_err(E::from)
     }
 
     fn first_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
-        query::first_statement(self.pipeline, stage, block).map_err(E::from)
+        query::first_statement(self.program, stage, block).map_err(E::from)
     }
 
     fn next_statement(
@@ -231,7 +231,7 @@ where
         block: Block,
         after: Statement,
     ) -> Result<Option<Statement>, E> {
-        query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
+        query::next_statement(self.program, stage, block, after).map_err(E::from)
     }
 }
 
@@ -243,7 +243,7 @@ where
     Lk: Linker<S>,
 {
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
-        query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
+        query::cfg_entry(self.program, stage, cfg).map_err(E::from)
     }
 }
 
@@ -259,7 +259,7 @@ where
         stage: CompileStage,
         graph: kirin_ir::DiGraph,
     ) -> Result<crate::GraphWalkPlan, E> {
-        query::digraph_walk_plan(self.pipeline, stage, graph).map_err(E::from)
+        query::digraph_walk_plan(self.program, stage, graph).map_err(E::from)
     }
 }
 
@@ -279,11 +279,11 @@ where
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
         let stage = self
-            .pipeline
+            .program
             .stage_by_name(stage_name)
             .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
-            .pipeline
+            .program
             .lookup_function_by_name(function_name)
             .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
         self.call(stage, Callee::Function(function), args)

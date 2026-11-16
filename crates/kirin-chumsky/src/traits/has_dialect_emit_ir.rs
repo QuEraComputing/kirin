@@ -7,7 +7,7 @@ use super::{EmitContext, EmitError, HasDialectParser};
 /// Dialect authors should not implement or reference it directly. The
 /// `#[derive(HasParser)]` macro generates all required impls automatically.
 /// The public parsing API uses [`HasParserEmitIR`] (via `ParseStatementText`
-/// and `ParsePipelineText`), which is the only emit-related trait that
+/// and `ParseProgramText`), which is the only emit-related trait that
 /// appears in user-facing where clauses.
 ///
 /// This is a separate trait from [`HasDialectParser`] because it is parameterized

@@ -1,4 +1,4 @@
-//! Integration tests for [`Pipeline::run_pass`], the rewrite-pass ownership
+//! Integration tests for [`Program::run_pass`], the rewrite-pass ownership
 //! boundary.
 //!
 //! The boundary has one success route and three failure routes, and the tests
@@ -6,7 +6,7 @@
 //! the pass panics, or the pass finishes but leaves derived metadata stale.
 //! Only the first leaves the stage in its slot; the other three poison the
 //! position, so the stage can be inspected through
-//! [`Pipeline::quarantined`] but never rewritten or re-entered.
+//! [`Program::quarantined`] but never rewritten or re-entered.
 //!
 //! Two properties are asserted repeatedly because they are the ones easiest to
 //! regress:
@@ -45,16 +45,16 @@ fn without_panic_output<T>(f: impl FnOnce() -> T) -> T {
 // Fixture
 // ---------------------------------------------------------------------------
 
-/// A one-stage pipeline whose stage holds one block with two arguments, an
+/// A one-stage program whose stage holds one block with two arguments, an
 /// `add` reading both, and an operand-less `nop`. `nop` is the handle for
 /// provoking a rejected edit: it has no operand slots, so any `replace_operand`
 /// on it fails without touching the stage.
 ///
 /// The stage is a bare [`StageInfo`], which is its own stage container —
 /// `StageInfo<L>` implements both [`StageMeta`] and [`HasStageInfo<L>`] — so a
-/// single-dialect pipeline needs no enum.
+/// single-dialect program needs no enum.
 struct Fixture {
-    pipeline: Pipeline<StageInfo<BuilderDialect>>,
+    program: Program<StageInfo<BuilderDialect>>,
     id: CompileStage,
     block: Block,
     add: Statement,
@@ -64,12 +64,12 @@ struct Fixture {
 impl Fixture {
     /// The stage still in its slot. Panics once a failed pass has poisoned it.
     fn stage(&self) -> &StageInfo<BuilderDialect> {
-        self.pipeline.stage(self.id).expect("stage is still usable")
+        self.program.stage(self.id).expect("stage is still usable")
     }
 
     /// The artifact a failed pass left at this position.
     fn quarantined(&self) -> &Quarantined<StageInfo<BuilderDialect>> {
-        self.pipeline
+        self.program
             .quarantined(self.id)
             .expect("the position was poisoned")
     }
@@ -87,7 +87,7 @@ impl Fixture {
         E: std::error::Error + Send + Sync + 'static,
         F: FnOnce(&mut Rewriter<BuilderDialect>) -> Result<T, E>,
     {
-        self.pipeline
+        self.program
             .run_pass::<BuilderDialect, _, _, _>(self.id, pass)
     }
 }
@@ -110,11 +110,11 @@ fn fixture() -> Fixture {
         .stmt(nop)
         .new();
 
-    let mut pipeline: Pipeline<StageInfo<BuilderDialect>> = Pipeline::new();
-    let id = pipeline.add_stage_raw(stage.finalize().unwrap());
+    let mut program: Program<StageInfo<BuilderDialect>> = Program::new();
+    let id = program.add_stage_raw(stage.finalize().unwrap());
 
     Fixture {
-        pipeline,
+        program,
         id,
         block,
         add,
@@ -144,7 +144,7 @@ fn a_successful_pass_returns_the_stage_and_the_pass_value() {
     );
     // And the stage is ordinary IR again, back in its slot, mirrors included.
     assert_eq!(verify_derived(f.stage()), Ok(()));
-    assert!(f.pipeline.quarantined(f.id).is_none());
+    assert!(f.program.quarantined(f.id).is_none());
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn a_pass_that_returns_an_error_quarantines_the_stage() {
 
     assert_eq!(error, StagePassError::PassFailed);
     assert!(
-        f.pipeline.stage(f.id).is_none(),
+        f.program.stage(f.id).is_none(),
         "the position is poisoned, so its stage is not lent out again"
     );
 

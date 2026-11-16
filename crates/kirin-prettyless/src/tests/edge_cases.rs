@@ -57,30 +57,30 @@ fn test_config_large_tab_spaces() {
     insta::assert_snapshot!(buf);
 }
 
-// --- Empty pipeline ---
+// --- Empty program ---
 
 #[test]
-fn test_empty_pipeline_render() {
-    use crate::PipelinePrintExt;
+fn test_empty_program_render() {
+    use crate::ProgramPrintExt;
 
-    let pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let output = pipeline.sprint();
+    let program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let output = program.sprint();
     assert_eq!(output, "");
 }
 
-// --- Pipeline with function but no stages ---
+// --- Program with function but no stages ---
 
 #[test]
-fn test_pipeline_function_no_stages() {
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("orphan").new().unwrap();
+fn test_program_function_no_stages() {
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("orphan").new().unwrap();
 
     // Function exists but has no staged representations
-    let output = PrintExt::sprint(&func, &pipeline);
+    let output = PrintExt::sprint(&func, &program);
     assert_eq!(output, "");
 }
 
-// --- Unknown function in pipeline ---
+// --- Unknown function in program ---
 // Note: Cannot construct a bogus Function ID from outside kirin-ir (Id is pub(crate)),
 // so we test the error variants directly instead.
 
@@ -260,12 +260,12 @@ fn test_render_error_display_fmt() {
 
 #[test]
 fn test_render_error_display_unknown_function() {
-    // Create a real function in a pipeline, then check the error variant
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("missing").new().unwrap();
+    // Create a real function in a program, then check the error variant
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("missing").new().unwrap();
     let err = crate::RenderError::UnknownFunction(func);
     let msg = err.to_string();
-    assert!(msg.contains("not found in pipeline"), "got: {}", msg);
+    assert!(msg.contains("not found in program"), "got: {}", msg);
 }
 
 #[test]
@@ -278,8 +278,8 @@ fn test_render_error_source() {
     let fmt_err = crate::RenderError::Fmt(std::fmt::Error);
     assert!(fmt_err.source().is_some());
 
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("src_test").new().unwrap();
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("src_test").new().unwrap();
     let unk_err = crate::RenderError::UnknownFunction(func);
     assert!(unk_err.source().is_none());
 }
@@ -288,16 +288,16 @@ fn test_render_error_source() {
 
 #[test]
 fn test_staged_function_unnamed() {
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
     // Create function without a name
-    let func = pipeline.function().new().unwrap();
+    let func = program.function().new().unwrap();
 
-    let stage_id = pipeline
+    let stage_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .name("X")
         .new();
-    let sf = pipeline
+    let sf = program
         .staged_function()
         .func(func)
         .stage(stage_id)
@@ -305,7 +305,7 @@ fn test_staged_function_unnamed() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+    program.stage_mut(stage_id).unwrap().with_builder(|ctx| {
         let a = SimpleLanguage::op_constant(ctx, 0i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
@@ -318,7 +318,7 @@ fn test_staged_function_unnamed() {
             .unwrap();
     });
 
-    let output = PrintExt::sprint(&func, &pipeline);
+    let output = PrintExt::sprint(&func, &program);
     // Should contain "unnamed" since no name was set
     insta::assert_snapshot!(output);
 }
@@ -368,21 +368,21 @@ fn test_document_list_custom_separator() {
     assert_eq!(buf, "1 | 2 | 3");
 }
 
-// --- PipelineRenderBuilder with custom config ---
+// --- ProgramRenderBuilder with custom config ---
 
 #[test]
-fn test_pipeline_render_builder_write_to() {
-    use crate::PipelinePrintExt;
+fn test_program_render_builder_write_to() {
+    use crate::ProgramPrintExt;
 
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("wr").new().unwrap();
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("wr").new().unwrap();
 
-    let stage_id = pipeline
+    let stage_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .name("S")
         .new();
-    let sf = pipeline
+    let sf = program
         .staged_function()
         .func(func)
         .stage(stage_id)
@@ -390,7 +390,7 @@ fn test_pipeline_render_builder_write_to() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+    program.stage_mut(stage_id).unwrap().with_builder(|ctx| {
         let a = SimpleLanguage::op_constant(ctx, 5i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
@@ -404,7 +404,7 @@ fn test_pipeline_render_builder_write_to() {
     });
 
     let mut output = Vec::new();
-    pipeline.render().write_to(&mut output).unwrap();
+    program.render().write_to(&mut output).unwrap();
     let text = String::from_utf8(output).unwrap();
     assert!(text.contains("stage @S"), "got: {}", text);
     assert!(text.contains("@wr"), "got: {}", text);
@@ -414,15 +414,15 @@ fn test_pipeline_render_builder_write_to() {
 
 #[test]
 fn test_function_render_builder_write_to() {
-    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("fwr").new().unwrap();
+    let mut program: Program<kirin_ir::StageInfo<SimpleLanguage>> = Program::new();
+    let func = program.function().name("fwr").new().unwrap();
 
-    let stage_id = pipeline
+    let stage_id = program
         .add_stage()
         .stage(kirin_ir::StageInfo::default())
         .name("T")
         .new();
-    let sf = pipeline
+    let sf = program
         .staged_function()
         .func(func)
         .stage(stage_id)
@@ -430,7 +430,7 @@ fn test_function_render_builder_write_to() {
         .new()
         .unwrap();
 
-    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+    program.stage_mut(stage_id).unwrap().with_builder(|ctx| {
         let a = SimpleLanguage::op_constant(ctx, 99i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
@@ -444,7 +444,7 @@ fn test_function_render_builder_write_to() {
     });
 
     let mut output = Vec::new();
-    PrintExt::render(&func, &pipeline)
+    PrintExt::render(&func, &program)
         .write_to(&mut output)
         .unwrap();
     let text = String::from_utf8(output).unwrap();

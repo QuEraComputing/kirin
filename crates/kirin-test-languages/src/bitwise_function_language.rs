@@ -5,7 +5,7 @@ use kirin_function::Return;
 use kirin_ir::{CFG, Dialect, Signature};
 
 /// Test language: Function + Bitwise + ControlFlow + Return.
-/// Used for bitwise pipeline roundtrip tests.
+/// Used for bitwise program roundtrip tests.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
 #[cfg_attr(feature = "pretty", derive(kirin_derive_chumsky::PrettyPrint))]
