@@ -164,7 +164,7 @@ impl<T: CompileTimeValue> For<T> {
 /// Supports zero values (void-if) through N values (multi-result).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$yield[ {values}]")]
-#[kirin(terminator, type = T)]
+#[kirin(terminator, builders, type = T)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Yield<T: CompileTimeValue> {
     values: Vec<SSAValue>,
