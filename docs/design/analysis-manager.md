@@ -18,7 +18,7 @@ cached result.**
 - **Analysis**: a computation that reads IR and produces facts, such as
   constant propagation ("`%b` is always 12") or demand ("nothing needs `%t`").
 - **Key**: what one result of an analysis is for, chosen by whoever asks
-  for it: a stage, or a list of roots each at its stage. Each distinct key
+  for it: a stage, or a set of roots each at its stage. Each distinct key
   gets its own result.
 - **Result**: the value an analysis produces for one key. The database
   caches results; rules read them.
@@ -26,8 +26,9 @@ cached result.**
   through a `Rewriter`. A `RewriteDriver` runs inside a pass. A pass may run a
   driver once, several times, or alongside other edits, and the database only
   sees the pass as a whole.
-- **Revision**: a counter the database bumps on every edit to the pipeline.
-  Each result records the revision it was computed at.
+- **Revision**: a counter the database bumps once for each pass that edits
+  the pipeline, and on each `pipeline_mut()`. Each result records the
+  revision it was computed at.
 - **Stale**: a result computed at an earlier revision, that is, on IR that
   has since been edited.
 - **`S`**: the pipeline's stage type, as in `Pipeline<S>`: the enum of every
@@ -83,7 +84,7 @@ All in `kirin-rewrite`, module `analysis`.
 /// It does not mention `S`, so a rule set can name an analysis and its key,
 /// and a rule can read its result.
 pub trait AnalysisKind: 'static {
-    /// What one result is for, such as a stage or a list of roots.
+    /// What one result is for, such as a stage or a set of roots.
     type Key: Clone + Eq + Hash + Send + Sync + 'static;
     type Output: Send + Sync + 'static;
 }
@@ -144,8 +145,8 @@ impl<S> Database<S> {
     pub fn pipeline_mut(&mut self) -> &mut Pipeline<S>;
     pub fn into_pipeline(self) -> Pipeline<S>;
 
-    /// How many times the pipeline has been edited since the database was
-    /// created.
+    /// How many passes have edited the pipeline, plus how many times
+    /// `pipeline_mut` was called, since the database was created.
     pub fn revision(&self) -> u64;
 
     /// Compute every requirement in `requires` that is not cached, then run
@@ -162,7 +163,8 @@ impl<S> Database<S> {
 pub enum AnalysisError {
     /// The analysis itself failed.
     Failed { analysis: &'static str, source: Box<dyn Error + Send + Sync> },
-    /// Computing `analysis` needed `analysis` again.
+    /// Computing `analysis` for a key needed `analysis` for the same key
+    /// again. The same analysis for a different key is not a cycle.
     Cycle { analysis: &'static str },
     /// A pass required `analysis`, but it was never registered.
     Unregistered { analysis: &'static str },
@@ -247,25 +249,31 @@ db.get::<StageConstProp>(&lowered)?;   // another result
 ```
 
 A root-based analysis starts from given roots, each at its stage, and may
-follow calls across stages with `CrossStageLinker`. Its key lists the roots:
+follow calls across stages with `CrossStageLinker`. Its key maps each root
+function, at its stage, to its arguments:
 
 ```rust
 impl AnalysisKind for ConstPropFacts {
-    type Key = Vec<(CompileStage, Callee, Vec<ConstPropValue<i64>>)>;
+    type Key = BTreeMap<(CompileStage, Callee), Vec<ConstPropValue<i64>>>;
     type Output = /* .. */;
 }
 
-// One result, which may span stages:
-db.get::<ConstPropFacts>(&vec![(source, main, vec![Top])])?;
-// A second result:
-db.get::<ConstPropFacts>(&vec![(source, helper, vec![Const(3)])])?;
+let from_main = BTreeMap::from([((source, main), vec![Top])]);
+let from_helper = BTreeMap::from([((source, helper), vec![Const(3)])]);
+db.get::<ConstPropFacts>(&from_main)?;     // one result, which may span stages
+db.get::<ConstPropFacts>(&from_helper)?;   // a second result
 ```
 
 The key must be `Clone + Eq + Hash`, since the cache looks results up by it.
-Asking with an equal key returns the cached result. Equal means equal as
-values, so `[main, helper]` and `[helper, main]` are two keys that compute
-the same result twice; an analysis whose key lists roots should keep them in
-a canonical order, for example by sorting them or using a sorted set.
+Asking with an equal key returns the cached result.
+
+Roots have no order, so a root-based key is a map, not a list. A
+`BTreeMap` keeps its entries sorted by arena id, which carries no meaning
+but is deterministic, so the same roots give the same key whatever order
+they are added in, and its `Eq` and `Hash` follow from that. A map also
+holds one root per function, which fits entry points: each is listed once,
+with conservative facts. This needs `Ord` on `CompileStage` and `Callee`,
+which order by arena id; the argument values need only `Eq + Hash`.
 
 This is the shape of a query in salsa, `fn query(db, key) -> Output`: one
 result per key, asked for by key, with `run` getting the database shared.
@@ -342,18 +350,15 @@ Every result is dropped, including those whose keys name other stages,
 because a result can depend on any stage through cross-stage calls. Telling
 them apart is a later refinement.
 
-A pass that edits nothing keeps every result automatically.
-
 **Revisions.** Dropping is done with a revision counter, as in salsa. The
-database counts the pipeline's edits, and each cached result records the
-revision it was computed at. An edit bumps the revision, and a lookup
-returns only results computed at the current one. Bumping also frees the
-stale results, so the cache never holds them. With the whole pipeline as
-one input this behaves exactly as clearing the cache. Salsa also keeps one
-revision, but treats each input separately, recording the revision it last
-changed at; making each function body such an input is how this later
-becomes selective (see [Toward query-based
-compilation](#toward-query-based-compilation)).
+database bumps it once for each pass that edits the pipeline, and each cached
+result records the revision it was computed at. A lookup returns only results
+computed at the current revision. Bumping also frees the stale results, so the
+cache never holds them. With the whole pipeline as one input this behaves
+exactly as clearing the cache. Salsa also keeps one revision, but treats each
+input separately, recording the revision it last changed at; making each
+function body such an input is how this later becomes selective (see [Toward
+query-based compilation](#toward-query-based-compilation)).
 
 **No edit goes unseen.** The database owns the pipeline, so code edits it in
 one of three ways, and each keeps the cache honest:
@@ -411,7 +416,7 @@ to build a fresh rule for each sweep (or each block). The rule keeps the
 
 ```rust
 // Sound only if `main` is the program's only entry point.
-let roots = vec![(stage, main, vec![Top])];
+let roots = BTreeMap::from([((stage, main), vec![Top])]);
 rules
     .add_statement_rule("fold", {
         let roots = roots.clone();
@@ -448,14 +453,14 @@ an analysis runs from given roots, and the result answers reads by context,
 value or program point. The interpreter itself memoizes nothing; the
 database caches its results.
 
-**The caller gives the roots, through the key.** A root is a callable with
-its arguments (constprop) or its demanded outputs (demand), as
-`analyze(stage, callee, args)` takes. A root-based analysis's key lists its
-roots; a stage-wide analysis's key is a stage, and its roots are every
-function of that stage. Either way the key alone decides what is analyzed:
-the analysis picks nothing on its own. A root is a callable, not an
-arbitrary statement: one can root at any function, but not at a lone
-`scf.if`. Analyzing from `main` also reaches what `main` calls.
+**The caller gives the roots, through the key.** A root is a callable with its
+arguments (constprop) or its demanded outputs (demand), as `analyze(stage,
+callee, args)` takes. A root-based analysis's key maps each root to its
+arguments; a stage-wide analysis's key is a stage, and its roots are every
+function of that stage. Either way the key alone decides what is analyzed: the
+analysis picks nothing on its own. A root is a callable, not an arbitrary
+statement: one can root at any function, but not at a lone `scf.if`. Analyzing
+from `main` also reaches what `main` calls.
 
 **Reads are keyed, at any statement the analysis reached.** That includes
 statements in nested bodies, such as the arms of an `scf.if`, and in every
@@ -473,12 +478,6 @@ in all of them: the join over the callable's contexts, as
 `AnalysisResults::joined_fact` computes. Per-context reads are also
 available, for rules that need them. As the interpreter puts it, joined
 answers claim nothing about callers the analysis did not visit.
-
-M3 uses this API as follows.
-
-**A root-based analysis's key lists its roots,** each with its stage and its
-arguments or demanded outputs, as a plain `Vec<(CompileStage, Callee,
-Vec<V>)>`.
 
 **One result covers every root in its key.** Since analyzing from `main`
 already reaches what `main` calls, a callee needs no result of its own. With
@@ -520,7 +519,8 @@ An analysis's result can be the interpreter's own: `ConstPropFacts::run`
 calls `analyze(stage, callee, args)` for each root and returns the owned
 `Analyzed` values it gets, with no copy into a rewrite-side type.
 
-The pieces sit where the interpreter puts its own:
+Each piece goes in the crate that already holds the matching interpreter
+code:
 
 | Piece | Crate |
 |---|---|
@@ -575,19 +575,21 @@ recorded.
 Each step is reviewed before the next starts.
 
 1. **Core types.** `AnalysisKind`, `Analysis`, `AnalysisCache`, `Requirement`,
-   `Database`, `AnalysisError`, `RunPassError`, with cycle detection, and
-   `Rewriter::edited` in `kirin-ir`. Tests in
+   `Database`, `AnalysisError`, `RunPassError`, with cycle detection,
+   `Rewriter::edited` in `kirin-ir`, and `Ord` on the IR id types and
+   `Callee`, ordered by arena id. Tests in
    `crates/kirin-rewrite/tests/analysis_database.rs` with test analyses
    counting their runs: compute once then reuse; `get_cached` never computes;
    a failure is not cached; distinct keys get distinct results; equal keys
-   share one; dependencies through the database; cycles; `run_pass` computes
-   every requirement, including one analysis for two keys; an unregistered
-   requirement fails before the pass and leaves the stage untouched; `get`
-   computes an unregistered analysis; a pass with no edits keeps results and
-   the revision; a pass with an edit bumps the revision and drops every
-   result, whatever its key; a pass that edits and then drains its events
-   still bumps the revision; a failed pass drops everything; `pipeline_mut()`
-   drops everything; a pass reads the results computed before it.
+   share one; the same roots added in two orders share one; dependencies
+   through the database; cycles; `run_pass` computes every requirement,
+   including one analysis for two keys; an unregistered requirement fails
+   before the pass and leaves the stage untouched; `get` computes an
+   unregistered analysis; a pass with no edits keeps results and the revision;
+   a pass with an edit bumps the revision and drops every result, whatever its
+   key; a pass that edits and then drains its events still bumps the revision;
+   a failed pass drops everything; `pipeline_mut()` drops everything; a pass
+   reads the results computed before it.
 2. **Rules read results.** Recipes receive `&AnalysisCache`;
    `.requires::<A>(key)`; `RuleSet::required()`; the driver checks
    requirements and fails with `MissingAnalysis`.
