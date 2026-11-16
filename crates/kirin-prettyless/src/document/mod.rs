@@ -6,6 +6,7 @@
 
 pub(crate) mod builder;
 mod ir_render;
+mod module;
 
 pub use builder::Document;
 

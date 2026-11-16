@@ -32,6 +32,10 @@
 //! emitting IR, and [`EmitContext`] gives full control over SSA name
 //! registration.
 //!
+//! [`ParseModuleText::parse_module`] parses a standalone
+//! `module @name { statement; ... }` into an explicitly selected program stage.
+//! It shares an SSA scope across members and reuses the dialect statement parser.
+//!
 //! # Defining Dialects
 //!
 //! ```ignore
@@ -49,6 +53,7 @@
 pub mod ast;
 mod builtins;
 mod function_text;
+mod module_text;
 mod parsers;
 mod traits;
 
@@ -59,6 +64,7 @@ pub use kirin_lexer::Token;
 
 pub use ast::*;
 pub use function_text::*;
+pub use module_text::ParseModuleText;
 pub use parsers::*;
 pub use traits::*;
 
@@ -80,6 +86,7 @@ pub mod prelude {
     pub use crate::function_text::{
         FunctionParseError, FunctionParseErrorKind, ParseDispatch, ParseProgramText,
     };
+    pub use crate::module_text::ParseModuleText;
     pub use crate::parsers::*;
     pub use crate::traits::{
         BoxedParser, ChumskyError, DirectlyParsable, EmitContext, EmitError, EmitIR,
