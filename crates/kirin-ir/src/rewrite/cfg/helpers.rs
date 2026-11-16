@@ -38,7 +38,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// The statement chain starting at `head`, following `next` links.
-    pub(super) fn chain_from(&self, head: Option<Statement>) -> Vec<Statement> {
+    pub(in crate::rewrite) fn chain_from(&self, head: Option<Statement>) -> Vec<Statement> {
         let mut out = Vec::new();
         let mut current = head;
         while let Some(stmt) = current {
@@ -49,7 +49,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Every statement of `block`: the non-terminator chain, then the terminator.
-    pub(super) fn block_statements(&self, block: Block) -> Vec<Statement> {
+    pub(in crate::rewrite) fn block_statements(&self, block: Block) -> Vec<Statement> {
         let Some(info) = block.get_info(self.stage) else {
             return Vec::new();
         };
@@ -184,7 +184,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Allocate block argument `index` of `block`.
-    pub(super) fn alloc_block_argument(
+    pub(in crate::rewrite) fn alloc_block_argument(
         &mut self,
         block: Block,
         index: usize,

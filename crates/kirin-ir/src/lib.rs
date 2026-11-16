@@ -55,7 +55,7 @@ pub use product::{HasProduct, Product};
 pub use program::Program;
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
 pub use rewrite::{
-    InsertionPoint, MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter,
+    IRMap, InsertionPoint, MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter,
 };
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,

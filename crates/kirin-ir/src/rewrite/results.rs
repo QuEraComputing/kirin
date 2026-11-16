@@ -9,7 +9,7 @@
 //! it is gone each result slot is either bound or a real tombstone. It also
 //! tombstones every detached statement it never inserted.
 
-use crate::{Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
+use crate::{Body, Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
 
 use crate::rewrite::rewriter::{RewriteError, Rewriter};
 
@@ -71,11 +71,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every detached statement no [`insert`](Rewriter::insert)
     /// placed, with its results, operand uses and bodies, every
-    /// [`new_block`](Rewriter::new_block) block no statement owns, and every
+    /// [`new_block`](Rewriter::new_block) block no statement owns, every
+    /// detached CFG (such as a [`clone_cfg`](Rewriter::clone_cfg) copy) no
+    /// statement adopted, and every
     /// [`new_result`](Rewriter::new_result) value no statement bound, so
     /// nothing detached or empty outlives the `Rewriter`.
     ///
-    /// After a panic the detached statements and blocks are left in place: a
+    /// After a panic the detached statements and bodies are left in place: a
     /// panic part-way through an edit can leave them inconsistent, so
     /// tombstoning them could panic again. Two cases are covered. When this
     /// `Rewriter` is dropped while a panic unwinds, a second panic would abort
@@ -90,6 +92,9 @@ impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
             }
             for block in std::mem::take(&mut self.unowned_blocks) {
                 self.tombstone_block(block);
+            }
+            for cfg in std::mem::take(&mut self.detached_cfgs) {
+                self.tombstone_body(Body::CFG(cfg));
             }
         }
         for (value, _) in self.unbound_ssa_results.drain() {
