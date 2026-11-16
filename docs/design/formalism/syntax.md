@@ -8,13 +8,13 @@ just enough formal shorthand to compose with Parts II-IV.
 ## Reading Recipe
 
 - **Formal read:** Treat this as the grammar-level domain of `s` (statement), owners (`CFG`/`Block`), and SSA carriers consumed by the judgment.
-- **API read:** Verify mappings in `crates/kirin-ir/src/{pipeline.rs,stage/info.rs,language.rs,node/{function/*,cfg.rs,block.rs,stmt.rs,ssa.rs},product.rs}` and stage/language composition in `example/toy-lang/src/{language.rs,stage.rs}`.
+- **API read:** Verify mappings in `crates/kirin-ir/src/{program.rs,stage/info.rs,language.rs,node/{function/*,cfg.rs,block.rs,stmt.rs,ssa.rs},product.rs}` and stage/language composition in `example/toy-lang/src/{language.rs,stage.rs}`.
 
 The formal names below map directly to concrete Rust IR/runtime types.
 
 | Formal name | Rust type / trait | Code |
 | --- | --- | --- |
-| `Program` | `Pipeline<S>` | [`crates/kirin-ir/src/pipeline.rs`](../../../crates/kirin-ir/src/pipeline.rs) |
+| `Program` | `Program<S>` | [`crates/kirin-ir/src/program.rs`](../../../crates/kirin-ir/src/program.rs) |
 | `Stage` | `StageInfo<L>` plus stage enum implementing `StageMeta` | [`crates/kirin-ir/src/stage/info.rs`](../../../crates/kirin-ir/src/stage/info.rs), [`crates/kirin-ir/src/stage/meta.rs`](../../../crates/kirin-ir/src/stage/meta.rs), [`example/toy-lang/src/stage.rs`](../../../example/toy-lang/src/stage.rs) |
 | `Language` | dialect enum `L: Dialect` (often wrapper enum with `#[wraps]`) | [`crates/kirin-ir/src/language.rs`](../../../crates/kirin-ir/src/language.rs), [`example/toy-lang/src/language.rs`](../../../example/toy-lang/src/language.rs) |
 | `Function` | `FunctionInfo` / `Function` | [`crates/kirin-ir/src/node/function/generic.rs`](../../../crates/kirin-ir/src/node/function/generic.rs) |
@@ -28,9 +28,9 @@ The formal names below map directly to concrete Rust IR/runtime types.
 
 ## I.2 IR shape (interpreter-relevant)
 
-Kirin syntax for interpreter purposes is SSA IR over staged pipelines:
+Kirin syntax for interpreter purposes is SSA IR over staged programs:
 
-- `Pipeline<S>` is the immutable top-level program container.
+- `Program<S>` is the immutable top-level program container.
 - `StageInfo<L>` is per-stage storage for one language `L`.
 - `L: Dialect` is the stage language (often an enum wrapping multiple dialects).
 - `Function -> StagedFunction -> SpecializedFunction` is the callable hierarchy.
@@ -42,7 +42,7 @@ The interpreter executes this graph-like SSA structure, not an expression tree.
 ## I.3 Minimal grammar skeleton
 
 ```
-Program        ::= Pipeline(Stage*)
+Program        ::= Program(Stage*)
 Stage          ::= StageInfo(Language)
 Language       ::= DialectEnumVariant*
 
@@ -90,7 +90,7 @@ impls.
 
 Interpreter correctness relies on:
 
-1. Stage and statement references are valid in `Pipeline`.
+1. Stage and statement references are valid in `Program`.
 2. Block argument arities match incoming edge products.
 3. Call argument/result arities match target signatures.
 4. Statement ordering and successor metadata are coherent.

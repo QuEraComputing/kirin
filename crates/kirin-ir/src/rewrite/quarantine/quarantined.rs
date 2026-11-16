@@ -15,7 +15,7 @@ use super::report;
 ///
 /// `S` is what the quarantine took custody of. A pass over standalone stage
 /// info yields `Quarantined<StageInfo<L>>`; a pass over a stage that lives in a
-/// [`Pipeline`](crate::Pipeline) yields `Quarantined<S>` over the whole stage
+/// [`Program`](crate::Program) yields `Quarantined<S>` over the whole stage
 /// container. This allows a stage wrapping several dialects be
 /// quarantined without naming them.
 ///
@@ -86,7 +86,7 @@ impl<S> Quarantined<S> {
     /// info inside it before the stage moves in.
     ///
     /// The counterpart to [`Quarantined::from_stage_info`] for a stage enum: a
-    /// [`Pipeline`](crate::Pipeline) holds StageSlots which `wrap stage: S`,
+    /// [`Program`](crate::Program) holds StageSlots which `wrap stage: S`,
     /// so we need to be able to quarantine these. However, the report can only
     /// be rendered from the [`StageInfo`] a pass actually rewrote.
     #[allow(dead_code)]
@@ -111,7 +111,7 @@ impl<L: Dialect> Quarantined<StageInfo<L>> {
     /// Take ownership of a bare stage info a failed pass has already mutated,
     /// rendering its report before it moves in.
     ///
-    /// [`Pipeline::run_pass`](crate::Pipeline::run_pass) is the only caller in ordinary use; this
+    /// [`Program::run_pass`](crate::Program::run_pass) is the only caller in ordinary use; this
     /// stays public so that tests can build a `Quarantined` over a stage
     /// corrupted on purpose, which no pass can produce through a
     /// [`Rewriter`](crate::Rewriter).

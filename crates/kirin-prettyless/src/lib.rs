@@ -26,14 +26,14 @@ mod config;
 mod document;
 mod error;
 mod impls;
-mod pipeline;
+mod program;
 mod traits;
 
 // Re-export main types
 pub use config::Config;
 pub use document::Document;
-pub use pipeline::{
-    FunctionRenderBuilder, PipelineDocument, PipelinePrintExt, PipelineRenderBuilder, PrintExt,
+pub use program::{
+    FunctionRenderBuilder, PrintExt, ProgramDocument, ProgramPrintExt, ProgramRenderBuilder,
     RenderDispatch,
 };
 
@@ -49,9 +49,9 @@ pub type ArenaDoc<'a> = prettyless::DocBuilder<'a, Arena<'a>>;
 /// Prelude module for common imports.
 pub mod prelude {
     pub use crate::{
-        ArenaDoc, Config, DocAllocator, Document, FunctionRenderBuilder, PipelineDocument,
-        PipelinePrintExt, PipelineRenderBuilder, PrettyPrint, PrettyPrintExt,
-        PrettyPrintViaDisplay, PrintExt, RenderDispatch, RenderError,
+        ArenaDoc, Config, DocAllocator, Document, FunctionRenderBuilder, PrettyPrint,
+        PrettyPrintExt, PrettyPrintViaDisplay, PrintExt, ProgramDocument, ProgramPrintExt,
+        ProgramRenderBuilder, RenderDispatch, RenderError,
     };
     pub use prettyless;
 }

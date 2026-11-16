@@ -1,4 +1,4 @@
-use kirin_ir::{Body, CompileStage, Pipeline, SpecializedFunction, StageMeta};
+use kirin_ir::{Body, CompileStage, Program, SpecializedFunction, StageMeta};
 
 use super::query;
 use crate::{Callee, InterpreterError, StageQuery};
@@ -26,8 +26,8 @@ impl LinkTarget {
     ///
     /// Each lookup reads the specialization's authoritative definition rather
     /// than retaining a separate body alongside the target.
-    pub fn body<S: StageQuery>(&self, pipeline: &Pipeline<S>) -> Result<Body, InterpreterError> {
-        query::callable_body(pipeline, self.stage, self.specialization)
+    pub fn body<S: StageQuery>(&self, program: &Program<S>) -> Result<Body, InterpreterError> {
+        query::callable_body(program, self.stage, self.specialization)
     }
 }
 
@@ -43,7 +43,7 @@ pub trait Linker<S: StageMeta> {
     /// another stage under a cross-stage policy.
     fn resolve(
         &self,
-        pipeline: &Pipeline<S>,
+        program: &Program<S>,
         lookup_stage: CompileStage,
         callee: &Callee,
     ) -> Result<LinkTarget, InterpreterError>;
@@ -55,21 +55,21 @@ pub struct SameStageLinker;
 
 /// Resolve calls across stages: prefer a live specialization at the lookup
 /// stage, otherwise fall back to any stage that has one. This is the standard
-/// linker for pipelines where functions are declared at several stages but
+/// linker for programs where functions are declared at several stages but
 /// lowered bodies live at only one.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CrossStageLinker;
 
 fn callee_function<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     lookup_stage: CompileStage,
     callee: &Callee,
 ) -> Result<Callee, InterpreterError> {
     match *callee {
         Callee::Named(symbol) => {
-            let name = query::resolve_symbol_name(pipeline, lookup_stage, symbol)?
+            let name = query::resolve_symbol_name(program, lookup_stage, symbol)?
                 .ok_or(InterpreterError::MissingCallSymbol(symbol))?;
-            let function = pipeline
+            let function = program
                 .lookup_function_by_name(&name)
                 .ok_or(InterpreterError::MissingFunctionName(name))?;
             Ok(Callee::Function(function))
@@ -80,26 +80,26 @@ fn callee_function<S: StageQuery>(
 
 /// Resolve a (symbol-free) callee at a specific stage.
 fn target_at_stage<S: StageQuery>(
-    pipeline: &Pipeline<S>,
+    program: &Program<S>,
     stage: CompileStage,
     callee: &Callee,
 ) -> Result<LinkTarget, InterpreterError> {
     let specialized = match *callee {
         Callee::Named(symbol) => return Err(InterpreterError::MissingCallSymbol(symbol)),
         Callee::Function(function) => {
-            let staged = pipeline
+            let staged = program
                 .function_info(function)
                 .ok_or(InterpreterError::MissingFunction(function))?
                 .staged_function(stage)
                 .ok_or(InterpreterError::MissingStagedFunction { function, stage })?;
-            query::unique_specialization(pipeline, stage, staged)?
+            query::unique_specialization(program, stage, staged)?
         }
-        Callee::Staged(staged) => query::unique_specialization(pipeline, stage, staged)?,
+        Callee::Staged(staged) => query::unique_specialization(program, stage, staged)?,
         Callee::Specialized(specialized) => specialized,
     };
     // In particular, an already specialized handle must exist here before
     // CrossStageLinker accepts this candidate stage.
-    query::validate_specialization(pipeline, stage, specialized)?;
+    query::validate_specialization(program, stage, specialized)?;
     Ok(LinkTarget {
         stage,
         specialization: specialized,
@@ -109,32 +109,32 @@ fn target_at_stage<S: StageQuery>(
 impl<S: StageQuery> Linker<S> for SameStageLinker {
     fn resolve(
         &self,
-        pipeline: &Pipeline<S>,
+        program: &Program<S>,
         lookup_stage: CompileStage,
         callee: &Callee,
     ) -> Result<LinkTarget, InterpreterError> {
-        let callee = callee_function(pipeline, lookup_stage, callee)?;
-        target_at_stage(pipeline, lookup_stage, &callee)
+        let callee = callee_function(program, lookup_stage, callee)?;
+        target_at_stage(program, lookup_stage, &callee)
     }
 }
 
 impl<S: StageQuery> Linker<S> for CrossStageLinker {
     fn resolve(
         &self,
-        pipeline: &Pipeline<S>,
+        program: &Program<S>,
         lookup_stage: CompileStage,
         callee: &Callee,
     ) -> Result<LinkTarget, InterpreterError> {
-        let callee = callee_function(pipeline, lookup_stage, callee)?;
-        let home = target_at_stage(pipeline, lookup_stage, &callee);
+        let callee = callee_function(program, lookup_stage, callee)?;
+        let home = target_at_stage(program, lookup_stage, &callee);
         if home.is_ok() {
             return home;
         }
-        for stage in pipeline.stages().filter_map(StageMeta::stage_id) {
+        for stage in program.stages().filter_map(StageMeta::stage_id) {
             if stage == lookup_stage {
                 continue;
             }
-            if let Ok(target) = target_at_stage(pipeline, stage, &callee) {
+            if let Ok(target) = target_at_stage(program, stage, &callee) {
                 return Ok(target);
             }
         }

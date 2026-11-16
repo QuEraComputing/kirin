@@ -55,7 +55,7 @@ impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
 
 /// Unified trait for stage identity and stage-container metadata.
 ///
-/// Automatically implemented for [`StageInfo<L>`]. Allows [`Pipeline::add_stage`]
+/// Automatically implemented for [`StageInfo<L>`]. Allows [`Program::add_stage`]
 /// to set both a readable name and the numeric stage ID on the stage.
 ///
 /// For enum stages, derive this trait with `#[derive(StageMeta)]`:
@@ -74,9 +74,9 @@ impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
     note = "use `#[derive(StageMeta)]` on your stage enum to generate stage identity methods"
 )]
 pub trait StageMeta: Sized {
-    /// The dialect dispatch list for `pipeline.parse(text)`.
+    /// The dialect dispatch list for `program.parse(text)`.
     ///
-    /// For heterogeneous pipelines use nested tuples: `(LangA, (LangB, ()))`.
+    /// For heterogeneous programs use nested tuples: `(LangA, (LangB, ()))`.
     type Languages;
 
     /// Get the stage name, if set.
@@ -116,7 +116,7 @@ impl<L: Dialect> StageMeta for StageInfo<L> {
         self.stage_id = id;
     }
 
-    /// For single-dialect pipelines, there is only one possible stage, so the
+    /// For single-dialect programs, there is only one possible stage, so the
     /// `stage_name` argument is ignored and a default `StageInfo` is returned.
     fn from_stage_name(_stage_name: &str) -> Result<Self, String> {
         Ok(StageInfo::default())

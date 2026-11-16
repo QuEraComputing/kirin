@@ -1,5 +1,5 @@
 use crate::rewrite::drive_pass;
-use crate::{CompileStage, Dialect, HasStageInfo, Pipeline, Quarantined, Rewriter, StageMeta};
+use crate::{CompileStage, Dialect, HasStageInfo, Program, Quarantined, Rewriter, StageMeta};
 
 use super::{
     StageDispatchMiss, StageDispatchRequiredError, StagePassError, SupportsStageDispatch,
@@ -8,7 +8,7 @@ use super::{
     slot::StageStatus,
 };
 
-impl<S> Pipeline<S>
+impl<S> Program<S>
 where
     S: StageMeta,
 {
@@ -147,7 +147,7 @@ where
     ///
     /// On failure, the slot is poisoned in place rather than emptied. It keeps
     /// its position, so every [`CompileStage`] issued so far stays valid, and
-    /// it keeps the failure artifact, readable through [`Pipeline::quarantined`].
+    /// it keeps the failure artifact, readable through [`Program::quarantined`].
     ///
     /// There is no rollback: the edits a failed pass already made stay applied,
     /// which is why that stage can never be handed out again.

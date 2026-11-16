@@ -2,7 +2,7 @@
 
 The interpreter framework (`kirin-interpreter`) supports concrete execution
 and lattice-based abstract interpretation over the same dialect semantics,
-including analyses that cross language boundaries in multi-stage pipelines.
+including analyses that cross language boundaries in multi-stage programs.
 
 The working plan for removing the remaining abstract/dense total-frame
 injection dependencies, together with the deferred concrete facade/core API
@@ -19,7 +19,7 @@ The design is organized as a **two-persona contract**:
   sub-computation by *pushing a frame the dialect owns* (`SparseForwardEffect::Push`),
   built per-engine through a small dialect dispatch capability. Ordinary
   (non-control) dialects never push frames at all.
-- **Compiler authors** compose languages into pipelines and *select*
+- **Compiler authors** compose languages into programs and *select*
   components: an engine, a value domain, an error type, and a linker. When they
   need more control, the same compiler-author surface also includes opt-in
   traversal and analysis components: a private concrete continuation
@@ -322,7 +322,7 @@ usually write zero framework-trait impls:
    with `Interpretable` added to the derive list. Their existing `Dialect`
    derive delegates callable-body discovery to the marked leaf definitions.
 2. **Stage enum** — add `#[derive(InterpDispatch)]` next to `StageMeta` and
-   `ParseDispatch`. Single-language pipelines (`Pipeline<StageInfo<L>>`) get a
+   `ParseDispatch`. Single-language programs (`Program<StageInfo<L>>`) get a
    blanket impl.
 3. **Value and error types** — plain Rust: a value type with the operator
    impls the dialects need, an error enum with `From` impls for
@@ -330,11 +330,11 @@ usually write zero framework-trait impls:
 4. **Engine + linker** — components selected by value:
 
 ```rust
-let mut interp = ConcreteInterpreter::<Stage, i64, ToyError>::new(&pipeline)
+let mut interp = ConcreteInterpreter::<Stage, i64, ToyError>::new(&program)
     .with_linker(CrossStageLinker);
 let result = expect_single(interp.call_by_name("source", "main", [3, 5])?)?;
 
-let analysis = ConstProp::<Stage, ToyError>::new(&pipeline)
+let analysis = ConstProp::<Stage, ToyError>::new(&program)
     .with_linker(CrossStageLinker);
 let (ret, analysis) = analysis.analyze_by_name("source", "abs", [Const(7)])?;
 let value = expect_single(ret)?;
@@ -350,7 +350,7 @@ engine. The concrete interpreter keeps `&mut self` entry points.
 
 ```rust
 pub trait Linker<S: StageMeta> {
-    fn resolve(&self, pipeline: &Pipeline<S>, lookup_stage: CompileStage, callee: &Callee)
+    fn resolve(&self, program: &Program<S>, lookup_stage: CompileStage, callee: &Callee)
         -> Result<LinkTarget, InterpreterError>;
 }
 
@@ -363,7 +363,7 @@ impl LinkTarget {
     // Discovery: look the definition up in `stage`, then project its body.
     pub fn body<S: StageQuery>(
         &self,
-        pipeline: &Pipeline<S>,
+        program: &Program<S>,
     ) -> Result<Body, InterpreterError>;
 }
 ```
@@ -403,7 +403,7 @@ that operation up first — specialization record, then its definition statement
 and only then projects; every lookup failure (missing stage, specialization
 record, or statement) belongs to this layer and is invisible to the projection.
 
-Engines holding a pipeline call `LinkTarget::body` directly. `CallFrame` cannot:
+Engines holding a program call `LinkTarget::body` directly. `CallFrame` cannot:
 it reaches the IR only through the engine, so `CallServices` exposes
 `resolve_callee` (identity) and `discover_body` (discovery) as two methods
 rather than one returning a pair.
@@ -834,7 +834,7 @@ lifecycle. `CallServices::resolve_callee` applies the engine's configured
 linker; `CallServices::discover_body` performs discovery on the returned target.
 Neither carries a value product. They are two methods rather than one returning
 a pair because a target determines its own body, so pairing them would admit a
-body that contradicts the specialization record. Engine roots hold a pipeline
+body that contradicts the specialization record. Engine roots hold a program
 and call `Linker::resolve` plus `LinkTarget::body` directly; `CallFrame` needs
 the trait because it reaches the IR only through the engine. Compiler authors
 configure resolution policy through `.with_linker(...)`. None of this makes the trait a convention: **`CallFrame`

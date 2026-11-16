@@ -16,7 +16,7 @@ digraph kirin {
     label=<
 <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
   <TR><TD><FONT POINT-SIZE="20"><B>Kirin Hybrid IR</B></FONT></TD></TR>
-  <TR><TD><FONT POINT-SIZE="13" COLOR="#555">Multi-stage pipeline  ·  SSA CFG + petgraph in one IR</FONT></TD></TR>
+  <TR><TD><FONT POINT-SIZE="13" COLOR="#555">Multi-stage program  ·  SSA CFG + petgraph in one IR</FONT></TD></TR>
   <TR><TD CELLPADDING="6"> </TD></TR>
   <TR><TD>
     <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#ccc">
@@ -33,9 +33,9 @@ digraph kirin {
 >
     labelloc=t
 
-    // ==== PIPELINE ====
-    subgraph cluster_pipeline {
-        label=<<B>Pipeline</B>>
+    // ==== PROGRAM ====
+    subgraph cluster_program {
+        label=<<B>Program</B>>
         style=rounded
         color="#bbb"
         bgcolor="#fafafa"

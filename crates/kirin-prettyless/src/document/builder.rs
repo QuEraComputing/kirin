@@ -56,7 +56,7 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// Create a new document builder with global symbol table support.
     ///
     /// The `global_symbols` table is used to resolve [`GlobalSymbol`] names
-    /// (e.g., function names) that were interned via [`Pipeline::intern`](kirin_ir::Pipeline::intern).
+    /// (e.g., function names) that were interned via [`Program::intern`](kirin_ir::Program::intern).
     pub fn with_global_symbols(
         config: Config,
         stage: &'a StageInfo<L>,

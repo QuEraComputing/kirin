@@ -18,7 +18,7 @@
 //! [`SparseBackwardTransfer`]:
 //!
 //! - **[`SparseBackwardTransfer`]** is the [`Interp`] delegate and the target
-//!   of rule dispatch: pipeline access, the calling convention and context
+//!   of rule dispatch: program access, the calling convention and context
 //!   policy, the demand facts (one [`EnvStore`] environment per selected
 //!   context), the discovered contexts' metadata, the dispatch location, the
 //!   facts that changed, and the pending call activations.
@@ -56,8 +56,8 @@ use std::marker::PhantomData;
 use std::mem;
 
 use kirin_ir::{
-    Block, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice, Pipeline,
-    Product, SSAKind, SSAValue, StageMeta, Statement, Symbol,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice, Product,
+    Program, SSAKind, SSAValue, StageMeta, Statement, Symbol,
 };
 
 use super::DemandFrame;
@@ -363,7 +363,7 @@ pub type SparseBackwardDriver<
 // ===========================================================================
 
 /// The transfer of the sparse backward engine and the target of rule
-/// dispatch: pipeline access, the calling convention and context policy, the
+/// dispatch: program access, the calling convention and context policy, the
 /// demand facts of every context, the discovered contexts' metadata, the
 /// dispatch location, and the per-rule buffers.
 pub struct SparseBackwardTransfer<
@@ -377,7 +377,7 @@ pub struct SparseBackwardTransfer<
 > where
     P: DemandContext<V>,
 {
-    pipeline: &'ir Pipeline<S>,
+    program: &'ir Program<S>,
     pub(super) linker: Lk,
     pub(super) policy: P,
     location: Option<InterpLocation>,
@@ -400,8 +400,8 @@ impl<'ir, S: StageMeta, V, E, P, Sem> SparseBackwardTransfer<'ir, S, V, E, SameS
 where
     P: DemandContext<V> + Default,
 {
-    pub(super) fn new(pipeline: &'ir Pipeline<S>) -> Self {
-        Self::with_parts(pipeline, SameStageLinker, P::default())
+    pub(super) fn new(program: &'ir Program<S>) -> Self {
+        Self::with_parts(program, SameStageLinker, P::default())
     }
 }
 
@@ -409,9 +409,9 @@ impl<'ir, S: StageMeta, V, E, Lk, P, Sem> SparseBackwardTransfer<'ir, S, V, E, L
 where
     P: DemandContext<V>,
 {
-    pub(super) fn with_parts(pipeline: &'ir Pipeline<S>, linker: Lk, policy: P) -> Self {
+    pub(super) fn with_parts(program: &'ir Program<S>, linker: Lk, policy: P) -> Self {
         Self {
-            pipeline,
+            program,
             linker,
             policy,
             location: None,
@@ -424,12 +424,12 @@ where
         }
     }
 
-    pub(super) fn into_parts(self) -> (&'ir Pipeline<S>, Lk, P) {
-        (self.pipeline, self.linker, self.policy)
+    pub(super) fn into_parts(self) -> (&'ir Program<S>, Lk, P) {
+        (self.program, self.linker, self.policy)
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
+    pub fn program(&self) -> &'ir Program<S> {
+        self.program
     }
 
     /// Join `fact` into `value`'s demand in `env`, recording it if it rose.
@@ -481,7 +481,7 @@ where
         callee: &Callee,
         outputs: Product<V>,
     ) -> Result<(LinkTarget, P::Key, EnvIndex), E> {
-        let target = self.linker.resolve(self.pipeline, lookup_stage, callee)?;
+        let target = self.linker.resolve(self.program, lookup_stage, callee)?;
         let key = self.policy.key(&target, &outputs);
         let env = self.env.get_or_allocate(key.clone());
         self.activations.push((env, target, outputs));
@@ -497,7 +497,7 @@ where
         statement: Statement,
     ) -> Result<SparseBackwardEffect<V>, E> {
         let info = self
-            .pipeline
+            .program
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         let location = InterpLocation {
@@ -521,13 +521,13 @@ where
         value: SSAValue,
     ) -> Result<Vec<DemandWork>, E> {
         let stage = self.contexts.get(&env).ok_or(UNDISCOVERED)?.target.stage;
-        let statements = match query::value_kind(self.pipeline, stage, value)? {
+        let statements = match query::value_kind(self.program, stage, value)? {
             SSAKind::Result(statement, _) => vec![statement],
             SSAKind::BlockArgument(block, _) => {
-                query::block_argument_predecessors(self.pipeline, stage, block)?.into_vec()
+                query::block_argument_predecessors(self.program, stage, block)?.into_vec()
             }
             SSAKind::Port(parent, _) => {
-                vec![query::graph_port_owner(self.pipeline, stage, parent)?]
+                vec![query::graph_port_owner(self.program, stage, parent)?]
             }
         };
         Ok(statements
@@ -547,9 +547,9 @@ where
     /// `target`'s callable body and entry block. Unsupported bodies fail here
     /// rather than producing empty facts.
     fn callable_entry(&self, target: LinkTarget) -> Result<(Body, Block), E> {
-        let body = target.body(self.pipeline)?;
+        let body = target.body(self.program)?;
         let entry = match body {
-            Body::CFG(cfg) => query::cfg_entry(self.pipeline, target.stage, cfg)?
+            Body::CFG(cfg) => query::cfg_entry(self.program, target.stage, cfg)?
                 .ok_or(InterpreterError::EmptyCFG)?,
             Body::Block(block) => block,
             Body::DiGraph(_) | Body::UnGraph(_) => {
@@ -562,7 +562,7 @@ where
     /// `target`'s entry parameters — what callers map onto arguments.
     pub(super) fn entry_params(&self, target: LinkTarget) -> Result<Vec<SSAValue>, E> {
         let (_, entry) = self.callable_entry(target)?;
-        Ok(query::block_params(self.pipeline, target.stage, entry)?)
+        Ok(query::block_params(self.program, target.stage, entry)?)
     }
 }
 
@@ -623,11 +623,11 @@ where
     }
 
     fn block_params(&self, block: Block) -> Result<Vec<SSAValue>, E> {
-        query::block_params(self.pipeline, self.stage(), block).map_err(E::from)
+        query::block_params(self.program, self.stage(), block).map_err(E::from)
     }
 
     fn terminator_args(&self, block: Block) -> Result<TerminatorArgs, E> {
-        query::terminator_arguments(self.pipeline, self.stage(), block).map_err(E::from)
+        query::terminator_arguments(self.program, self.stage(), block).map_err(E::from)
     }
 
     fn declare_return(&mut self, operands: &[SSAValue]) -> Result<(), E> {
@@ -680,7 +680,7 @@ where
             if !visited.insert(body) {
                 continue;
             }
-            let contents = query::body_contents(self.inner().pipeline, stage, body)?;
+            let contents = query::body_contents(self.inner().program, stage, body)?;
             bodies.extend(contents.children);
             for statement in contents.statements {
                 self.schedule_work((env, statement));
@@ -826,7 +826,7 @@ where
 /// another root takes another engine.
 ///
 /// ```ignore
-/// let analyzed = SparseBackwardInterpreter::<Stage, Demand>::new(&pipeline)
+/// let analyzed = SparseBackwardInterpreter::<Stage, Demand>::new(&program)
 ///     .analyze(stage, callee, [Demand::Live])?;
 /// let params = analyzed.response(analyzed.root());
 /// let demanded = analyzed.is_demanded(analyzed.root(), value);
@@ -857,8 +857,8 @@ where
     P: DemandContext<V> + Default,
     Sem: SparseBackwardSemantic,
 {
-    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
-        Self::from_transfer(SparseBackwardTransfer::new(pipeline))
+    pub fn new(program: &'ir Program<S>) -> Self {
+        Self::from_transfer(SparseBackwardTransfer::new(program))
     }
 }
 
@@ -883,9 +883,9 @@ where
         self,
         linker: Lk2,
     ) -> SparseBackwardInterpreter<'ir, S, V, E, Lk2, P, Sem> {
-        let (pipeline, _, policy) = self.driver.into_inner().into_parts();
+        let (program, _, policy) = self.driver.into_inner().into_parts();
         SparseBackwardInterpreter::from_transfer(SparseBackwardTransfer::with_parts(
-            pipeline, linker, policy,
+            program, linker, policy,
         ))
     }
 
@@ -895,14 +895,14 @@ where
         self,
         policy: P2,
     ) -> SparseBackwardInterpreter<'ir, S, V, E, Lk, P2, Sem> {
-        let (pipeline, linker, _) = self.driver.into_inner().into_parts();
+        let (program, linker, _) = self.driver.into_inner().into_parts();
         SparseBackwardInterpreter::from_transfer(SparseBackwardTransfer::with_parts(
-            pipeline, linker, policy,
+            program, linker, policy,
         ))
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.driver.inner().pipeline()
+    pub fn program(&self) -> &'ir Program<S> {
+        self.driver.inner().program()
     }
 }
 
@@ -924,11 +924,11 @@ where
         result_values: impl IntoIterator<Item = V>,
     ) -> Result<Analyzed<Self>, E> {
         let stage = self
-            .pipeline()
+            .program()
             .stage_by_name(stage_name)
             .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
-            .pipeline()
+            .program()
             .lookup_function_by_name(function_name)
             .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
         self.analyze(stage, Callee::Function(function), result_values)

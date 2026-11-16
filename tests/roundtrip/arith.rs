@@ -175,5 +175,5 @@ specialize @arith fn @compose(i64, i64, f64, f64) -> i64 cfg {
 }
 "#;
 
-    roundtrip::assert_pipeline_roundtrip::<ArithFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ArithFunctionLanguage>(input);
 }

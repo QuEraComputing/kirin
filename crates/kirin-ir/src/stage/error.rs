@@ -1,7 +1,7 @@
 /// Why stage dispatch returned no action result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StageDispatchMiss {
-    /// The requested stage ID is not present in the pipeline.
+    /// The requested stage ID is not present in the program.
     MissingStage,
     /// The position exists, but its stage cannot be reached: a pass either has
     /// it out on loan or failed and poisoned the position.
@@ -19,15 +19,15 @@ pub enum StageDispatchRequiredError<E> {
     Miss(StageDispatchMiss),
 }
 
-/// Why [`Pipeline::run_pass`](crate::Pipeline::run_pass) did not hand back a
+/// Why [`Program::run_pass`](crate::Program::run_pass) did not hand back a
 /// pass result.
 ///
-/// Only [`PassFailed`](StagePassError::PassFailed) leaves the pipeline changed.
+/// Only [`PassFailed`](StagePassError::PassFailed) leaves the program changed.
 /// Under every other variant the stage is exactly as it was, so the caller may
 /// fix the call and try again.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StagePassError {
-    /// No position in the pipeline has this [`CompileStage`](crate::CompileStage).
+    /// No position in the program has this [`CompileStage`](crate::CompileStage).
     UnknownStage,
     /// The position exists, but a pass took its stage and never gave it back.
     /// Likely, an unwind escaped between the two.
@@ -40,7 +40,7 @@ pub enum StagePassError {
     DialectMismatch,
     /// This pass failed, so the position is now poisoned and that stage must be
     /// abandoned. The cause, event log, and report are available from
-    /// [`Pipeline::quarantined`](crate::Pipeline::quarantined).
+    /// [`Program::quarantined`](crate::Program::quarantined).
     PassFailed,
 }
 
@@ -48,7 +48,7 @@ impl std::fmt::Display for StagePassError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StagePassError::UnknownStage => {
-                write!(f, "no stage at that position in the pipeline")
+                write!(f, "no stage at that position in the program")
             }
             StagePassError::StageTransferred => {
                 write!(f, "the stage was lent to a pass that never returned it")

@@ -15,7 +15,7 @@ specialize @test fn @main(i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ArithFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ArithFunctionLanguage>(input);
 }
 
 #[test]
@@ -36,7 +36,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ArithFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ArithFunctionLanguage>(input);
 }
 
 #[test]
@@ -54,7 +54,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ArithFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ArithFunctionLanguage>(input);
 }
 
 #[test]
@@ -79,5 +79,5 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
   }
 }
 "#;
-    roundtrip::assert_pipeline_roundtrip::<ArithFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ArithFunctionLanguage>(input);
 }

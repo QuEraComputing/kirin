@@ -159,5 +159,5 @@ specialize @bitwise fn @compose(i64, i64, u32, u32) -> i64 cfg {
 }
 "#;
 
-    roundtrip::assert_pipeline_roundtrip::<BitwiseFunctionLanguage>(input);
+    roundtrip::assert_program_roundtrip::<BitwiseFunctionLanguage>(input);
 }

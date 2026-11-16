@@ -83,7 +83,7 @@ pub struct CallEffect<V> {
 pub enum Callee {
     /// A stage-local symbol, resolved through the symbol table.
     Named(Symbol),
-    /// A pipeline-level function.
+    /// A program-level function.
     Function(Function),
     /// A staged function.
     Staged(StagedFunction),

@@ -19,7 +19,7 @@
 //! ```ignore
 //! use kirin_interpreter::AnalysisResults;
 //!
-//! let analyzed = DemandAnalysis::<Stage>::new(&pipeline).analyze(stage, callee, [Demand::Live])?;
+//! let analyzed = DemandAnalysis::<Stage>::new(&program).analyze(stage, callee, [Demand::Live])?;
 //! assert!(analyzed.is_demanded(analyzed.root(), some_value));
 //! ```
 

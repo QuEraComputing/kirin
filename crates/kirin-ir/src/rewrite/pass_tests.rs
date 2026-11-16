@@ -7,7 +7,7 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{
-    Block, CompileStage, Mismatch, Pipeline, QuarantineCause, Quarantined, RewriteError, Rewriter,
+    Block, CompileStage, Mismatch, Program, QuarantineCause, Quarantined, RewriteError, Rewriter,
     SSAValue, StageInfo, StagePassError, Statement, VerifyError,
 };
 
@@ -23,10 +23,10 @@ fn clear_uses(stage: &mut StageInfo<TestLang>, value: SSAValue) {
         .clear();
 }
 
-/// A one-stage pipeline holding one block with two arguments, an `add` reading
+/// A one-stage program holding one block with two arguments, an `add` reading
 /// both, and an operand-less `nop` to aim a rejected edit at.
 struct Fixture {
-    pipeline: Pipeline<StageInfo<TestLang>>,
+    program: Program<StageInfo<TestLang>>,
     id: CompileStage,
     block: Block,
     nop: Statement,
@@ -47,11 +47,11 @@ fn fixture() -> Fixture {
         .stmt(nop)
         .new();
 
-    let mut pipeline: Pipeline<StageInfo<TestLang>> = Pipeline::new();
-    let id = pipeline.add_stage_raw(stage.finalize().unwrap());
+    let mut program: Program<StageInfo<TestLang>> = Program::new();
+    let id = program.add_stage_raw(stage.finalize().unwrap());
 
     Fixture {
-        pipeline,
+        program,
         id,
         block,
         nop,
@@ -60,17 +60,17 @@ fn fixture() -> Fixture {
 
 impl Fixture {
     fn stage(&self) -> &StageInfo<TestLang> {
-        self.pipeline.stage(self.id).expect("stage is still usable")
+        self.program.stage(self.id).expect("stage is still usable")
     }
 
     fn stage_mut(&mut self) -> &mut StageInfo<TestLang> {
-        self.pipeline
+        self.program
             .stage_mut(self.id)
             .expect("stage is still usable")
     }
 
     fn quarantined(&self) -> &Quarantined<StageInfo<TestLang>> {
-        self.pipeline
+        self.program
             .quarantined(self.id)
             .expect("the position was poisoned")
     }
@@ -84,7 +84,7 @@ impl Fixture {
         E: std::error::Error + Send + Sync + 'static,
         F: FnOnce(&mut Rewriter<TestLang>) -> Result<T, E>,
     {
-        self.pipeline.run_pass::<TestLang, _, _, _>(self.id, pass)
+        self.program.run_pass::<TestLang, _, _, _>(self.id, pass)
     }
 }
 

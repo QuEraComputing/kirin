@@ -90,7 +90,7 @@ impl<L: Dialect> Arenas<L> {
         self.name = name;
     }
 
-    /// Get the compile-stage ID assigned by the pipeline, if any.
+    /// Get the compile-stage ID assigned by the program, if any.
     pub fn stage_id(&self) -> Option<CompileStage> {
         self.stage_id
     }

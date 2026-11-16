@@ -7,7 +7,7 @@ use kirin_wildcard::{NativeError, NativeFailure};
 /// Why a driver run failed.
 ///
 /// Edits made before the failure stay applied. Inside
-/// [`Pipeline::run_pass`](kirin_ir::Pipeline::run_pass), returning this
+/// [`Program::run_pass`](kirin_ir::Program::run_pass), returning this
 /// quarantines the stage.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DriverError {

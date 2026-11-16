@@ -4,7 +4,7 @@ use kirin_function::Return;
 use kirin_ir::{CFG, Dialect, Signature};
 
 /// Test language: Function + Arith + ControlFlow + Return.
-/// Used for arith pipeline roundtrips and as bare (no-namespace) language.
+/// Used for arith program roundtrips and as bare (no-namespace) language.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
 #[cfg_attr(feature = "pretty", derive(kirin_derive_chumsky::PrettyPrint))]

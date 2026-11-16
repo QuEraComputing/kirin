@@ -17,9 +17,9 @@ pub trait Interpretable<I: Interp, Semantics>: Dialect {
 
 /// Monomorphic statement dispatch over a stage enum.
 ///
-/// Mirrors `ParseDispatch` from the parser: multi-stage pipelines add
-/// `#[derive(InterpDispatch)]` to their stage enum; single-language pipelines
-/// (`Pipeline<StageInfo<L>>`) get the blanket impl below. Engines route every
+/// Mirrors `ParseDispatch` from the parser: multi-stage programs add
+/// `#[derive(InterpDispatch)]` to their stage enum; single-language programs
+/// (`Program<StageInfo<L>>`) get the blanket impl below. Engines route every
 /// statement execution through this trait; compiler
 /// authors derive it and never call it.
 ///

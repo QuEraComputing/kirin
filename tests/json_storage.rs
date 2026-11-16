@@ -1,6 +1,6 @@
 #![cfg(feature = "serde")]
 
-use kirin::ir::{Arena, InternTable, Pipeline, Symbol};
+use kirin::ir::{Arena, InternTable, Program, Symbol};
 use kirin_arith::ArithValue;
 
 #[test]
@@ -61,17 +61,17 @@ fn intern_lookup_rebuilt_without_changing_ids() {
 }
 
 #[test]
-fn pipeline_rebuilds_function_lookup_for_all_stages() {
-    let mut pipeline: Pipeline<String> = Pipeline::new();
-    let source = pipeline.add_stage_raw("source".into());
-    let target = pipeline.add_stage_raw("target".into());
-    let function = pipeline.function().name("function").new().unwrap();
+fn program_rebuilds_function_lookup_for_all_stages() {
+    let mut program: Program<String> = Program::new();
+    let source = program.add_stage_raw("source".into());
+    let target = program.add_stage_raw("target".into());
+    let function = program.function().name("function").new().unwrap();
     // IDs for each stage can coincide; the compile-stage key disambiguates them.
     let sf: kirin::ir::StagedFunction = serde_json::from_str("0").unwrap();
-    pipeline.link(function, source, sf).unwrap();
-    pipeline.link(function, target, sf).unwrap();
-    let mut restored: Pipeline<String> =
-        serde_json::from_str(&serde_json::to_string(&pipeline).unwrap()).unwrap();
+    program.link(function, source, sf).unwrap();
+    program.link(function, target, sf).unwrap();
+    let mut restored: Program<String> =
+        serde_json::from_str(&serde_json::to_string(&program).unwrap()).unwrap();
     assert_eq!(
         restored.resolve_staged_function("function", source),
         Some(sf)
@@ -84,12 +84,12 @@ fn pipeline_rebuilds_function_lookup_for_all_stages() {
 }
 
 #[test]
-fn pipeline_positions_keep_their_stage_names() {
+fn program_positions_keep_their_stage_names() {
     use kirin::prelude::*;
     use kirin_test_languages::ArithFunctionLanguage;
     use kirin_test_utils::roundtrip::json_roundtrip;
 
-    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let mut ir: Program<StageInfo<ArithFunctionLanguage>> = Program::new();
     let source = ir
         .add_stage()
         .stage(StageInfo::default())
@@ -109,12 +109,12 @@ fn pipeline_positions_keep_their_stage_names() {
 }
 
 #[test]
-fn pipeline_refuses_to_serialize_a_poisoned_stage() {
+fn program_refuses_to_serialize_a_poisoned_stage() {
     use kirin::ir::RewriteError;
     use kirin::prelude::*;
     use kirin_test_languages::ArithFunctionLanguage;
 
-    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let mut ir: Program<StageInfo<ArithFunctionLanguage>> = Program::new();
     let source = ir
         .add_stage()
         .stage(StageInfo::default())
@@ -144,7 +144,7 @@ stage @target fn @f(i64) -> i64;
 specialize @source fn @f(i64) -> i64 cfg { ^entry(%x: i64) { ret %x; } }
 specialize @target fn @f(i64) -> i64 cfg { ^entry(%x: i64) { ret %x; } }
 "#;
-    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let mut ir: Program<StageInfo<ArithFunctionLanguage>> = Program::new();
     ir.parse(text).unwrap();
     let source = ir.stage_by_name("source").unwrap();
     let target = ir.stage_by_name("target").unwrap();

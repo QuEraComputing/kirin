@@ -14,7 +14,7 @@ A `ConcreteInterpreter` comprises the following (wrapping
 
 ```rust
 pub struct ConcreteInterpreter<'ir, S: StageMeta, V, E> {
-    pipeline: &'ir Pipeline<S>,
+    program: &'ir Program<S>,
     linker: SameStageLinker,
     env: ConcreteEnv<V>,
     frames: Vec<FrameStackItem<V, E>>,
@@ -475,10 +475,10 @@ pub type ToyInterpreter<'ir, Lk = CrossStageLinker> = ConcreteInterpreter<
 >;
 
 let mut interp: ToyInterpreter<'_> =
-    ConcreteInterpreter::new(pipeline).with_linker(CrossStageLinker);
+    ConcreteInterpreter::new(program).with_linker(CrossStageLinker);
 ```
 
-Here, the `pipeline` object contains the source code that we want to execute. To
+Here, the `program` object contains the source code that we want to execute. To
 run this code, it is simply a matter of calling `ConcreteInterpreter`'s
 `call_by_name` method:
 

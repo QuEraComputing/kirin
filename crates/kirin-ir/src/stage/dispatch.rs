@@ -6,7 +6,7 @@ use crate::stage::meta::{HasStageInfo, StageMeta};
 /// Recursive dispatcher over `S::Languages` for immutable stage access.
 ///
 /// This trait is implemented for `()` and nested tuples `(L, Tail)` and is
-/// intended to be used by [`crate::Pipeline::dispatch_stage`].
+/// intended to be used by [`crate::Program::dispatch_stage`].
 pub trait StageDispatch<S, A, R, E>
 where
     S: StageMeta,
@@ -41,7 +41,7 @@ where
 /// Recursive dispatcher over `S::Languages` for mutable stage access.
 ///
 /// This trait is implemented for `()` and nested tuples `(L, Tail)` and is
-/// intended to be used by [`crate::Pipeline::dispatch_stage_mut`].
+/// intended to be used by [`crate::Program::dispatch_stage_mut`].
 pub trait StageDispatchMut<S, A, R, E>
 where
     S: StageMeta,

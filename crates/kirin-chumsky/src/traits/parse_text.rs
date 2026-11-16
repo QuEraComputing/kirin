@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{BuilderStageInfo, Dialect, Pipeline, StageInfo};
+use kirin_ir::{BuilderStageInfo, Dialect, Program, StageInfo};
 
 use super::emit_ir::EmitContext;
 use super::has_parser::ParseError;
@@ -10,9 +10,9 @@ use super::parse_emit::{ChumskyError, ParseEmit};
 /// Generic over `L` (the dialect) and `Ctx` (extra context needed to locate
 /// the target stage). The default `Ctx = ()` applies to `StageInfo<L>` where
 /// the receiver *is* the stage, so callers simply write
-/// `stage.parse_statement(input)`. For `Pipeline<S>`, `Ctx` is
+/// `stage.parse_statement(input)`. For `Program<S>`, `Ctx` is
 /// [`CompileStage`](kirin_ir::CompileStage) and callers write
-/// `pipeline.parse_statement::<MyLang>(stage_id, input)`.
+/// `program.parse_statement::<MyLang>(stage_id, input)`.
 ///
 /// # Examples
 ///
@@ -23,10 +23,10 @@ use super::parse_emit::{ChumskyError, ParseEmit};
 /// let mut stage: StageInfo<MyLang> = StageInfo::default();
 /// let stmt = stage.parse_statement("%res = add %a, %b")?;
 ///
-/// // Pipeline — dialect specified via turbofish, stage ID required:
-/// let mut pipeline: Pipeline<StageInfo<MyLang>> = Pipeline::new();
-/// let id = pipeline.add_stage().stage(StageInfo::default()).new();
-/// let stmt = pipeline.parse_statement::<MyLang>(id, "%res = add %a, %b")?;
+/// // Program — dialect specified via turbofish, stage ID required:
+/// let mut program: Program<StageInfo<MyLang>> = Program::new();
+/// let id = program.add_stage().stage(StageInfo::default()).new();
+/// let stmt = program.parse_statement::<MyLang>(id, "%res = add %a, %b")?;
 /// ```
 pub trait ParseStatementText<L: Dialect, Ctx = ()> {
     fn parse_statement(
@@ -114,7 +114,7 @@ where
     }
 }
 
-impl<L, S> ParseStatementText<L, kirin_ir::CompileStage> for Pipeline<S>
+impl<L, S> ParseStatementText<L, kirin_ir::CompileStage> for Program<S>
 where
     L: Dialect + ParseEmit<L>,
     S: kirin_ir::HasStageInfo<L>,
@@ -128,7 +128,7 @@ where
         let stage_entry = self.stage_mut(stage_id).ok_or_else(|| {
             let message = match status {
                 None | Some(kirin_ir::StageStatus::Present) => {
-                    format!("stage {stage_id:?} not found in pipeline")
+                    format!("stage {stage_id:?} not found in program")
                 }
                 Some(kirin_ir::StageStatus::Transferred) => format!(
                     "stage {stage_id:?} is on loan to a rewrite pass that never returned it"

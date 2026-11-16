@@ -15,7 +15,7 @@ mod generate;
 /// # When to use
 ///
 /// Add `#[derive(RenderDispatch)]` alongside `#[derive(StageMeta)]` on
-/// stage enums that participate in pipeline pretty-printing. Each inner
+/// stage enums that participate in program pretty-printing. Each inner
 /// dialect type (the `L` in `StageInfo<L>`) must implement `PrettyPrint`.
 ///
 /// # Attributes

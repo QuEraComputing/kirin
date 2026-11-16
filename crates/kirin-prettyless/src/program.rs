@@ -1,19 +1,19 @@
-//! Pipeline-wide pretty printing support.
+//! Program-wide pretty printing support.
 //!
 //! Provides [`RenderDispatch`] for type-erased per-function rendering within a
-//! stage, and [`PipelineDocument`] for printing a specific function across all
-//! stages in a pipeline.
+//! stage, and [`ProgramDocument`] for printing a specific function across all
+//! stages in a program.
 
 use std::io::{Write, stdout};
 
-use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Pipeline, StageInfo, StagedFunction};
+use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Program, StageInfo, StagedFunction};
 
 use crate::{Config, Document, PrettyPrint, RenderError};
 
 /// Trait for rendering a specific staged function within a compilation stage.
 ///
 /// This provides type-erased rendering: the inner dialect type `L` is hidden
-/// behind the trait, allowing pipeline-wide iteration over heterogeneous stages.
+/// behind the trait, allowing program-wide iteration over heterogeneous stages.
 ///
 /// The stage prefix (e.g., `stage @A`) is derived from the context's own
 /// identity (name and/or stage ID), so callers don't need to supply it.
@@ -76,20 +76,20 @@ where
     }
 }
 
-/// Pipeline-wide document for printing a specific function across all stages.
+/// Program-wide document for printing a specific function across all stages.
 ///
 /// Given a [`Function`] ID, looks up its [`FunctionInfo`](kirin_ir::FunctionInfo)
 /// to find the staged functions at each compilation stage, then renders each one.
 #[must_use]
-pub struct PipelineDocument<'a, S> {
+pub struct ProgramDocument<'a, S> {
     config: Config,
-    pipeline: &'a Pipeline<S>,
+    program: &'a Program<S>,
 }
 
-impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
-    /// Create a new pipeline document.
-    pub fn new(config: Config, pipeline: &'a Pipeline<S>) -> Self {
-        Self { config, pipeline }
+impl<'a, S: RenderDispatch> ProgramDocument<'a, S> {
+    /// Create a new program document.
+    pub fn new(config: Config, program: &'a Program<S>) -> Self {
+        Self { config, program }
     }
 
     /// Render a function across all stages where it has a staged representation.
@@ -99,9 +99,9 @@ impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
     /// separated by blank lines. The stage prefix (e.g., `stage @A`) is derived
     /// from each context's own identity — no external prefix is needed.
     pub fn render_function(&self, func: Function) -> Result<String, RenderError> {
-        let gs = self.pipeline.global_symbols();
+        let gs = self.program.global_symbols();
         let func_info = self
-            .pipeline
+            .program
             .function_info(func)
             .ok_or(RenderError::UnknownFunction(func))?;
 
@@ -110,10 +110,10 @@ impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
             // A stage a rewrite pass took or poisoned cannot be rendered.
             // `Quarantined::report` exists for that case. Be explicit rather than
             // dropping the stage.
-            let Some(stage) = self.pipeline.stage(stage_id) else {
-                let note = match self.pipeline.stage_status(stage_id) {
+            let Some(stage) = self.program.stage(stage_id) else {
+                let note = match self.program.stage_status(stage_id) {
                     Some(status) => format!("// <stage {stage_id:?} unavailable: {status:?}>"),
-                    None => format!("// <stage {stage_id:?} not in pipeline>"),
+                    None => format!("// <stage {stage_id:?} not in program>"),
                 };
                 if !output.is_empty() {
                     output.push_str("\n\n");
@@ -132,11 +132,11 @@ impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
     }
 }
 
-/// Builder for rendering a specific [`Function`] across pipeline stages.
+/// Builder for rendering a specific [`Function`] across program stages.
 #[must_use = "call .into_string(), .print(), or .bat() to produce output"]
 pub struct FunctionRenderBuilder<'a, S> {
     function: Function,
-    pipeline: &'a Pipeline<S>,
+    program: &'a Program<S>,
     config: Config,
 }
 
@@ -149,7 +149,7 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
 
     /// Render to a string, consuming the builder.
     pub fn into_string(self) -> Result<String, RenderError> {
-        PipelineDocument::new(self.config, self.pipeline).render_function(self.function)
+        ProgramDocument::new(self.config, self.program).render_function(self.function)
     }
 
     /// Write to a writer.
@@ -174,14 +174,14 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
     }
 }
 
-/// Builder for rendering all functions in a [`Pipeline`].
+/// Builder for rendering all functions in a [`Program`].
 #[must_use = "call .into_string(), .print(), or .bat() to produce output"]
-pub struct PipelineRenderBuilder<'a, S> {
-    pipeline: &'a Pipeline<S>,
+pub struct ProgramRenderBuilder<'a, S> {
+    program: &'a Program<S>,
     config: Config,
 }
 
-impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
+impl<'a, S: RenderDispatch> ProgramRenderBuilder<'a, S> {
     /// Set custom rendering configuration.
     pub fn config(mut self, config: Config) -> Self {
         self.config = config;
@@ -190,9 +190,9 @@ impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
 
     /// Render to a string, consuming the builder.
     pub fn into_string(self) -> Result<String, RenderError> {
-        let doc = PipelineDocument::new(self.config, self.pipeline);
+        let doc = ProgramDocument::new(self.config, self.program);
         let mut parts = Vec::new();
-        for func_info in self.pipeline.function_arena().iter() {
+        for func_info in self.program.function_arena().iter() {
             let rendered = doc.render_function(func_info.id())?;
             if !rendered.is_empty() {
                 parts.push(rendered);
@@ -228,12 +228,12 @@ pub trait PrintExt {
     /// Create a builder for rendering this function across all stages.
     fn render<'a, S: RenderDispatch>(
         &self,
-        pipeline: &'a Pipeline<S>,
+        program: &'a Program<S>,
     ) -> FunctionRenderBuilder<'a, S>;
 
     /// Convenience shorthand: render to string with default config.
-    fn sprint<S: RenderDispatch>(&self, pipeline: &Pipeline<S>) -> String {
-        self.render(pipeline)
+    fn sprint<S: RenderDispatch>(&self, program: &Program<S>) -> String {
+        self.render(program)
             .into_string()
             .unwrap_or_else(|e| panic!("render failed: {e}"))
     }
@@ -242,22 +242,22 @@ pub trait PrintExt {
 impl PrintExt for Function {
     fn render<'a, S: RenderDispatch>(
         &self,
-        pipeline: &'a Pipeline<S>,
+        program: &'a Program<S>,
     ) -> FunctionRenderBuilder<'a, S> {
         FunctionRenderBuilder {
             function: *self,
-            pipeline,
+            program,
             config: Config::default(),
         }
     }
 }
 
-/// Extension trait for printing all functions in a [`Pipeline`].
-pub trait PipelinePrintExt {
+/// Extension trait for printing all functions in a [`Program`].
+pub trait ProgramPrintExt {
     type Stage: RenderDispatch;
 
-    /// Create a builder for rendering every function in the pipeline.
-    fn render(&self) -> PipelineRenderBuilder<'_, Self::Stage>;
+    /// Create a builder for rendering every function in the program.
+    fn render(&self) -> ProgramRenderBuilder<'_, Self::Stage>;
 
     /// Convenience shorthand: render to string with default config.
     fn sprint(&self) -> String {
@@ -267,12 +267,12 @@ pub trait PipelinePrintExt {
     }
 }
 
-impl<S: RenderDispatch> PipelinePrintExt for Pipeline<S> {
+impl<S: RenderDispatch> ProgramPrintExt for Program<S> {
     type Stage = S;
 
-    fn render(&self) -> PipelineRenderBuilder<'_, Self::Stage> {
-        PipelineRenderBuilder {
-            pipeline: self,
+    fn render(&self) -> ProgramRenderBuilder<'_, Self::Stage> {
+        ProgramRenderBuilder {
+            program: self,
             config: Config::default(),
         }
     }

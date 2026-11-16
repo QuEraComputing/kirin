@@ -11,7 +11,7 @@
 //!
 //! - [`Function`] / [`FunctionInfo`] — A logical function identity, independent
 //!   of any compilation stage. It maps a name to the set of staged versions
-//!   produced as the function moves through the pipeline.
+//!   produced as the function moves through the program.
 //!
 //! - [`StagedFunction`] / [`StagedFunctionInfo`] — A function compiled to a
 //!   specific stage (e.g. parsed, optimized, lowered). Carries the generic

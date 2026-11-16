@@ -5,9 +5,9 @@ use kirin_test_languages::ScalarFunctionLanguage;
 
 #[test]
 fn constprop_analyzes_i32_addition() {
-    let mut pipeline: Pipeline<StageInfo<ScalarFunctionLanguage>> = Pipeline::new();
-    ParsePipelineText::parse(
-        &mut pipeline,
+    let mut program: Program<StageInfo<ScalarFunctionLanguage>> = Program::new();
+    ParseProgramText::parse(
+        &mut program,
         r#"
 stage @test fn @add(i32, i32) -> i32;
 specialize @test fn @add(i32, i32) -> i32 cfg {
@@ -20,7 +20,7 @@ specialize @test fn @add(i32, i32) -> i32 cfg {
     )
     .unwrap();
 
-    let analysis = ConstProp::<_, i32, InterpreterError>::new(&pipeline);
+    let analysis = ConstProp::<_, i32, InterpreterError>::new(&program);
     let analyzed = analysis
         .analyze_by_name(
             "test",

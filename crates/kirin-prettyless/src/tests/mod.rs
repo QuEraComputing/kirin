@@ -1,6 +1,6 @@
 //! Integration and unit tests for pretty printing.
 
-use kirin_ir::{Block, BuilderStageInfo, Dialect, GlobalSymbol, InternTable, Pipeline, StageInfo};
+use kirin_ir::{Block, BuilderStageInfo, Dialect, GlobalSymbol, InternTable, Program, StageInfo};
 use kirin_test_languages::*;
 use prettyless::DocAllocator;
 
@@ -90,7 +90,7 @@ include!("pretty_print.rs");
 include!("write.rs");
 include!("global_symbol.rs");
 include!("sprint_with_globals.rs");
-include!("pipeline.rs");
+include!("program.rs");
 include!("impls.rs");
 include!("edge_cases.rs");
 include!("graph_snapshot.rs");

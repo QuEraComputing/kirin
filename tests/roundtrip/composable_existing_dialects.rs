@@ -77,7 +77,7 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
 }
 "#;
 
-    roundtrip::assert_pipeline_roundtrip::<ComposedSourceLanguage>(input);
+    roundtrip::assert_program_roundtrip::<ComposedSourceLanguage>(input);
 }
 
 #[test]
@@ -95,7 +95,7 @@ specialize @test fn @main() -> i64 cfg {
 }
 "#;
 
-    roundtrip::assert_pipeline_roundtrip::<WrappedConstantLanguage>(input);
+    roundtrip::assert_program_roundtrip::<WrappedConstantLanguage>(input);
 }
 
 #[test]

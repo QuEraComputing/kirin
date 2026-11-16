@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use crate::arena::{Arena, Id, Item};
-use crate::builder::error::{PipelineError, PipelineStagedError};
+use crate::builder::error::{ProgramError, ProgramStagedError};
 use crate::intern::InternTable;
 use crate::language::Dialect;
 use crate::node::function::{
@@ -14,13 +14,18 @@ use crate::rewrite::Quarantined;
 use crate::signature::Signature;
 use crate::stage::{HasStageInfo, StageDispatchMiss, StageInfo, StageMeta, StageSlot, StageStatus};
 
-/// A compilation pipeline that holds stages and a global symbol table.
+/// The root IR database: every stage of a program, its cross-stage functions,
+/// and a global symbol table.
+///
+/// It is not a pass pipeline: a stage is a whole IR level, and stages are kept
+/// (not discarded after lowering) so a function can be respecialized at any of
+/// them.
 ///
 /// The global symbol table (`global_symbols`) provides cross-stage interning
 /// for identifiers like function names. Stage-local symbols (SSA names, blocks)
 /// remain in each stage's [`StageInfo`].
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Pipeline<S> {
+pub struct Program<S> {
     stages: Vec<StageSlot<S>>,
     functions: Arena<Function, FunctionInfo>,
     global_symbols: InternTable<String, GlobalSymbol>,
@@ -28,13 +33,13 @@ pub struct Pipeline<S> {
     name_index: FxHashMap<GlobalSymbol, Function>,
 }
 
-impl<S> Default for Pipeline<S> {
+impl<S> Default for Program<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> Pipeline<S> {
+impl<S> Program<S> {
     /// Look up a stage by its human-readable name, returning its [`CompileStage`].
     ///
     /// Resolves the name against the slot rather than the stage, so a position
@@ -56,13 +61,13 @@ impl<S> Pipeline<S> {
             .map(|index| CompileStage::new(Id(index)))
     }
 
-    /// Every position in the pipeline with the name it answers to, in order.
+    /// Every position in the program with the name it answers to, in order.
     ///
-    /// The reverse of [`Pipeline::stage_by_name`], and like it this reads the
+    /// The reverse of [`Program::stage_by_name`], and like it this reads the
     /// name off the position rather than the stage, so a position a pass has
     /// taken or poisoned is still listed.
     ///
-    /// Unlike [`Pipeline::stages`], this yields *every* position, so the
+    /// Unlike [`Program::stages`], this yields *every* position, so the
     /// [`CompileStage`] it hands back is always the real one.
     pub fn stage_names(&self) -> impl Iterator<Item = (CompileStage, Option<GlobalSymbol>)> + '_
     where
@@ -83,9 +88,9 @@ impl<S> Pipeline<S> {
         }
     }
 
-    /// Add a stage to the pipeline, returning its [`CompileStage`].
+    /// Add a stage to the program, returning its [`CompileStage`].
     ///
-    /// *Non-builder variant.* Prefer the builder form (see [`Pipeline::add_stage`]
+    /// *Non-builder variant.* Prefer the builder form (see [`Program::add_stage`]
     /// in the `#[bon::bon]` block) when you want to set a stage name.
     pub fn add_stage_raw(&mut self, stage: S) -> CompileStage {
         let id = CompileStage::new(Id(self.stages.len()));
@@ -97,14 +102,14 @@ impl<S> Pipeline<S> {
     ///
     /// Returns `None` both when `id` names no position at all and when the
     /// position exists but the stage is either transferred to or poisoned
-    /// by a pass. Use [`Pipeline::stage_status`] to tell those apart.
+    /// by a pass. Use [`Program::stage_status`] to tell those apart.
     pub fn stage(&self, id: CompileStage) -> Option<&S> {
         self.stage_or_miss(id).ok()
     }
 
     /// Get a mutable reference to a stage by its [`CompileStage`].
     ///
-    /// Shares [`Pipeline::stage`]'s `None` cases.
+    /// Shares [`Program::stage`]'s `None` cases.
     pub fn stage_mut(&mut self, id: CompileStage) -> Option<&mut S> {
         self.stage_or_miss_mut(id).ok()
     }
@@ -113,7 +118,7 @@ impl<S> Pipeline<S> {
     ///
     /// Crate-private: a slot exposes its own state and its
     /// [`Quarantined`](crate::Quarantined), which
-    /// [`Pipeline::stage`] deliberately does not. Callers outside the crate go
+    /// [`Program::stage`] deliberately does not. Callers outside the crate go
     /// through the accessors that answer one question each.
     pub(crate) fn slot(&self, id: CompileStage) -> Option<&StageSlot<S>> {
         self.stages.get(Id::from(id).raw())
@@ -121,7 +126,7 @@ impl<S> Pipeline<S> {
 
     /// The slot at `id`, mutably, whatever state it is in.
     ///
-    /// The pass wrapper needs this rather than [`Pipeline::stage_mut`]: running
+    /// The pass wrapper needs this rather than [`Program::stage_mut`]: running
     /// a pass moves the stage out of its slot and back, which is a change of
     /// slot *state*, not a mutation of the stage.
     pub(crate) fn slot_mut(&mut self, id: CompileStage) -> Option<&mut StageSlot<S>> {
@@ -131,7 +136,7 @@ impl<S> Pipeline<S> {
     /// Which state the position at `id` is in, or `None` if there is no such
     /// position.
     ///
-    /// [`Pipeline::stage`] answers "can I use this stage?"; this answers "why
+    /// [`Program::stage`] answers "can I use this stage?"; this answers "why
     /// not?"
     pub fn stage_status(&self, id: CompileStage) -> Option<StageStatus> {
         self.slot(id).map(StageSlot::status)
@@ -150,7 +155,7 @@ impl<S> Pipeline<S> {
 
     /// The stage at `id`, or the reason dispatch cannot reach it.
     ///
-    /// The same lookup as [`Pipeline::stage`], but it keeps *why* it failed
+    /// The same lookup as [`Program::stage`], but it keeps *why* it failed
     /// rather than folding both reasons into `None`. Dispatch reports that
     /// reason to its caller, so a poisoned position is not mistaken for a
     /// missing one.
@@ -159,7 +164,7 @@ impl<S> Pipeline<S> {
         slot.stage().ok_or(StageDispatchMiss::StageUnavailable)
     }
 
-    /// Mutable counterpart of [`Pipeline::stage_or_miss`].
+    /// Mutable counterpart of [`Program::stage_or_miss`].
     pub(crate) fn stage_or_miss_mut(
         &mut self,
         id: CompileStage,
@@ -168,16 +173,16 @@ impl<S> Pipeline<S> {
         slot.stage_mut().ok_or(StageDispatchMiss::StageUnavailable)
     }
 
-    /// Iterate every stage the pipeline still holds, in pipeline order.
+    /// Iterate every stage the program still holds, in program order.
     ///
     /// Skips positions whose stage is absent, so the yielded items are always
-    /// usable. Positions are not renumbered: use [`Pipeline::stage_by_name`] or
+    /// usable. Positions are not renumbered: use [`Program::stage_by_name`] or
     /// a [`CompileStage`] to address one.
     pub fn stages(&self) -> impl Iterator<Item = &S> {
         self.stages.iter().filter_map(StageSlot::stage)
     }
 
-    /// Iterate every stage the pipeline still holds, mutably, in pipeline order.
+    /// Iterate every stage the program still holds, mutably, in program order.
     pub fn stages_mut(&mut self) -> impl Iterator<Item = &mut S> {
         self.stages.iter_mut().filter_map(StageSlot::stage_mut)
     }
@@ -200,10 +205,10 @@ impl<S> Pipeline<S> {
     /// Look up a function by its interned name in O(1) time.
     ///
     /// The `name` parameter is a [`GlobalSymbol`] — callers that have a string
-    /// should intern it first via [`Pipeline::intern`].
+    /// should intern it first via [`Program::intern`].
     ///
     /// Returns `None` if no function with the given name has been allocated
-    /// via [`Pipeline::function`].
+    /// via [`Program::function`].
     pub fn function_by_name(&self, name: GlobalSymbol) -> Option<Function> {
         self.name_index.get(&name).copied()
     }
@@ -253,23 +258,23 @@ impl<S> Pipeline<S> {
     ///
     /// This is a low-level method for manually linking a staged function that was
     /// created directly on a [`StageInfo`] (via [`StageInfo::staged_function`]).
-    /// Prefer [`Pipeline::staged_function`] which creates and links in one step.
+    /// Prefer [`Program::staged_function`] which creates and links in one step.
     ///
     /// Equivalent to
-    /// `pipeline.function_info_mut(func)?.add_staged_function(stage, sf)`.
+    /// `program.function_info_mut(func)?.add_staged_function(stage, sf)`.
     ///
     /// # Errors
     ///
-    /// Returns [`PipelineError::UnknownFunction`] if `func` does not exist.
+    /// Returns [`ProgramError::UnknownFunction`] if `func` does not exist.
     pub fn link(
         &mut self,
         func: Function,
         stage: CompileStage,
         sf: StagedFunction,
-    ) -> Result<(), PipelineError> {
+    ) -> Result<(), ProgramError> {
         self.functions
             .get_mut(func)
-            .ok_or(PipelineError::UnknownFunction(func))?
+            .ok_or(ProgramError::UnknownFunction(func))?
             .add_staged_function(stage, sf);
         Ok(())
     }
@@ -293,7 +298,7 @@ impl<S> Pipeline<S> {
         info.staged_function(stage)
     }
 
-    /// Resolve a stage-local [`Symbol`] to a pipeline-level [`Function`].
+    /// Resolve a stage-local [`Symbol`] to a program-level [`Function`].
     ///
     /// The lookup chain is:
     /// stage-local symbol -> interned name -> global symbol -> function id.
@@ -311,8 +316,8 @@ impl<S> Pipeline<S> {
 }
 
 #[bon::bon]
-impl<S> Pipeline<S> {
-    /// Add a stage to the pipeline, returning its [`CompileStage`].
+impl<S> Program<S> {
+    /// Add a stage to the program, returning its [`CompileStage`].
     ///
     /// If a `name` is provided, it is interned into the global symbol table
     /// and set on the stage via [`StageMeta::set_stage_name`]. This lets the
@@ -322,8 +327,8 @@ impl<S> Pipeline<S> {
     /// # Examples
     ///
     /// ```ignore
-    /// let id = pipeline.add_stage().stage(ctx).new();                   // unnamed
-    /// let id = pipeline.add_stage().stage(ctx).name("llvm_ir").new();   // named
+    /// let id = program.add_stage().stage(ctx).new();                   // unnamed
+    /// let id = program.add_stage().stage(ctx).name("llvm_ir").new();   // named
     /// ```
     #[builder(finish_fn = new)]
     pub fn add_stage(&mut self, mut stage: S, #[builder(into)] name: Option<String>) -> CompileStage
@@ -347,26 +352,26 @@ impl<S> Pipeline<S> {
     ///
     /// # Errors
     ///
-    /// Returns [`PipelineError::DuplicateFunctionName`] if a function with
+    /// Returns [`ProgramError::DuplicateFunctionName`] if a function with
     /// the same name already exists.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let func = pipeline.function().new()?;               // anonymous
-    /// let func = pipeline.function().name("foo").new()?;   // named
+    /// let func = program.function().new()?;               // anonymous
+    /// let func = program.function().name("foo").new()?;   // named
     /// ```
     #[builder(finish_fn = new)]
     pub fn function(
         &mut self,
         #[builder(into)] name: Option<String>,
-    ) -> Result<Function, PipelineError> {
+    ) -> Result<Function, ProgramError> {
         let sym = name
             .map(|n| {
                 if let Some(existing) = self.global_symbols.lookup(n.as_str())
                     && self.name_index.contains_key(&existing)
                 {
-                    return Err(PipelineError::DuplicateFunctionName(existing));
+                    return Err(ProgramError::DuplicateFunctionName(existing));
                 }
                 Ok(self.global_symbols.intern(n))
             })
@@ -391,14 +396,14 @@ impl<S> Pipeline<S> {
     ///
     /// # Errors
     ///
-    /// Returns [`PipelineStagedError::Pipeline`] if `func` or `stage` refers
-    /// to an unknown ID, or [`PipelineStagedError::StagedFunction`] if the
+    /// Returns [`ProgramStagedError::Program`] if `func` or `stage` refers
+    /// to an unknown ID, or [`ProgramStagedError::StagedFunction`] if the
     /// stage-level staged-function creation conflicts.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let sf = pipeline.staged_function()
+    /// let sf = program.staged_function()
     ///     .func(func)
     ///     .stage(stage_id)
     ///     .signature(sig)
@@ -413,7 +418,7 @@ impl<S> Pipeline<S> {
         signature: Option<Signature<L::Type>>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
-    ) -> Result<StagedFunction, PipelineStagedError<L>>
+    ) -> Result<StagedFunction, ProgramStagedError<L>>
     where
         S: HasStageInfo<L>,
         L::Type: crate::Placeholder,
@@ -422,7 +427,7 @@ impl<S> Pipeline<S> {
         let name = self
             .functions
             .get(func)
-            .ok_or(PipelineError::UnknownFunction(func))?
+            .ok_or(ProgramError::UnknownFunction(func))?
             .name();
 
         // Borrow the stage mutably to access its StageInfo.
@@ -431,7 +436,7 @@ impl<S> Pipeline<S> {
             .get_mut(Id::from(stage).raw())
             .and_then(StageSlot::stage_mut)
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
-            .ok_or(PipelineError::UnknownFunction(func))?;
+            .ok_or(ProgramError::UnknownFunction(func))?;
 
         // Delegate to BuilderStageInfo::staged_function via with_builder.
         let sf = stage_info.with_builder(|b| {
@@ -446,7 +451,7 @@ impl<S> Pipeline<S> {
         // Auto-link the staged function to the abstract Function.
         self.functions
             .get_mut(func)
-            .ok_or(PipelineError::UnknownFunction(func))?
+            .ok_or(ProgramError::UnknownFunction(func))?
             .add_staged_function(stage, sf);
 
         Ok(sf)
@@ -460,14 +465,14 @@ impl<S> Pipeline<S> {
     ///
     /// # Errors
     ///
-    /// Returns [`PipelineStagedError`] if the stage does not contain a
+    /// Returns [`ProgramStagedError`] if the stage does not contain a
     /// `StageInfo` for the given dialect, or if a function with the same name
     /// already exists.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let (func, sf, spec) = pipeline.define_function::<MyDialect>()
+    /// let (func, sf, spec) = program.define_function::<MyDialect>()
     ///     .stage(stage_id)
     ///     .definition(definition)
     ///     .name("my_func")
@@ -482,7 +487,7 @@ impl<S> Pipeline<S> {
         stage: CompileStage,
         signature: Option<Signature<L::Type>>,
         #[builder(into)] definition: Statement,
-    ) -> Result<(Function, StagedFunction, SpecializedFunction), PipelineStagedError<L>>
+    ) -> Result<(Function, StagedFunction, SpecializedFunction), ProgramStagedError<L>>
     where
         S: HasStageInfo<L>,
         L::Type: crate::Placeholder,
@@ -501,7 +506,7 @@ impl<S> Pipeline<S> {
             .get_mut(Id::from(stage).raw())
             .and_then(StageSlot::stage_mut)
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
-            .ok_or(PipelineError::UnknownFunction(func))?;
+            .ok_or(ProgramError::UnknownFunction(func))?;
 
         // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
@@ -514,142 +519,142 @@ impl<S> Pipeline<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::Pipeline;
-    use crate::builder::error::PipelineError;
+    use super::Program;
+    use crate::builder::error::ProgramError;
 
     #[test]
     fn duplicate_function_names_are_forbidden() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let _ = pipeline.function().name("foo").new().unwrap();
-        let result = pipeline.function().name("foo").new();
+        let mut program: Program<()> = Program::new();
+        let _ = program.function().name("foo").new().unwrap();
+        let result = program.function().name("foo").new();
         assert!(
-            matches!(result, Err(PipelineError::DuplicateFunctionName(_))),
+            matches!(result, Err(ProgramError::DuplicateFunctionName(_))),
             "expected DuplicateFunctionName, got: {result:?}"
         );
     }
 
     #[test]
     fn function_by_name_is_stable_for_unique_names() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let foo = pipeline.function().name("foo").new().unwrap();
-        let sym = pipeline
+        let mut program: Program<()> = Program::new();
+        let foo = program.function().name("foo").new().unwrap();
+        let sym = program
             .lookup_symbol("foo")
             .expect("foo symbol should exist");
-        assert_eq!(pipeline.function_by_name(sym), Some(foo));
+        assert_eq!(program.function_by_name(sym), Some(foo));
     }
 
     #[test]
-    fn pipeline_intern_resolve_roundtrip() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let sym = pipeline.intern("hello");
-        assert_eq!(pipeline.resolve(sym), Some("hello"));
+    fn program_intern_resolve_roundtrip() {
+        let mut program: Program<()> = Program::new();
+        let sym = program.intern("hello");
+        assert_eq!(program.resolve(sym), Some("hello"));
     }
 
     #[test]
-    fn pipeline_intern_is_idempotent() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let s1 = pipeline.intern("hello");
-        let s2 = pipeline.intern("hello");
+    fn program_intern_is_idempotent() {
+        let mut program: Program<()> = Program::new();
+        let s1 = program.intern("hello");
+        let s2 = program.intern("hello");
         assert_eq!(s1, s2);
     }
 
     #[test]
-    fn pipeline_anonymous_function() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let f1 = pipeline.function().new().unwrap();
-        let f2 = pipeline.function().new().unwrap();
+    fn program_anonymous_function() {
+        let mut program: Program<()> = Program::new();
+        let f1 = program.function().new().unwrap();
+        let f2 = program.function().new().unwrap();
         // Anonymous functions don't conflict
         assert_ne!(f1, f2);
     }
 
     #[test]
-    fn pipeline_add_stage_and_access() {
-        let mut pipeline: Pipeline<String> = Pipeline::new();
-        let id = pipeline.add_stage_raw("stage0".to_string());
-        assert_eq!(pipeline.stage(id), Some(&"stage0".to_string()));
+    fn program_add_stage_and_access() {
+        let mut program: Program<String> = Program::new();
+        let id = program.add_stage_raw("stage0".to_string());
+        assert_eq!(program.stage(id), Some(&"stage0".to_string()));
     }
 
     #[test]
-    fn pipeline_lookup_symbol_returns_none_for_missing() {
-        let pipeline: Pipeline<()> = Pipeline::new();
-        assert_eq!(pipeline.lookup_symbol("nonexistent"), None);
+    fn program_lookup_symbol_returns_none_for_missing() {
+        let program: Program<()> = Program::new();
+        assert_eq!(program.lookup_symbol("nonexistent"), None);
     }
 
     #[test]
-    fn pipeline_function_by_name_returns_none_for_missing() {
+    fn program_function_by_name_returns_none_for_missing() {
         use crate::node::symbol::GlobalSymbol;
-        let pipeline: Pipeline<()> = Pipeline::new();
+        let program: Program<()> = Program::new();
         // GlobalSymbol(0) has never been allocated
-        assert_eq!(pipeline.function_by_name(GlobalSymbol::from(0)), None);
+        assert_eq!(program.function_by_name(GlobalSymbol::from(0)), None);
     }
 
     #[test]
-    fn pipeline_stage_returns_none_for_invalid_id() {
+    fn program_stage_returns_none_for_invalid_id() {
         use crate::arena::Id;
         use crate::node::function::CompileStage;
 
-        let mut pipeline: Pipeline<String> = Pipeline::new();
-        pipeline.add_stage_raw("stage0".to_string());
+        let mut program: Program<String> = Program::new();
+        program.add_stage_raw("stage0".to_string());
         let invalid = CompileStage::new(Id(999));
-        assert_eq!(pipeline.stage(invalid), None);
+        assert_eq!(program.stage(invalid), None);
     }
 
     #[test]
-    fn pipeline_stage_mut_returns_none_for_invalid_id() {
+    fn program_stage_mut_returns_none_for_invalid_id() {
         use crate::arena::Id;
         use crate::node::function::CompileStage;
 
-        let mut pipeline: Pipeline<String> = Pipeline::new();
-        pipeline.add_stage_raw("stage0".to_string());
+        let mut program: Program<String> = Program::new();
+        program.add_stage_raw("stage0".to_string());
         let invalid = CompileStage::new(Id(999));
-        assert_eq!(pipeline.stage_mut(invalid), None);
+        assert_eq!(program.stage_mut(invalid), None);
     }
 
     #[test]
-    fn pipeline_stages_slice() {
-        let mut pipeline: Pipeline<String> = Pipeline::new();
-        pipeline.add_stage_raw("a".to_string());
-        pipeline.add_stage_raw("b".to_string());
-        pipeline.add_stage_raw("c".to_string());
-        let stages: Vec<&String> = pipeline.stages().collect();
+    fn program_stages_slice() {
+        let mut program: Program<String> = Program::new();
+        program.add_stage_raw("a".to_string());
+        program.add_stage_raw("b".to_string());
+        program.add_stage_raw("c".to_string());
+        let stages: Vec<&String> = program.stages().collect();
         assert_eq!(stages, vec!["a", "b", "c"]);
     }
 
     #[test]
-    fn pipeline_link_unknown_function_returns_error() {
+    fn program_link_unknown_function_returns_error() {
         use crate::arena::Id;
         use crate::node::function::{Function, StagedFunction};
 
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let stage = pipeline.add_stage_raw(());
-        // Create a Function ID that doesn't exist in the pipeline
+        let mut program: Program<()> = Program::new();
+        let stage = program.add_stage_raw(());
+        // Create a Function ID that doesn't exist in the program
         let invalid_func = Function::from(Id(999));
         let sf = StagedFunction::from(Id(0));
-        let result = pipeline.link(invalid_func, stage, sf);
+        let result = program.link(invalid_func, stage, sf);
         assert!(
-            matches!(result, Err(PipelineError::UnknownFunction(_))),
+            matches!(result, Err(ProgramError::UnknownFunction(_))),
             "expected UnknownFunction, got: {result:?}"
         );
     }
 
     #[test]
-    fn pipeline_function_info_returns_none_for_invalid() {
+    fn program_function_info_returns_none_for_invalid() {
         use crate::arena::Id;
         use crate::node::function::Function;
 
-        let pipeline: Pipeline<()> = Pipeline::new();
+        let program: Program<()> = Program::new();
         let invalid_func = Function::from(Id(999));
-        assert!(pipeline.function_info(invalid_func).is_none());
+        assert!(program.function_info(invalid_func).is_none());
     }
 
     #[test]
-    fn pipeline_resolve_returns_none_for_invalid_symbol() {
+    fn program_resolve_returns_none_for_invalid_symbol() {
         use crate::node::symbol::GlobalSymbol;
 
-        let pipeline: Pipeline<()> = Pipeline::new();
+        let program: Program<()> = Program::new();
         // GlobalSymbol(42) was never interned
         let invalid_sym = GlobalSymbol::from(42);
-        assert_eq!(pipeline.resolve(invalid_sym), None);
+        assert_eq!(program.resolve(invalid_sym), None);
     }
 
     // --- Minimal StageMeta impl for stage_by_name tests ---
@@ -701,32 +706,32 @@ mod tests {
 
     #[test]
     fn stage_by_name_returns_matching_stage() {
-        let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
-        let id = pipeline
+        let mut program: Program<NamedStage> = Program::new();
+        let id = program
             .add_stage()
             .stage(NamedStage::new())
             .name("source")
             .new();
-        assert_eq!(pipeline.stage_by_name("source"), Some(id));
+        assert_eq!(program.stage_by_name("source"), Some(id));
     }
 
     #[test]
     fn stage_by_name_returns_none_for_missing() {
-        let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
-        pipeline
+        let mut program: Program<NamedStage> = Program::new();
+        program
             .add_stage()
             .stage(NamedStage::new())
             .name("source")
             .new();
-        assert_eq!(pipeline.stage_by_name("nonexistent"), None);
+        assert_eq!(program.stage_by_name("nonexistent"), None);
     }
 
     #[test]
     fn stage_by_name_returns_none_for_unnamed_stage() {
-        let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
+        let mut program: Program<NamedStage> = Program::new();
         // Add an unnamed stage (no name set via builder)
-        pipeline.add_stage_raw(NamedStage::new());
-        assert_eq!(pipeline.stage_by_name("anything"), None);
+        program.add_stage_raw(NamedStage::new());
+        assert_eq!(program.stage_by_name("anything"), None);
     }
 
     #[test]
@@ -734,20 +739,20 @@ mod tests {
         use crate::arena::Id;
         use crate::node::function::StagedFunction;
 
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let stage = pipeline.add_stage_raw(());
-        let func = pipeline.function().name("main").new().unwrap();
+        let mut program: Program<()> = Program::new();
+        let stage = program.add_stage_raw(());
+        let func = program.function().name("main").new().unwrap();
         let sf = StagedFunction::from(Id(42));
-        pipeline.link(func, stage, sf).unwrap();
+        program.link(func, stage, sf).unwrap();
 
-        assert_eq!(pipeline.resolve_staged_function("main", stage), Some(sf));
+        assert_eq!(program.resolve_staged_function("main", stage), Some(sf));
     }
 
     #[test]
     fn resolve_staged_function_missing_name() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let stage = pipeline.add_stage_raw(());
-        assert_eq!(pipeline.resolve_staged_function("missing", stage), None);
+        let mut program: Program<()> = Program::new();
+        let stage = program.add_stage_raw(());
+        assert_eq!(program.resolve_staged_function("missing", stage), None);
     }
 
     #[test]
@@ -755,38 +760,36 @@ mod tests {
         use crate::arena::Id;
         use crate::node::function::CompileStage;
 
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let _ = pipeline.function().name("main").new().unwrap();
+        let mut program: Program<()> = Program::new();
+        let _ = program.function().name("main").new().unwrap();
         let unlinked_stage = CompileStage::new(Id(99));
         assert_eq!(
-            pipeline.resolve_staged_function("main", unlinked_stage),
+            program.resolve_staged_function("main", unlinked_stage),
             None
         );
     }
 
     #[test]
     fn resolve_staged_function_not_linked_at_stage() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let stage_a = pipeline.add_stage_raw(());
-        let stage_b = pipeline.add_stage_raw(());
-        let func = pipeline.function().name("foo").new().unwrap();
+        let mut program: Program<()> = Program::new();
+        let stage_a = program.add_stage_raw(());
+        let stage_b = program.add_stage_raw(());
+        let func = program.function().name("foo").new().unwrap();
         // Link to stage_a only
         use crate::arena::Id;
         use crate::node::function::StagedFunction;
         let sf = StagedFunction::from(Id(0));
-        pipeline.link(func, stage_a, sf).unwrap();
+        program.link(func, stage_a, sf).unwrap();
 
         // Should find at stage_a but not stage_b
-        assert_eq!(pipeline.resolve_staged_function("foo", stage_a), Some(sf));
-        assert_eq!(pipeline.resolve_staged_function("foo", stage_b), None);
+        assert_eq!(program.resolve_staged_function("foo", stage_a), Some(sf));
+        assert_eq!(program.resolve_staged_function("foo", stage_b), None);
     }
 
     #[test]
-    fn pipeline_multiple_anonymous_functions_are_distinct() {
-        let mut pipeline: Pipeline<()> = Pipeline::new();
-        let funcs: Vec<_> = (0..10)
-            .map(|_| pipeline.function().new().unwrap())
-            .collect();
+    fn program_multiple_anonymous_functions_are_distinct() {
+        let mut program: Program<()> = Program::new();
+        let funcs: Vec<_> = (0..10).map(|_| program.function().new().unwrap()).collect();
         // All should be distinct
         for i in 0..funcs.len() {
             for j in (i + 1)..funcs.len() {
@@ -798,17 +801,17 @@ mod tests {
         }
         // All should have function_info
         for f in &funcs {
-            assert!(pipeline.function_info(*f).is_some());
+            assert!(program.function_info(*f).is_some());
         }
         // None should have names
         for f in &funcs {
-            assert_eq!(pipeline.function_info(*f).unwrap().name(), None);
+            assert_eq!(program.function_info(*f).unwrap().name(), None);
         }
     }
 }
 
 #[cfg(feature = "serde")]
-impl<'de, S: serde::Deserialize<'de>> serde::Deserialize<'de> for Pipeline<S> {
+impl<'de, S: serde::Deserialize<'de>> serde::Deserialize<'de> for Program<S> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
         struct Data<S> {

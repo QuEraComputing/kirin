@@ -1,5 +1,5 @@
 //! Proof of concept: removing double negations with `#[rewrite_rule]` rules,
-//! driven to a fixpoint inside `Pipeline::run_pass` in every walk order.
+//! driven to a fixpoint inside `Program::run_pass` in every walk order.
 
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
@@ -356,10 +356,10 @@ fn double_neg_erasing_used_producer() {
 /// The error running `rules` over `input` in post-order fails with, or
 /// `None` if the run succeeds.
 fn run_error(rules: &RuleSet<L>, input: &str) -> Option<DriverError> {
-    let (mut pipeline, stage) = parse(input);
+    let (mut program, stage) = parse(input);
     let driver = RewriteDriver::new(rules);
     let mut failure = None;
-    let _ = pipeline.run_pass(stage, |rewriter| {
+    let _ = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -507,21 +507,21 @@ fn program(body: &str, ret: &str) -> String {
     )
 }
 
-fn parse(input: &str) -> (Pipeline<StageInfo<L>>, CompileStage) {
-    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    pipeline.parse(input).expect("the program parses");
-    let stage = pipeline.stage_by_name("arith").expect("the stage exists");
-    (pipeline, stage)
+fn parse(input: &str) -> (Program<StageInfo<L>>, CompileStage) {
+    let mut program: Program<StageInfo<L>> = Program::new();
+    program.parse(input).expect("the program parses");
+    let stage = program.stage_by_name("arith").expect("the stage exists");
+    (program, stage)
 }
 
 /// Run `rules` over `input` in order `O`, returning the printed result.
 fn rewrite<O: WalkOrder>(rules: &RuleSet<L>, input: &str) -> (String, RewriteSummary) {
-    let (mut pipeline, stage) = parse(input);
+    let (mut program, stage) = parse(input);
     let driver = RewriteDriver::new(rules);
-    let summary = pipeline
+    let summary = program
         .run_pass(stage, |rewriter| driver.run::<O>(rewriter))
         .expect("the pass succeeds");
-    (pipeline.sprint(), summary)
+    (program.sprint(), summary)
 }
 
 /// `input` printed, to compare against without depending on spacing.
@@ -651,11 +651,11 @@ fn every_function_in_the_stage_is_rewritten() {
 #[test]
 fn a_redefined_function_is_not_rewritten() {
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let (mut pipeline, stage) = parse(&input);
-    let old = pipeline
+    let (mut program, stage) = parse(&input);
+    let old = program
         .resolve_staged_function("f", stage)
         .expect("`@f` exists");
-    let info = pipeline.stage_mut(stage).expect("the stage exists");
+    let info = program.stage_mut(stage).expect("the stage exists");
     let (name, signature) = {
         let old = old.expect_info(info);
         (old.name(), old.signature().clone())
@@ -674,7 +674,7 @@ fn a_redefined_function_is_not_rewritten() {
 
     let rules = neg_rules();
     let driver = RewriteDriver::new(&rules);
-    let summary = pipeline
+    let summary = program
         .run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))
         .expect("the pass succeeds");
     assert_eq!((summary.applied, summary.erased), (0, 0));
@@ -756,11 +756,11 @@ fn a_native_check_returning_err_fails_the_run() {
         "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
         "%b",
     );
-    let (mut pipeline, stage) = parse(&input);
+    let (mut program, stage) = parse(&input);
     let driver = RewriteDriver::new(&rules);
 
     let mut failure = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -788,10 +788,10 @@ fn a_constraint_with_try_applies_on_ok_true_and_fails_the_run_on_err() {
         "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
         "%b",
     );
-    let (mut pipeline, stage) = parse(&of_sum);
+    let (mut program, stage) = parse(&of_sum);
     let driver = RewriteDriver::new(&rules);
     let mut failure = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -940,11 +940,11 @@ fn a_constraint_on_a_non_bool_fails_the_run() {
     })
     .unwrap();
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let (mut pipeline, stage) = parse(&input);
+    let (mut program, stage) = parse(&input);
     let driver = RewriteDriver::new(&rules);
 
     let mut failure = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -963,11 +963,11 @@ fn a_constraint_on_a_non_bool_fails_the_run() {
 fn a_native_argument_of_the_wrong_type_fails_the_run() {
     let rules = RuleSet::build(|stage| vec![double_neg_of_zero(stage)]).unwrap();
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let (mut pipeline, stage) = parse(&input);
+    let (mut program, stage) = parse(&input);
     let driver = RewriteDriver::new(&rules);
 
     let mut failure = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -1041,12 +1041,12 @@ fn a_rule_erasing_its_root_runs_in_the_reverse_bfs_orders() {
 fn a_rule_erasing_its_root_fails_in_the_other_orders() {
     let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let (mut pipeline, stage) = parse(&input);
+    let (mut program, stage) = parse(&input);
     let driver = RewriteDriver::new(&rules);
 
     let mut failure = None;
     let mut edits = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         edits = Some(rewriter.events().len());
@@ -1071,12 +1071,12 @@ fn a_failed_rewrite_quarantines_the_stage() {
         "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %s = add %a, %b -> i64;",
         "%s",
     );
-    let (mut pipeline, stage) = parse(&input);
+    let (mut program, stage) = parse(&input);
     let rules = RuleSet::build(|stage| vec![double_neg_erasing_producer(stage)]).unwrap();
     let driver = RewriteDriver::new(&rules);
 
     let mut failure = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -1090,18 +1090,18 @@ fn a_failed_rewrite_quarantines_the_stage() {
             ..
         })
     ));
-    assert_eq!(pipeline.stage_status(stage), Some(StageStatus::Poisoned));
+    assert_eq!(program.stage_status(stage), Some(StageStatus::Poisoned));
 }
 
 #[test]
 fn running_out_of_sweeps_quarantines_the_stage() {
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let (mut pipeline, stage) = parse(&input);
+    let (mut program, stage) = parse(&input);
     let rules = neg_rules();
     let driver = RewriteDriver::new(&rules).max_sweeps(1);
 
     let mut failure = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
+    let result = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PostOrder>(rewriter);
         failure = result.clone().err();
         result
@@ -1112,5 +1112,5 @@ fn running_out_of_sweeps_quarantines_the_stage() {
         failure,
         Some(DriverError::BudgetExhausted { sweeps: 1, .. })
     ));
-    assert_eq!(pipeline.stage_status(stage), Some(StageStatus::Poisoned));
+    assert_eq!(program.stage_status(stage), Some(StageStatus::Poisoned));
 }

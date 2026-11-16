@@ -18,7 +18,7 @@ generic over `I: Interp`; the concrete/abstract distinction is carried by
 
 We use:
 
-- `P`: immutable pipeline IR (`Pipeline<S>`)
+- `P`: immutable program IR (`Program<S>`)
 - `σ`: dynamic SSA store/environment state (`EnvStore<K, SSAValue, V>`)
 - `κ`: explicit continuation as frame stack (scope + call frames)
 - `ρ`: active environment capability (`EnvIndex`)

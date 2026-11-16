@@ -1,7 +1,7 @@
 use crate::node::symbol::GlobalSymbol;
 use crate::{Quarantined, StageMeta};
 
-/// One stage position in a [`Pipeline`](crate::Pipeline).
+/// One stage position in a [`Program`](crate::Program).
 ///
 /// A pass takes exclusive ownership of the stage it rewrites, so a slot must be
 /// able to be empty. It must *not* be emptied with `mem::take`: a default
@@ -29,7 +29,7 @@ enum SlotState<S> {
     ///
     /// This state is reachable only if something unwinds between taking
     /// the stage out and putting it back, outside the `catch_unwind` that
-    /// [`Pipeline::run_pass`](crate::rewrite::pass::drive_pass) installs
+    /// [`Program::run_pass`](crate::rewrite::pass::drive_pass) installs
     /// Hence, it marks a stage lost to a panic, rather than one never written back.
     Transferred { name: Option<GlobalSymbol> },
     /// A pass failed here. The slot keeps its position so every previously
@@ -41,11 +41,11 @@ enum SlotState<S> {
     },
 }
 
-/// Which of three states a stage position in a [`Pipeline`](crate::Pipeline)
+/// Which of three states a stage position in a [`Program`](crate::Program)
 /// is in, named without borrowing what it holds.
 ///
-/// Read with [`Pipeline::stage_status`](crate::Pipeline::stage_status).
-/// [`Pipeline::stage`](crate::Pipeline::stage) collapses the latter two into
+/// Read with [`Program::stage_status`](crate::Program::stage_status).
+/// [`Program::stage`](crate::Program::stage) collapses the latter two into
 /// `None`, which is the right answer for "can I use this?" but not for "why
 /// not?".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,7 +168,7 @@ impl<S> StageSlot<S> {
     }
 }
 
-/// Serializes as the stage it holds, so a pipeline's stages stay a plain list
+/// Serializes as the stage it holds, so a program's stages stay a plain list
 /// on the wire and its name travels with the stage.
 ///
 /// A position without a stage is an error rather than skipped: every serialized
@@ -180,7 +180,7 @@ impl<S: serde::Serialize> serde::Serialize for StageSlot<S> {
         match self.stage() {
             Some(stage) => stage.serialize(serializer),
             None => Err(serde::ser::Error::custom(format_args!(
-                "cannot serialize a pipeline position whose stage is unavailable: {:?}",
+                "cannot serialize a program position whose stage is unavailable: {:?}",
                 self.status()
             ))),
         }

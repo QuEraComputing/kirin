@@ -5,7 +5,7 @@ mod zx;
 
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
-use kirin::pretty::PipelinePrintExt;
+use kirin::pretty::ProgramPrintExt;
 
 use stage::Stage;
 
@@ -30,9 +30,9 @@ fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Parse { file } => {
             let src = std::fs::read_to_string(&file)?;
-            let mut pipeline: Pipeline<Stage> = Pipeline::new();
-            ParsePipelineText::parse(&mut pipeline, &src)?;
-            let rendered = pipeline.sprint();
+            let mut program: Program<Stage> = Program::new();
+            ParseProgramText::parse(&mut program, &src)?;
+            let rendered = program.sprint();
             print!("{rendered}");
             Ok(())
         }

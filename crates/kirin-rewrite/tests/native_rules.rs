@@ -125,18 +125,18 @@ fn with_double_neg() -> (RuleSet<L>, PatternRule<L>) {
 /// Run `rules` over [`FOUR_NEGS`] in pre-order: the printed result and the
 /// summary, or the error.
 fn run(rules: &RuleSet<L>) -> Result<(String, RewriteSummary), DriverError> {
-    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-    pipeline.parse(FOUR_NEGS).expect("the program parses");
-    let stage = pipeline.stage_by_name("arith").expect("the stage exists");
+    let mut program: Program<StageInfo<L>> = Program::new();
+    program.parse(FOUR_NEGS).expect("the program parses");
+    let stage = program.stage_by_name("arith").expect("the stage exists");
     let driver = RewriteDriver::new(rules);
     let mut outcome = None;
-    let _ = pipeline.run_pass(stage, |rewriter| {
+    let _ = program.run_pass(stage, |rewriter| {
         let result = driver.run::<PreOrder>(rewriter);
         outcome = Some(result.clone());
         result
     });
     let summary = outcome.expect("the pass ran")?;
-    Ok((pipeline.sprint(), summary))
+    Ok((program.sprint(), summary))
 }
 
 /// What `double_neg` alone rewrites [`FOUR_NEGS`] to.
@@ -167,9 +167,9 @@ fn statement_rules_run_in_list_order_with_patterns() {
     rules.add_pattern_rule(rule).unwrap();
     let (output, summary) = run(&rules).unwrap();
     assert_eq!(output, {
-        let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
-        pipeline.parse(FOUR_NEGS).expect("the program parses");
-        pipeline.sprint()
+        let mut program: Program<StageInfo<L>> = Program::new();
+        program.parse(FOUR_NEGS).expect("the program parses");
+        program.sprint()
     });
     assert_eq!(summary.sweeps, 1);
     assert_eq!(summary.applied, 0);

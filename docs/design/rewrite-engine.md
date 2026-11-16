@@ -7,7 +7,7 @@ Implementation-scope update (2026-07-29): the rewrite-engine milestone ends at
 operationally coherent in-place mutation plus independently derived mirror
 comparison and ownership-enforced quarantine.
 Whole-stage verifier implementation is a separate future subsystem. Sections
-below that discuss verifier integration describe the eventual pipeline
+below that discuss verifier integration describe the eventual program
 boundary, not a current rewrite-engine deliverable.
 
 This document proposes a Kirin 2.0 rewrite framework. The core design is:
@@ -75,7 +75,7 @@ the expected mirrors and compares them with the installed ones; it never
 repairs a mismatch. Success returns the owned stage. Any rewrite, driver,
 derivation, mismatch, or panic failure transfers it into diagnostic-only
 `Quarantined<StageInfo<L>>`; v1 does not roll back. A future independent
-verifier may be integrated at a higher pipeline boundary. `kirin-ir`
+verifier may be integrated at a higher program boundary. `kirin-ir`
 deliberately does **not** prove a rewrite is *semantically* correct: preserving
 program meaning is the rule author's responsibility today, and the deferred
 constraint/proof tier (top of Diagram A) is what would automate that later.
@@ -127,7 +127,7 @@ flowchart TB
   L2 -->|depends on| L1
   RW -.maintains.-> UES
   RW -->|edits StageInfo in place| IR
-  RD -.->|optional future pipeline integration| VER
+  RD -.->|optional future program integration| VER
   RW -.records.-> EV
 
   %% ---- callout note shapes (dotted, no-arrow connectors) ----
@@ -182,7 +182,7 @@ flowchart TB
   CMP -->|equal| OUT["Return owned StageInfo"]
   DER -->|authoritative IR invalid| ABT["Quarantined StageInfo<br/>diagnostics only"]
   CMP -->|mismatch| ABT
-  OUT -.->|optional future pipeline step| VER["Independent whole-stage Verifier"]
+  OUT -.->|optional future program step| VER["Independent whole-stage Verifier"]
   VER -->|success| VOUT["Verified StageInfo"]
   VER -->|failure| ABT
   OWN --> AM["AnalysisManager<br/>drop cached results"]
@@ -478,7 +478,7 @@ B exposes more opportunities for A
 ```
 
 only when A and B are inside the same fixpoint or the pass author wraps the
-pipeline in a larger fixpoint.
+program in a larger fixpoint.
 
 Example:
 
@@ -1639,7 +1639,7 @@ comparison, or panic transfers the same mutated stage into a non-`Clone`,
 non-`Default`, diagnostic-only quarantine. The caller cannot regain ordinary IR
 access and must abandon that compilation unit. The outer ownership boundary
 catches unwinds so a panic follows the same route. A future independent
-verifier may be called by a higher-level pipeline after this boundary.
+verifier may be called by a higher-level program after this boundary.
 
 There is no runtime `Rewriting` state: the exclusive owned value is the pass
 reservation. `Ready` is merely the absence of that reservation, and
@@ -2084,7 +2084,7 @@ needs recoverable failure may explicitly clone the stage before `run_pass`.
 The outer owner, not the pass closure, calls `catch_unwind(AssertUnwindSafe(..))`
 while retaining the stage. This supersedes a pass signature that consumes the
 stage itself: such a pass would drop the only diagnostic artifact during an
-unwind. A free `run_pass` supports standalone stages and tests; the pipeline
+unwind. A free `run_pass` supports standalone stages and tests; the program
 wrapper localizes slot take/reinsert/poisoning to one place.
 
 Quarantine diagnostics never call ordinary pretty-printers or linked-list
@@ -2419,8 +2419,8 @@ block itself. State never outlives a sweep, or a block for a block rule.
 ### `RuleSet`
 
 The explicit, deterministically ordered collection of declarative and native
-rules available to one driver invocation or pipeline phase. A `RuleSet` does
-not own traversal or mutation. The compiler/pipeline statically assembles all
+rules available to one driver invocation or program phase. A `RuleSet` does
+not own traversal or mutation. The compiler/program statically assembles all
 rule sets; v1 has no dynamic global rule discovery.
 
 `RuleSet` is not the same as Kirin-python's executable `Chain` combinator. The
@@ -2673,11 +2673,11 @@ legality, and dialect validity remains a separate future subsystem.
   than `&mut StageInfo<L>`: the boundary owns the `Rewriter`, so its event log
   survives an unwind, and a pass cannot reach raw arenas ahead of the
   escape-hatch lockdown below.
-- [x] Add the pipeline wrapper that takes/reinserts the whole stage-enum slot.
+- [x] Add the program wrapper that takes/reinserts the whole stage-enum slot.
   `StageSlot<S>` is a three-state position — present, transferred, poisoned. A poisoned
   position keeps its index, so every `CompileStage` issued stays valid, and
   keeps its name, so it stays addressable.
-  `Pipeline::stage_status` and `Pipeline::quarantined` are the
+  `Program::stage_status` and `Program::quarantined` are the
   read side.
 - [x] Catch panics at the outer owner with `AssertUnwindSafe`. This is justified
   because Kirin forbids unsafe/raw storage: an unwind can leave logical

@@ -89,10 +89,10 @@ impl std::ops::AddAssign for RewriteSummary {
 /// breaking the walk's contract fails the run with [`DriverError::Walk`].
 ///
 /// The driver edits through the [`Rewriter`] a pass is given, so it runs
-/// inside [`Pipeline::run_pass`](kirin_ir::Pipeline::run_pass):
+/// inside [`Program::run_pass`](kirin_ir::Program::run_pass):
 ///
 /// ```ignore
-/// pipeline.run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))?;
+/// program.run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))?;
 /// ```
 pub struct RewriteDriver<'r, L: Dialect> {
     rules: &'r RuleSet<L>,

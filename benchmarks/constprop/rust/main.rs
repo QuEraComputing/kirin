@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 mod common;
 use common::{BenchmarkLanguage, workload};
 
-type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
+type IR = Program<StageInfo<BenchmarkLanguage>>;
 type V = ConstPropValue<i64>;
 
 /// An abstract argument tuple; `null` is an unknown (top) argument.

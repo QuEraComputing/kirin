@@ -4,7 +4,7 @@ use std::{hint::black_box, time::Instant};
 use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_cf::ControlFlow;
-use kirin_prettyless::PipelinePrintExt;
+use kirin_prettyless::ProgramPrintExt;
 
 #[path = "../../common/rust/mod.rs"]
 mod common;
@@ -13,7 +13,7 @@ use common::{BenchmarkLanguage, spec, workload};
 
 mod shape;
 
-type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
+type IR = Program<StageInfo<BenchmarkLanguage>>;
 
 fn main() {
     let mut args = std::env::args().skip(1);

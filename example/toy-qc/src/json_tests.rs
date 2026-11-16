@@ -1,6 +1,6 @@
 use crate::stage::Stage;
 use kirin::prelude::*;
-use kirin::pretty::PipelinePrintExt;
+use kirin::pretty::ProgramPrintExt;
 use kirin_test_utils::roundtrip::json_roundtrip;
 
 #[test]
@@ -11,11 +11,11 @@ fn file_corpus_preserves_circuit_and_zx_graph_connectivity() {
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap();
-        let mut ir: Pipeline<Stage> = Pipeline::new();
+        let mut ir: Program<Stage> = Program::new();
         ir.parse(&text).unwrap();
         let restored = json_roundtrip(&ir);
         assert_eq!(ir.sprint(), restored.sprint(), "{file}");
-        let mut reparsed: Pipeline<Stage> = Pipeline::new();
+        let mut reparsed: Program<Stage> = Program::new();
         reparsed.parse(&restored.sprint()).unwrap();
         assert_eq!(restored.sprint(), reparsed.sprint());
         for stage in restored.stages() {

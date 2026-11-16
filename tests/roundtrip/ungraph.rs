@@ -62,7 +62,7 @@ fn test_ungraph_node_roundtrip() {
     );
 }
 
-// --- Pipeline-level UnGraph tests ---
+// --- Program-level UnGraph tests ---
 
 /// An UnGraph-bodied function: `%x` and `%y` are boundary ports (wires), each
 /// read once by `%s`; `%t` reads `%s`, which is not a wire.
@@ -74,24 +74,24 @@ specialize @test fn @by_ungraph(i64, i64) -> i64 ungraph ^u0(%x: i64, %y: i64) {
 }
 "#;
 
-type GraphPipeline = Pipeline<StageInfo<kirin_test_languages::GraphFunctionLanguage>>;
+type GraphProgram = Program<StageInfo<kirin_test_languages::GraphFunctionLanguage>>;
 
-fn parse_graph_pipeline(text: &str) -> GraphPipeline {
-    let mut pipeline = GraphPipeline::new();
-    pipeline.parse(text).expect("pipeline parses");
-    pipeline
+fn parse_graph_program(text: &str) -> GraphProgram {
+    let mut program = GraphProgram::new();
+    program.parse(text).expect("program parses");
+    program
 }
 
-/// `pipeline`'s `@test` stage and the one UnGraph in it (asserting there is
+/// `program`'s `@test` stage and the one UnGraph in it (asserting there is
 /// exactly one).
 fn test_stage_and_ungraph(
-    pipeline: &GraphPipeline,
+    program: &GraphProgram,
 ) -> (
     &StageInfo<kirin_test_languages::GraphFunctionLanguage>,
     UnGraph,
 ) {
-    let stage = pipeline
-        .stage(pipeline.stage_by_name("test").unwrap())
+    let stage = program
+        .stage(program.stage_by_name("test").unwrap())
         .unwrap();
     let graphs: Vec<UnGraph> = stage.ungraph_arena().iter().map(|info| info.id()).collect();
     assert_eq!(graphs.len(), 1);
@@ -100,8 +100,8 @@ fn test_stage_and_ungraph(
 
 /// The graph has one edge, carried by its first boundary port, and every
 /// node resolves to its own petgraph node.
-fn assert_port_edge(pipeline: &GraphPipeline) {
-    let (stage, ug) = test_stage_and_ungraph(pipeline);
+fn assert_port_edge(program: &GraphProgram) {
+    let (stage, ug) = test_stage_and_ungraph(program);
     let info = ug.expect_info(stage);
     let port = SSAValue::from(info.edge_ports()[0]);
     let weights: Vec<SSAValue> = info.graph().edge_weights().copied().collect();
@@ -115,14 +115,14 @@ fn assert_port_edge(pipeline: &GraphPipeline) {
 #[cfg(feature = "serde")]
 #[test]
 fn test_ungraph_json_restores_graph_mirror() {
-    let pipeline = parse_graph_pipeline(UNGRAPH_FN);
+    let program = parse_graph_program(UNGRAPH_FN);
 
     // The graph mirror is serialized like the other mirrors and trusted on
     // load; verification confirms it still agrees with the IR.
-    let json = serde_json::to_string(&pipeline).unwrap();
-    let restored: GraphPipeline = serde_json::from_str(&json).unwrap();
+    let json = serde_json::to_string(&program).unwrap();
+    let restored: GraphProgram = serde_json::from_str(&json).unwrap();
 
-    let (stage, ug) = test_stage_and_ungraph(&pipeline);
+    let (stage, ug) = test_stage_and_ungraph(&program);
     let (restored_stage, restored_ug) = test_stage_and_ungraph(&restored);
     let restored_info = restored_ug.expect_info(restored_stage);
     assert_eq!(
@@ -135,9 +135,9 @@ fn test_ungraph_json_restores_graph_mirror() {
 
 #[test]
 fn test_ungraph_text_roundtrip_after_rewrite() {
-    let mut pipeline = parse_graph_pipeline(UNGRAPH_FN);
-    let stage_id = pipeline.stage_by_name("test").unwrap();
-    let (stage, ug) = test_stage_and_ungraph(&pipeline);
+    let mut program = parse_graph_program(UNGRAPH_FN);
+    let stage_id = program.stage_by_name("test").unwrap();
+    let (stage, ug) = test_stage_and_ungraph(&program);
     let info = ug.expect_info(stage);
     let x = SSAValue::from(info.edge_ports()[0]);
     // `%t` is the node that does not read `%x`.
@@ -147,19 +147,19 @@ fn test_ungraph_text_roundtrip_after_rewrite() {
         .unwrap();
 
     // `%t` now reads `%x` too, so the port gains a second reader: an edge.
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let stage = program.stage_mut(stage_id).unwrap();
     kirin::ir::Rewriter::new(stage)
         .replace_operand(t, 0, x)
         .unwrap();
-    assert_port_edge(&pipeline);
+    assert_port_edge(&program);
 
     // Print → parse → print is valid and stable after one round, and the
     // reparsed graph has the same edge.
-    let printed = pipeline.sprint();
-    let reparsed = parse_graph_pipeline(&printed);
+    let printed = program.sprint();
+    let reparsed = parse_graph_program(&printed);
     assert_port_edge(&reparsed);
     let printed_again = reparsed.sprint();
-    assert_eq!(parse_graph_pipeline(&printed_again).sprint(), printed_again);
+    assert_eq!(parse_graph_program(&printed_again).sprint(), printed_again);
 }
 
 #[test]
@@ -173,7 +173,7 @@ specialize @test fn @g(i64, i64) -> i64 ungraph ^u0(%x: i64, %y: i64) {
   ret %s;
 }
 "#;
-    let error = GraphPipeline::new()
+    let error = GraphProgram::new()
         .parse(input)
         .expect_err("a terminator is not an ungraph member");
     assert!(
@@ -193,21 +193,21 @@ specialize @test fn @wired() -> any ungraph ^ug0 {
 }
 "#;
 
-type WirePipeline = Pipeline<StageInfo<UngraphTestLanguage>>;
+type WireProgram = Program<StageInfo<UngraphTestLanguage>>;
 
-fn parse_wire_pipeline(text: &str) -> WirePipeline {
-    let mut pipeline = WirePipeline::new();
-    pipeline.parse(text).expect("pipeline parses");
-    pipeline
+fn parse_wire_program(text: &str) -> WireProgram {
+    let mut program = WireProgram::new();
+    program.parse(text).expect("program parses");
+    program
 }
 
 /// An edge statement inserted after the node that reads it prints in member
 /// order, after that node, and still reparses to the same graph.
 #[test]
 fn test_ungraph_wire_inserted_after_its_reader_roundtrips() {
-    let mut pipeline = parse_wire_pipeline(WIRED_FN);
-    let stage_id = pipeline.stage_by_name("test").unwrap();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let mut program = parse_wire_program(WIRED_FN);
+    let stage_id = program.stage_by_name("test").unwrap();
+    let stage = program.stage_mut(stage_id).unwrap();
     let ug = stage.ungraph_arena().iter().next().unwrap().id();
     let reader = ug.expect_info(stage).nodes().last().unwrap();
 
@@ -223,8 +223,8 @@ fn test_ungraph_wire_inserted_after_its_reader_roundtrips() {
     let members: Vec<Statement> = ug.expect_info(stage).members().map(|(s, _)| s).collect();
     assert_eq!(members.last(), Some(&wire));
 
-    let printed = pipeline.sprint();
-    let reparsed = parse_wire_pipeline(&printed);
+    let printed = program.sprint();
+    let reparsed = parse_wire_program(&printed);
     assert_eq!(reparsed.sprint(), printed);
     let stage = reparsed
         .stage(reparsed.stage_by_name("test").unwrap())

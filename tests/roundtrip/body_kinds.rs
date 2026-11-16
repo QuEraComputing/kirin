@@ -1,4 +1,4 @@
-//! Round-trip coverage for the four body-kind discriminators in one pipeline.
+//! Round-trip coverage for the four body-kind discriminators in one program.
 //!
 //! Every Kirin body kind is spelled with an explicit textual discriminator in
 //! the default whole-field `{body}` position:
@@ -17,7 +17,7 @@
 use kirin_test_languages::GraphFunctionLanguage;
 use kirin_test_utils::roundtrip;
 
-/// One pipeline, four callables, one discriminator each — plus a CFG-bodied
+/// One program, four callables, one discriminator each — plus a CFG-bodied
 /// `@main` whose `graph_eval` statement carries a *nested* DiGraph, so the
 /// nested-body path is tagged and round-tripped too.
 const ALL_BODY_KINDS: &str = r#"
@@ -73,8 +73,8 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
 /// renders. A missing or spurious discriminator on any of the four kinds
 /// breaks either the first parse or the reparse.
 #[test]
-fn test_all_body_kinds_pipeline_roundtrip() {
-    roundtrip::assert_pipeline_roundtrip::<GraphFunctionLanguage>(ALL_BODY_KINDS);
+fn test_all_body_kinds_program_roundtrip() {
+    roundtrip::assert_program_roundtrip::<GraphFunctionLanguage>(ALL_BODY_KINDS);
 }
 
 /// The printed form of each body kind carries its discriminator, and a CFG's
@@ -83,11 +83,11 @@ fn test_all_body_kinds_pipeline_roundtrip() {
 fn test_printed_body_kinds_carry_their_discriminators() {
     use kirin::prelude::*;
 
-    let mut pipeline: Pipeline<StageInfo<GraphFunctionLanguage>> = Pipeline::new();
-    pipeline
+    let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+    program
         .parse(ALL_BODY_KINDS)
-        .expect("pipeline parse should succeed");
-    let printed = pipeline.sprint();
+        .expect("program parse should succeed");
+    let printed = program.sprint();
 
     for expected in [
         "@by_cfg (i64, i64) -> i64 cfg {",
@@ -97,7 +97,7 @@ fn test_printed_body_kinds_carry_their_discriminators() {
     ] {
         assert!(
             printed.contains(expected),
-            "expected {expected:?} in printed pipeline:\n{printed}"
+            "expected {expected:?} in printed program:\n{printed}"
         );
     }
 

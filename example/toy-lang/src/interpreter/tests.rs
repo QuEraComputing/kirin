@@ -1,4 +1,4 @@
-use kirin::prelude::{GetInfo, HasStageInfo, ParsePipelineText, Pipeline, Signature, StageInfo};
+use kirin::prelude::{GetInfo, HasStageInfo, ParseProgramText, Program, Signature, StageInfo};
 use kirin_arith::ArithType;
 use kirin_function::{Call, Function, Return};
 
@@ -234,23 +234,23 @@ specialize @lowered fn @dual_impl(i64) -> i64 cfg {
 }
 "#;
 
-fn build_pipeline(src: &str) -> Pipeline<Stage> {
-    let mut pipeline = Pipeline::new();
-    ParsePipelineText::parse(&mut pipeline, src).expect("parse failed");
-    pipeline
+fn build_program(src: &str) -> Program<Stage> {
+    let mut program = Program::new();
+    ParseProgramText::parse(&mut program, src).expect("parse failed");
+    program
 }
 
-fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
-    let mut pipeline = build_pipeline(CROSS_STAGE_SPECIALIZED_CALLS);
-    let source_stage = pipeline.stage_by_name("source").unwrap();
-    let lowered_stage = pipeline.stage_by_name("lowered").unwrap();
-    let caller = pipeline
+fn build_cross_stage_specialized_program() -> Program<Stage> {
+    let mut program = build_program(CROSS_STAGE_SPECIALIZED_CALLS);
+    let source_stage = program.stage_by_name("source").unwrap();
+    let lowered_stage = program.stage_by_name("lowered").unwrap();
+    let caller = program
         .resolve_staged_function("source_direct_specialized", source_stage)
         .unwrap();
-    let lowered_dual_impl = pipeline
+    let lowered_dual_impl = program
         .resolve_staged_function("dual_impl", lowered_stage)
         .unwrap();
-    let lowered_stage_meta = pipeline.stage(lowered_stage).unwrap();
+    let lowered_stage_meta = program.stage(lowered_stage).unwrap();
     let lowered_info: &StageInfo<LowLevel> = lowered_stage_meta.try_stage_info().unwrap();
     let lowered_specialized = lowered_dual_impl
         .get_info(lowered_info)
@@ -258,7 +258,7 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
         .unique_live_specialization()
         .unwrap();
 
-    let Stage::Source(source_info) = pipeline.stage_mut(source_stage).unwrap() else {
+    let Stage::Source(source_info) = program.stage_mut(source_stage).unwrap() else {
         unreachable!("source stage id resolved to a non-source stage");
     };
     source_info.with_builder(|builder| {
@@ -290,27 +290,27 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
             .unwrap();
     });
 
-    pipeline
+    program
 }
 
 #[test]
 fn runs_source_add() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
-    let result = run_source_i64(&pipeline, "main", &[3, 5]).unwrap();
+    let program = build_program(include_str!("../../programs/add.kirin"));
+    let result = run_source_i64(&program, "main", &[3, 5]).unwrap();
     assert_eq!(result, 8);
 }
 
 #[test]
 fn runs_source_branching() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
-    assert_eq!(run_source_i64(&pipeline, "abs", &[-7]).unwrap(), 7);
-    assert_eq!(run_source_i64(&pipeline, "abs", &[7]).unwrap(), 7);
+    let program = build_program(include_str!("../../programs/branching.kirin"));
+    assert_eq!(run_source_i64(&program, "abs", &[-7]).unwrap(), 7);
+    assert_eq!(run_source_i64(&program, "abs", &[7]).unwrap(), 7);
 }
 
 #[test]
 fn runs_source_recursive_factorial() {
-    let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-    let result = run_source_i64(&pipeline, "factorial", &[5]).unwrap();
+    let program = build_program(include_str!("../../programs/factorial.kirin"));
+    let result = run_source_i64(&program, "factorial", &[5]).unwrap();
     assert_eq!(result, 120);
 }
 
@@ -319,9 +319,9 @@ fn constprop_source_recursive_factorial() {
     // Bounded arg-tuple context sensitivity unfolds factorial(5) → 4 → 3 → 2 → 1
     // under distinct summary keys, so the analysis folds the result back
     // precisely instead of collapsing the entry argument to Top.
-    let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+    let program = build_program(include_str!("../../programs/factorial.kirin"));
     let result =
-        analyze_constprop(&pipeline, "source", "factorial", &[ConstProp::Const(5)]).unwrap();
+        analyze_constprop(&program, "source", "factorial", &[ConstProp::Const(5)]).unwrap();
     assert_eq!(result, ConstProp::Const(120));
 }
 
@@ -332,15 +332,15 @@ fn constprop_source_recursive_factorial_unknown_is_top() {
     // same-key caller re-enqueues its own summary as the return value rises)
     // converges this soundly to `Top` — not a bogus `Const` from seeing only
     // the base case — and terminates.
-    let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-    let result = analyze_constprop(&pipeline, "source", "factorial", &[ConstProp::Top]).unwrap();
+    let program = build_program(include_str!("../../programs/factorial.kirin"));
+    let result = analyze_constprop(&program, "source", "factorial", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
 #[test]
 fn runs_source_recursive_fibonacci() {
-    let pipeline = build_pipeline(include_str!("../../programs/fibonacci.kirin"));
-    let result = run_source_i64(&pipeline, "fib", &[10]).unwrap();
+    let program = build_program(include_str!("../../programs/fibonacci.kirin"));
+    let result = run_source_i64(&program, "fib", &[10]).unwrap();
     assert_eq!(result, 55);
 }
 
@@ -352,8 +352,8 @@ fn constprop_source_recursive_fibonacci() {
     // analyzed once and folded back precisely (fib(10) = 55) — the two recursive
     // call sites reuse the memoized per-constant summaries instead of joining
     // their entry arguments to Top.
-    let pipeline = build_pipeline(include_str!("../../programs/fibonacci.kirin"));
-    let result = analyze_constprop(&pipeline, "source", "fib", &[ConstProp::Const(10)]).unwrap();
+    let program = build_program(include_str!("../../programs/fibonacci.kirin"));
+    let result = analyze_constprop(&program, "source", "fib", &[ConstProp::Const(10)]).unwrap();
     assert_eq!(result, ConstProp::Const(55));
 }
 
@@ -364,16 +364,16 @@ fn constprop_source_recursive_fibonacci_unknown_is_top() {
     // the self-dependency fix re-enqueues the summary as its return value rises
     // and converges soundly to `Top` (and terminates), rather than reporting a
     // bogus `Const` from seeing only the base case.
-    let pipeline = build_pipeline(include_str!("../../programs/fibonacci.kirin"));
-    let result = analyze_constprop(&pipeline, "source", "fib", &[ConstProp::Top]).unwrap();
+    let program = build_program(include_str!("../../programs/fibonacci.kirin"));
+    let result = analyze_constprop(&program, "source", "fib", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
 #[test]
 fn constprop_source_add() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let program = build_program(include_str!("../../programs/add.kirin"));
     let result = analyze_constprop(
-        &pipeline,
+        &program,
         "source",
         "main",
         &[ConstProp::Const(3), ConstProp::Const(5)],
@@ -384,9 +384,9 @@ fn constprop_source_add() {
 
 #[test]
 fn constprop_source_add_with_unknown() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let program = build_program(include_str!("../../programs/add.kirin"));
     let result = analyze_constprop(
-        &pipeline,
+        &program,
         "source",
         "main",
         &[ConstProp::Top, ConstProp::Const(5)],
@@ -402,45 +402,45 @@ fn constprop_direct_dominated_cross_block_use() {
     // the CFG edge: `%v = %x + %x`, so `@cross(Const(3)) == Const(6)`, and an
     // unknown input widens to `Top`. (Regression for M3b block-owner convergence:
     // a directly-read external fact must reach the reading block.)
-    let pipeline = build_pipeline(CROSS_BLOCK_DIRECT_USE);
+    let program = build_program(CROSS_BLOCK_DIRECT_USE);
     assert_eq!(
-        analyze_constprop(&pipeline, "lowered", "cross", &[ConstProp::Const(3)]).unwrap(),
+        analyze_constprop(&program, "lowered", "cross", &[ConstProp::Const(3)]).unwrap(),
         ConstProp::Const(6)
     );
     assert_eq!(
-        analyze_constprop(&pipeline, "lowered", "cross", &[ConstProp::Top]).unwrap(),
+        analyze_constprop(&program, "lowered", "cross", &[ConstProp::Top]).unwrap(),
         ConstProp::Top
     );
 }
 
 #[test]
 fn constprop_loop_carried_cross_block_rise_is_top() {
-    let pipeline = build_pipeline(LOOP_CARRIED_CROSS_BLOCK_RISE);
+    let program = build_program(LOOP_CARRIED_CROSS_BLOCK_RISE);
     // `%acc` widens to Top, so `%doubled = %acc + %acc` is Top, and `ret %doubled`
     // must be Top. (M3a returns a stale early constant — the gap M3b closes.)
     assert_eq!(
-        analyze_constprop(&pipeline, "lowered", "rise", &[ConstProp::Top]).unwrap(),
+        analyze_constprop(&program, "lowered", "rise", &[ConstProp::Top]).unwrap(),
         ConstProp::Top
     );
 }
 
 #[test]
 fn constprop_source_known_branch() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
+    let program = build_program(include_str!("../../programs/branching.kirin"));
     assert_eq!(
-        analyze_constprop(&pipeline, "source", "abs", &[ConstProp::Const(-7)]).unwrap(),
+        analyze_constprop(&program, "source", "abs", &[ConstProp::Const(-7)]).unwrap(),
         ConstProp::Const(7)
     );
     assert_eq!(
-        analyze_constprop(&pipeline, "source", "abs", &[ConstProp::Const(7)]).unwrap(),
+        analyze_constprop(&program, "source", "abs", &[ConstProp::Const(7)]).unwrap(),
         ConstProp::Const(7)
     );
 }
 
 #[test]
 fn constprop_source_unknown_branch_joins_yields() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
-    let result = analyze_constprop(&pipeline, "source", "abs", &[ConstProp::Top]).unwrap();
+    let program = build_program(include_str!("../../programs/branching.kirin"));
+    let result = analyze_constprop(&program, "source", "abs", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
@@ -451,32 +451,32 @@ fn constprop_source_unknown_branch_joins_yields() {
 #[test]
 fn constprop_unknown_if_same_constant_joins_to_that_constant() {
     // if %unknown { yield 1 } else { yield 1 } -> join(Const(1), Const(1)) = Const(1)
-    let pipeline = build_pipeline(SOURCE_IF_SAME_CONST);
-    let result = analyze_constprop(&pipeline, "source", "if_same", &[ConstProp::Top]).unwrap();
+    let program = build_program(SOURCE_IF_SAME_CONST);
+    let result = analyze_constprop(&program, "source", "if_same", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Const(1));
 }
 
 #[test]
 fn constprop_unknown_if_different_constants_join_to_top() {
     // if %unknown { yield 1 } else { yield 2 } -> join(Const(1), Const(2)) = Top
-    let pipeline = build_pipeline(SOURCE_IF_DIFF_CONST);
-    let result = analyze_constprop(&pipeline, "source", "if_diff", &[ConstProp::Top]).unwrap();
+    let program = build_program(SOURCE_IF_DIFF_CONST);
+    let result = analyze_constprop(&program, "source", "if_diff", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
 #[test]
 fn constprop_float_division_is_top() {
     // Folding the f64 literals as integers would give Const(0).
-    let pipeline = build_pipeline(SOURCE_FLOAT_DIV);
-    let result: ConstProp = analyze_constprop(&pipeline, "source", "half", &[]).unwrap();
+    let program = build_program(SOURCE_FLOAT_DIV);
+    let result: ConstProp = analyze_constprop(&program, "source", "half", &[]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
 #[test]
 fn constprop_source_for_keeps_stable_carried_value() {
-    let pipeline = build_pipeline(SOURCE_FOR_CARRIED_STABLE);
+    let program = build_program(SOURCE_FOR_CARRIED_STABLE);
     let result = analyze_constprop(
-        &pipeline,
+        &program,
         "source",
         "stable",
         &[ConstProp::Const(0), ConstProp::Top, ConstProp::Const(1)],
@@ -487,24 +487,24 @@ fn constprop_source_for_keeps_stable_carried_value() {
 
 #[test]
 fn runs_cross_stage_source_to_lowered_to_source_concretely() {
-    let pipeline = build_pipeline(CROSS_STAGE_CALLS);
+    let program = build_program(CROSS_STAGE_CALLS);
 
     // source_to_lowered_to_source(-7) calls @low_then_high (bodied at
     // lowered) which calls @source_abs (bodied at source). The cross-stage
     // linker must route both calls to their bodied stages.
-    let result = run_i64(&pipeline, "source", "source_to_lowered_to_source", &[-7]).unwrap();
+    let result = run_i64(&program, "source", "source_to_lowered_to_source", &[-7]).unwrap();
     assert_eq!(result, 8);
 
-    let lowered_result = run_i64(&pipeline, "lowered", "low_then_high", &[-4]).unwrap();
+    let lowered_result = run_i64(&program, "lowered", "low_then_high", &[-4]).unwrap();
     assert_eq!(lowered_result, 5);
 }
 
 #[test]
 fn constprop_cross_stage_calls_between_source_and_lowered() {
-    let pipeline = build_pipeline(CROSS_STAGE_CALLS);
+    let program = build_program(CROSS_STAGE_CALLS);
 
     let source_result = analyze_constprop(
-        &pipeline,
+        &program,
         "source",
         "source_to_lowered_to_source",
         &[ConstProp::Const(-7)],
@@ -513,7 +513,7 @@ fn constprop_cross_stage_calls_between_source_and_lowered() {
     assert_eq!(source_result, ConstProp::Const(8));
 
     let lowered_result = analyze_constprop(
-        &pipeline,
+        &program,
         "lowered",
         "low_then_high",
         &[ConstProp::Const(-4)],
@@ -524,10 +524,10 @@ fn constprop_cross_stage_calls_between_source_and_lowered() {
 
 #[test]
 fn constprop_cross_stage_call_specialized_uses_direct_target() {
-    let pipeline = build_cross_stage_specialized_pipeline();
+    let program = build_cross_stage_specialized_program();
 
     let result = analyze_constprop(
-        &pipeline,
+        &program,
         "source",
         "source_direct_specialized",
         &[ConstProp::Const(5)],
@@ -539,9 +539,9 @@ fn constprop_cross_stage_call_specialized_uses_direct_target() {
 
 #[test]
 fn constprop_lowered_add() {
-    let pipeline = build_pipeline(ADD_LOWERED);
+    let program = build_program(ADD_LOWERED);
     let result = analyze_constprop(
-        &pipeline,
+        &program,
         "lowered",
         "add",
         &[ConstProp::Const(2), ConstProp::Const(3)],
@@ -552,28 +552,28 @@ fn constprop_lowered_add() {
 
 #[test]
 fn constprop_lowered_known_cf_branch() {
-    let pipeline = build_pipeline(BRANCH_LOWERED);
+    let program = build_program(BRANCH_LOWERED);
     assert_eq!(
-        analyze_constprop(&pipeline, "lowered", "sign", &[ConstProp::Const(-3)]).unwrap(),
+        analyze_constprop(&program, "lowered", "sign", &[ConstProp::Const(-3)]).unwrap(),
         ConstProp::Const(1)
     );
     assert_eq!(
-        analyze_constprop(&pipeline, "lowered", "sign", &[ConstProp::Const(5)]).unwrap(),
+        analyze_constprop(&program, "lowered", "sign", &[ConstProp::Const(5)]).unwrap(),
         ConstProp::Const(0)
     );
 }
 
 #[test]
 fn constprop_lowered_unknown_cf_branch_returns_top() {
-    let pipeline = build_pipeline(BRANCH_LOWERED);
-    let result = analyze_constprop(&pipeline, "lowered", "sign", &[ConstProp::Top]).unwrap();
+    let program = build_program(BRANCH_LOWERED);
+    let result = analyze_constprop(&program, "lowered", "sign", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
 #[test]
 fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
-    let pipeline = build_pipeline(SAME_BRANCH_LOWERED);
-    let result = analyze_constprop(&pipeline, "lowered", "same", &[ConstProp::Top]).unwrap();
+    let program = build_program(SAME_BRANCH_LOWERED);
+    let result = analyze_constprop(&program, "lowered", "same", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Const(1));
 }
 
@@ -582,7 +582,7 @@ mod advanced {
     use kirin_constprop::ConstPropContext;
     use kirin_interpreter::{AnalysisResults, SameStageLinker, engine::expect_single};
 
-    use super::{ConstProp, build_pipeline};
+    use super::{ConstProp, build_program};
 
     use crate::interpreter::ToyError;
 
@@ -594,8 +594,8 @@ mod advanced {
         // shared `Unknown` context (joined → Top). The result is soundly `Top`
         // (capping degrades precision, not soundness) — and it terminates,
         // which exercises the same-key self-dependency convergence.
-        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-        let analysis = crate::interpreter::ToyConstProp::new(&pipeline)
+        let program = build_program(include_str!("../../programs/factorial.kirin"));
+        let analysis = crate::interpreter::ToyConstProp::new(&program)
             .with_policy(ConstPropContext::with_budget(2))
             .with_linker(SameStageLinker);
         let analyzed = analysis
@@ -619,7 +619,7 @@ mod demand {
 
     use kirin::prelude::{
         CFG, CompileStage, GetInfo, HasBlocks, HasCFG, HasDigraphs, HasResults, HasUngraphs,
-        ParsePipelineText, Pipeline, SSAValue, Statement,
+        ParseProgramText, Program, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
     use kirin_demand::DemandAnalysis;
@@ -629,35 +629,35 @@ mod demand {
     use crate::language::HighLevel;
     use crate::stage::Stage;
 
-    pub(super) fn parse(program: &str) -> Pipeline<Stage> {
-        let mut pipeline: Pipeline<Stage> = Pipeline::new();
-        ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
-        pipeline
+    pub(super) fn parse(source: &str) -> Program<Stage> {
+        let mut program: Program<Stage> = Program::new();
+        ParseProgramText::parse(&mut program, source).expect("program parses");
+        program
     }
 
     /// A source-stage callable root. Body discovery belongs to the interpreter,
-    /// so this helper deliberately stops at the pipeline-level function handle.
-    pub(super) fn source_root(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Callee) {
-        let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let function = pipeline
+    /// so this helper deliberately stops at the program-level function handle.
+    pub(super) fn source_root(program: &Program<Stage>, name: &str) -> (CompileStage, Callee) {
+        let stage_id = program.stage_by_name("source").expect("source stage");
+        let function = program
             .lookup_function_by_name(name)
-            .expect("pipeline function");
+            .expect("program function");
         (stage_id, Callee::Function(function))
     }
 
     /// Extract a CFG only after the interpreter has resolved the callable and
     /// reported the target it actually analyzed.
-    pub(super) fn cfg_scope(pipeline: &Pipeline<Stage>, target: LinkTarget) -> (CompileStage, CFG) {
-        let Ok(Body::CFG(cfg)) = target.body(pipeline) else {
+    pub(super) fn cfg_scope(program: &Program<Stage>, target: LinkTarget) -> (CompileStage, CFG) {
+        let Ok(Body::CFG(cfg)) = target.body(program) else {
             panic!("expected analysis root to resolve to a CFG, got {target:?}");
         };
         (target.stage, cfg)
     }
 
     /// The parameters of the CFG's entry block.
-    pub(super) fn entry_params(pipeline: &Pipeline<Stage>, cfg: CFG) -> Vec<SSAValue> {
-        let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+    pub(super) fn entry_params(program: &Program<Stage>, cfg: CFG) -> Vec<SSAValue> {
+        let stage_id = program.stage_by_name("source").expect("source stage");
+        let Stage::Source(info) = program.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
         let block = cfg.blocks(info).next().expect("entry block");
@@ -673,12 +673,12 @@ mod demand {
     /// Find something by walking statement definitions anywhere in the CFG,
     /// including bodies nested under statements.
     fn find_in_body<R>(
-        pipeline: &Pipeline<Stage>,
+        program: &Program<Stage>,
         cfg: CFG,
         mut select: impl FnMut(Statement, &HighLevel) -> Option<R>,
     ) -> R {
-        let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+        let stage_id = program.stage_by_name("source").expect("source stage");
+        let Stage::Source(info) = program.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
 
@@ -730,28 +730,28 @@ mod demand {
     }
 
     pub(super) fn find_value<R>(
-        pipeline: &Pipeline<Stage>,
+        program: &Program<Stage>,
         cfg: CFG,
         select: impl FnMut(&HighLevel) -> Option<R>,
     ) -> R {
         let mut select = select;
-        find_in_body(pipeline, cfg, |_, definition| select(definition))
+        find_in_body(program, cfg, |_, definition| select(definition))
     }
 
     pub(super) fn find_statement(
-        pipeline: &Pipeline<Stage>,
+        program: &Program<Stage>,
         cfg: CFG,
         select: impl FnMut(&HighLevel) -> bool,
     ) -> Statement {
         let mut select = select;
-        find_in_body(pipeline, cfg, |statement, definition| {
+        find_in_body(program, cfg, |statement, definition| {
             select(definition).then_some(statement)
         })
     }
 
     /// The result of the `constant <value> -> i64` statement.
-    pub(super) fn constant_result(pipeline: &Pipeline<Stage>, cfg: CFG, value: i64) -> SSAValue {
-        find_value(pipeline, cfg, |definition| match definition {
+    pub(super) fn constant_result(program: &Program<Stage>, cfg: CFG, value: i64) -> SSAValue {
+        find_value(program, cfg, |definition| match definition {
             HighLevel::Constant(constant) if constant.value == ArithValue::I64(value) => {
                 Some(constant.result.into())
             }
@@ -782,16 +782,16 @@ specialize @source fn @if_body(i64) -> i64 cfg {
     /// a body-interior dead statement stays dead.
     #[test]
     fn scf_if_body_demand_follows_result_demand() {
-        let pipeline = parse(IF_BODY_DEMAND);
-        let (caller_stage, callee) = source_root(&pipeline, "if_body");
-        let result = DemandAnalysis::<_>::new(&pipeline)
+        let program = parse(IF_BODY_DEMAND);
+        let (caller_stage, callee) = source_root(&program, "if_body");
+        let result = DemandAnalysis::<_>::new(&program)
             .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
             .expect("analysis succeeds");
         let root = result.callable_of(result.root()).expect("root is reached");
-        let (_, cfg) = cfg_scope(&pipeline, root);
+        let (_, cfg) = cfg_scope(&program, root);
 
-        let cond = entry_params(&pipeline, cfg)[0];
-        let if_result = find_value(&pipeline, cfg, |definition| match definition {
+        let cond = entry_params(&program, cfg)[0];
+        let if_result = find_value(&program, cfg, |definition| match definition {
             HighLevel::Structured(_) => definition.results().next().map(|r| SSAValue::from(*r)),
             _ => None,
         });
@@ -805,15 +805,15 @@ specialize @source fn @if_body(i64) -> i64 cfg {
             "condition is a control root"
         );
         assert!(
-            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)),
+            result.is_demanded(result.root(), constant_result(&program, cfg, 1)),
             "then-arm yield operand feeds the demanded result"
         );
         assert!(
-            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 2)),
+            result.is_demanded(result.root(), constant_result(&program, cfg, 2)),
             "else-arm yield operand feeds the demanded result"
         );
         assert!(
-            !result.is_demanded(result.root(), constant_result(&pipeline, cfg, 9)),
+            !result.is_demanded(result.root(), constant_result(&program, cfg, 9)),
             "a dead constant inside a body stays dead"
         );
     }
@@ -841,16 +841,16 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
     /// yield operands and body interiors stay dead.
     #[test]
     fn scf_if_dead_result_keeps_only_condition() {
-        let pipeline = parse(IF_DEAD_RESULT);
-        let (caller_stage, callee) = source_root(&pipeline, "if_dead");
-        let result = DemandAnalysis::<_>::new(&pipeline)
+        let program = parse(IF_DEAD_RESULT);
+        let (caller_stage, callee) = source_root(&program, "if_dead");
+        let result = DemandAnalysis::<_>::new(&program)
             .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
             .expect("analysis succeeds");
         let root = result.callable_of(result.root()).expect("root is reached");
-        let (_, cfg) = cfg_scope(&pipeline, root);
+        let (_, cfg) = cfg_scope(&program, root);
 
-        let cond = entry_params(&pipeline, cfg)[0];
-        let if_result = find_value(&pipeline, cfg, |definition| match definition {
+        let cond = entry_params(&program, cfg)[0];
+        let if_result = find_value(&program, cfg, |definition| match definition {
             HighLevel::Structured(_) => definition.results().next().map(|r| SSAValue::from(*r)),
             _ => None,
         });
@@ -859,10 +859,10 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
             result.is_demanded(result.root(), cond),
             "condition is a control root"
         );
-        assert!(result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)));
+        assert!(result.is_demanded(result.root(), constant_result(&program, cfg, 0)));
         assert!(!result.is_demanded(result.root(), if_result));
-        assert!(!result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)));
-        assert!(!result.is_demanded(result.root(), constant_result(&pipeline, cfg, 2)));
+        assert!(!result.is_demanded(result.root(), constant_result(&program, cfg, 1)));
+        assert!(!result.is_demanded(result.root(), constant_result(&program, cfg, 2)));
     }
 
     pub(super) const FOR_CARRIED_DEMAND: &str = r#"
@@ -888,27 +888,27 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
     /// stays dead even though the loop runs.
     #[test]
     fn scf_for_loop_carried_demand_converges() {
-        let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
-        let result = DemandAnalysis::<_>::new(&pipeline)
+        let program = parse(FOR_CARRIED_DEMAND);
+        let (caller_stage, callee) = source_root(&program, "loop_sum");
+        let result = DemandAnalysis::<_>::new(&program)
             .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
             .expect("analysis succeeds");
         let root = result.callable_of(result.root()).expect("root is reached");
-        let (_, cfg) = cfg_scope(&pipeline, root);
+        let (_, cfg) = cfg_scope(&program, root);
 
-        let params = entry_params(&pipeline, cfg);
+        let params = entry_params(&program, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
-        let next = find_value(&pipeline, cfg, |definition| match definition {
+        let next = find_value(&program, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
             _ => None,
         });
         // Body params: [induction var, carried].
         let (induction, carried) = {
-            let stage_id = pipeline.stage_by_name("source").expect("source stage");
-            let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+            let stage_id = program.stage_by_name("source").expect("source stage");
+            let Stage::Source(info) = program.stage(stage_id).expect("stage info") else {
                 panic!("source stage holds HighLevel");
             };
-            let body = find_value(&pipeline, cfg, |definition| match definition {
+            let body = find_value(&program, cfg, |definition| match definition {
                 HighLevel::Structured(kirin_scf::StructuredControlFlow::For(op)) => Some(op.body()),
                 _ => None,
             });
@@ -923,11 +923,11 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
         };
 
         assert!(
-            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)),
+            result.is_demanded(result.root(), constant_result(&program, cfg, 0)),
             "init"
         );
         assert!(
-            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)),
+            result.is_demanded(result.root(), constant_result(&program, cfg, 1)),
             "one"
         );
         assert!(result.is_demanded(result.root(), next), "yield slot");
@@ -967,16 +967,16 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
     /// (init, yield slot, body interior) stays dead.
     #[test]
     fn scf_for_dead_result_keeps_only_bounds() {
-        let pipeline = parse(FOR_DEAD_RESULT);
-        let (caller_stage, callee) = source_root(&pipeline, "loop_dead");
-        let result = DemandAnalysis::<_>::new(&pipeline)
+        let program = parse(FOR_DEAD_RESULT);
+        let (caller_stage, callee) = source_root(&program, "loop_dead");
+        let result = DemandAnalysis::<_>::new(&program)
             .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
             .expect("analysis succeeds");
         let root = result.callable_of(result.root()).expect("root is reached");
-        let (_, cfg) = cfg_scope(&pipeline, root);
+        let (_, cfg) = cfg_scope(&program, root);
 
-        let params = entry_params(&pipeline, cfg);
-        let next = find_value(&pipeline, cfg, |definition| match definition {
+        let params = entry_params(&program, cfg);
+        let next = find_value(&program, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
             _ => None,
         });
@@ -987,13 +987,13 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
         );
         assert!(result.is_demanded(result.root(), params[1]));
         assert!(result.is_demanded(result.root(), params[2]));
-        assert!(result.is_demanded(result.root(), constant_result(&pipeline, cfg, 7)));
+        assert!(result.is_demanded(result.root(), constant_result(&program, cfg, 7)));
         assert!(
-            !result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)),
+            !result.is_demanded(result.root(), constant_result(&program, cfg, 0)),
             "init dead"
         );
         assert!(
-            !result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)),
+            !result.is_demanded(result.root(), constant_result(&program, cfg, 1)),
             "body interior dead"
         );
         assert!(!result.is_demanded(result.root(), next), "yield slot dead");
@@ -1025,23 +1025,23 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
     /// not effects. A pure `add` beside it with a dead result demands nothing.
     #[test]
     fn ignored_call_does_not_demand_arguments() {
-        let pipeline = parse(CALL_PURITY);
-        let (caller_stage, callee) = source_root(&pipeline, "main");
-        let result = DemandAnalysis::<_>::new(&pipeline)
+        let program = parse(CALL_PURITY);
+        let (caller_stage, callee) = source_root(&program, "main");
+        let result = DemandAnalysis::<_>::new(&program)
             .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
             .expect("analysis succeeds");
         let root = result.callable_of(result.root()).expect("root is reached");
-        let (_, cfg) = cfg_scope(&pipeline, root);
+        let (_, cfg) = cfg_scope(&program, root);
 
-        let params = entry_params(&pipeline, cfg);
+        let params = entry_params(&program, cfg);
         let (x, y) = (params[0], params[1]);
-        let unused = find_value(&pipeline, cfg, |definition| match definition {
+        let unused = find_value(&program, cfg, |definition| match definition {
             HighLevel::Lexical(Lexical::Call(_)) => {
                 definition.results().next().map(|r| SSAValue::from(*r))
             }
             _ => None,
         });
-        let deadsum = find_value(&pipeline, cfg, |definition| match definition {
+        let deadsum = find_value(&program, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
             _ => None,
         });
@@ -1050,7 +1050,7 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
             !result.is_demanded(result.root(), x),
             "an ignored call demands nothing"
         );
-        assert!(result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)));
+        assert!(result.is_demanded(result.root(), constant_result(&program, cfg, 0)));
         assert!(
             !result.is_demanded(result.root(), unused),
             "the call result is unused"
@@ -1071,7 +1071,7 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue};
+    use kirin::prelude::{CFG, CompileStage, Program, SSAValue};
     use kirin_arith::{Arith, ArithValue};
     use kirin_interpreter::{AnalysisResults, Analyzed, Body, Callee, ProgramPoint};
     use kirin_liveness::LiveSet;
@@ -1088,16 +1088,16 @@ mod dense {
     /// Run classic dense liveness with the toy total frame, returning the
     /// analyzed root's CFG alongside the result.
     fn analyze_dense_toy<'ir>(
-        pipeline: &'ir Pipeline<Stage>,
+        program: &'ir Program<Stage>,
         caller_stage: CompileStage,
         callee: Callee,
     ) -> (Analyzed<ToyDenseLiveness<'ir>>, CFG) {
-        let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(pipeline);
+        let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
         let analyzed = engine
             .analyze(caller_stage, callee)
             .expect("analysis succeeds");
         let root = *analyzed.root();
-        let Body::CFG(cfg) = root.body(pipeline).expect("analyzed root has a body") else {
+        let Body::CFG(cfg) = root.body(program).expect("analyzed root has a body") else {
             panic!("expected analysis root to resolve to a CFG, got {root:?}");
         };
         (analyzed, cfg)
@@ -1113,13 +1113,13 @@ mod dense {
     /// kirin-liveness — no demand pass runs here.)
     #[test]
     fn dense_per_point_inside_scf_if_arm() {
-        let pipeline = parse(IF_DEAD_RESULT);
-        let (caller_stage, callee) = source_root(&pipeline, "if_dead");
-        let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let program = parse(IF_DEAD_RESULT);
+        let (caller_stage, callee) = source_root(&program, "if_dead");
+        let (dense, cfg) = analyze_dense_toy(&program, caller_stage, callee);
 
-        let cond = entry_params(&pipeline, cfg)[0];
-        let a = constant_result(&pipeline, cfg, 1);
-        let a_const = find_statement(&pipeline, cfg, |definition| match definition {
+        let cond = entry_params(&program, cfg)[0];
+        let a = constant_result(&program, cfg, 1);
+        let a_const = find_statement(&program, cfg, |definition| match definition {
             HighLevel::Constant(constant) => constant.value == ArithValue::I64(1),
             _ => None::<()>.is_some(),
         });
@@ -1137,7 +1137,7 @@ mod dense {
 
         // The if's dead result is not live after it because nothing uses it;
         // before it, only the condition survives the arm join.
-        let if_stmt = find_statement(&pipeline, cfg, |definition| {
+        let if_stmt = find_statement(&program, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
         assert_eq!(
@@ -1145,7 +1145,7 @@ mod dense {
             Some(&live_set(&[cond]))
         );
 
-        let then_block = find_value(&pipeline, cfg, |definition| match definition {
+        let then_block = find_value(&program, cfg, |definition| match definition {
             HighLevel::Structured(StructuredControlFlow::If(if_op)) => Some(if_op.then_block()),
             _ => None,
         });
@@ -1179,16 +1179,16 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
     /// the state before the `if` must contain the condition and both.
     #[test]
     fn dense_scf_if_joins_both_arm_entries() {
-        let pipeline = parse(IF_ARMS_DIFFERENT_USES);
-        let (caller_stage, callee) = source_root(&pipeline, "if_arms");
-        let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let program = parse(IF_ARMS_DIFFERENT_USES);
+        let (caller_stage, callee) = source_root(&program, "if_arms");
+        let (dense, cfg) = analyze_dense_toy(&program, caller_stage, callee);
 
-        let params = entry_params(&pipeline, cfg);
+        let params = entry_params(&program, cfg);
         let (cond, x, y) = (params[0], params[1], params[2]);
-        let if_stmt = find_statement(&pipeline, cfg, |definition| {
+        let if_stmt = find_statement(&program, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
-        let r = find_value(&pipeline, cfg, |definition| match definition {
+        let r = find_value(&program, cfg, |definition| match definition {
             HighLevel::Structured(_) => {
                 use kirin::prelude::HasResults;
                 definition.results().next().map(|v| SSAValue::from(*v))
@@ -1214,27 +1214,27 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
     /// before the loop is exactly bounds + initial values.
     #[test]
     fn dense_loop_carried_fixpoint() {
-        let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
-        let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let program = parse(FOR_CARRIED_DEMAND);
+        let (caller_stage, callee) = source_root(&program, "loop_sum");
+        let (dense, cfg) = analyze_dense_toy(&program, caller_stage, callee);
 
-        let params = entry_params(&pipeline, cfg);
+        let params = entry_params(&program, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
-        let init = constant_result(&pipeline, cfg, 0);
-        let one = constant_result(&pipeline, cfg, 1);
-        let (next, acc) = find_value(&pipeline, cfg, |definition| match definition {
+        let init = constant_result(&program, cfg, 0);
+        let one = constant_result(&program, cfg, 1);
+        let (next, acc) = find_value(&program, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { lhs, result, .. }) => {
                 Some((SSAValue::from(*result), *lhs))
             }
             _ => None,
         });
-        let for_stmt = find_statement(&pipeline, cfg, |definition| {
+        let for_stmt = find_statement(&program, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
-        let add_stmt = find_statement(&pipeline, cfg, |definition| {
+        let add_stmt = find_statement(&program, cfg, |definition| {
             matches!(definition, HighLevel::Arith(Arith::Add { .. }))
         });
-        let sum = find_value(&pipeline, cfg, |definition| match definition {
+        let sum = find_value(&program, cfg, |definition| match definition {
             HighLevel::Structured(_) => {
                 use kirin::prelude::HasResults;
                 definition.results().next().map(|r| SSAValue::from(*r))
