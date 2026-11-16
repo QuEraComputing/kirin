@@ -1,6 +1,8 @@
 from typing import Literal
 
-from kirin import types
+import pytest
+
+from kirin import types, lowering
 from kirin.prelude import basic, basic_no_opt
 from kirin.analysis import TypeInference
 from kirin.dialects import py, func, ilist
@@ -51,3 +53,58 @@ def test_list_assign():
     assert stmt.expected.is_structurally_equal(
         ilist.IListType[types.Float, types.Literal(3)]
     )
+
+
+@basic_no_opt
+def pair() -> tuple[int, int]:
+    return 1, 2
+
+
+@basic_no_opt
+def nested() -> tuple[int, tuple[int, int]]:
+    return 1, (2, 3)
+
+
+def test_unpack_call_tuple():
+    @basic_no_opt
+    def unpack() -> int:
+        a, b = pair()
+        return a + b
+
+    assert unpack() == 3
+
+
+def test_unpack_literal_tuple():
+    @basic_no_opt
+    def unpack() -> int:
+        a, b = 1, 2
+        return a + b
+
+    assert unpack() == 3
+
+
+def test_unpack_nested_call_tuple():
+    @basic_no_opt
+    def unpack() -> int:
+        a, (b, c) = nested()
+        return a * 100 + b * 10 + c
+
+    assert unpack() == 123
+
+
+def test_unpack_call_tuple_length_mismatch():
+    with pytest.raises(lowering.BuildError, match="length mismatch: 3 != 2"):
+
+        @basic_no_opt
+        def unpack():
+            a, b, c = pair()
+            return a
+
+
+def test_unpack_unknown_length_raises():
+    with pytest.raises(lowering.BuildError, match="length mismatch: 2 != 1"):
+
+        @basic_no_opt
+        def unpack(x):
+            a, b = x
+            return a

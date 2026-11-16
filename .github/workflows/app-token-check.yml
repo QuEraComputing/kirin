@@ -1,0 +1,145 @@
+name: App token check
+
+# Manual smoke test for the GitHub App credentials used by release_tag.yml. Run this after any change to the
+# app's installation or its secrets, and before relying on a release.
+#
+# Why this exists: the release pipeline's failure mode is quiet. GitHub does not
+# start workflow runs from events created by GITHUB_TOKEN, so if the app is not
+# installed here or lacks contents: write, the v* tag never starts
+# release.yml and nothing publishes -- with no failed job to notice.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  token-check:
+    name: Mint a token and exercise it
+    runs-on: ubuntu-latest
+    # Deliberately empty: everything below must succeed on the app token alone.
+    # Granting the default GITHUB_TOKEN anything here would let a broken app
+    # installation pass by accident.
+    permissions: {}
+    steps:
+      # No `owner:` — same as release_tag.yml, so this tests the exact scope the
+      # release jobs get: this repository only.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.TOKEN_APP_ID }}
+          private-key: ${{ secrets.TOKEN_APP_PEM }}
+
+      - name: Token is valid and covers this repository
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api /rate_limit >/dev/null
+          echo "token accepted"
+          # Check access to this repository directly instead of listing every
+          # repository covered by the installation.
+          gh api "/repos/$REPO" --jq '.full_name'
+
+      # The grant is only visible to the *app's* JWT, not to the installation
+      # token minted above — so this step signs its own JWT from the same PEM.
+      # It is the only check here that reports what was granted rather than
+      # probing one capability at a time.
+      - name: Installation grants contents write
+        env:
+          APP_ID: ${{ secrets.TOKEN_APP_ID }}
+          APP_PEM: ${{ secrets.TOKEN_APP_PEM }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/app.pem"
+          # Via a file, not process substitution: the PEM is multi-line and
+          # openssl wants a real path. RUNNER_TEMP dies with the job.
+          printf '%s' "$APP_PEM" > "$key"
+          chmod 600 "$key"
+
+          b64() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+          now=$(date +%s)
+          hdr=$(printf '{"alg":"RS256","typ":"JWT"}' | b64)
+          # iat backdated 60s to tolerate clock skew between runner and GitHub;
+          # 9min expiry is under the 10min maximum GitHub accepts.
+          pay=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' $((now - 60)) $((now + 540)) "$APP_ID" | b64)
+          sig=$(printf '%s.%s' "$hdr" "$pay" | openssl dgst -sha256 -sign "$key" -binary | b64)
+          jwt="$hdr.$pay.$sig"
+          # Derived from a secret, so GitHub does not mask it automatically.
+          echo "::add-mask::$jwt"
+          rm -f "$key"
+
+          # curl, not gh: gh injects its own Authorization header and would
+          # silently query as GITHUB_TOKEN instead of as the app.
+          perms=$(curl -sS --fail-with-body \
+            -H "Authorization: Bearer $jwt" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/installation" | jq -c '.permissions')
+          echo "granted: $perms"
+
+          # What the app *asks for*, which is not the same thing as what this
+          # installation *has*. Expanding an app's permissions does not update
+          # existing installations until an org owner accepts the request, and
+          # the two views diverging is exactly what that looks like. Printing
+          # both turns "devops says it's fixed but it still fails" into a
+          # one-line diagnosis.
+          requested=$(curl -sS --fail-with-body \
+            -H "Authorization: Bearer $jwt" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app" | jq -c '.permissions')
+          echo "requested by app: $requested"
+
+          # Anything less than write here and release_tag.yml fails: contents is
+          # what pushes the version bump commit and the v* tag.
+          fail=0
+          for p in contents; do
+            got=$(jq -r --arg p "$p" '.[$p] // "none"' <<<"$perms")
+            want=$(jq -r --arg p "$p" '.[$p] // "none"' <<<"$requested")
+            [ "$got" = "write" ] && continue
+            fail=1
+            if [ "$want" = "write" ]; then
+              echo "::error::$p is write on the app but $got on this installation -- an org owner must accept the new permission request"
+            else
+              echo "::error::app has $p=$got, needs write"
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "contents: write granted"
+
+      - name: Token can read contents
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # release_tag.yml reads contents before it writes: the checkout of the
+          # release branch, its tags, and pyproject.toml all go through this.
+          gh api "/repos/$REPO/git/ref/heads/$REF_NAME" --jq '.object.sha'
+          echo "contents: read OK"
+
+      - name: Token can write refs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          # Unique per run so concurrent dispatches don't collide, and so a
+          # leftover ref from a crashed run never blocks the next one.
+          BRANCH: app-token-check/${{ github.run_id }}-${{ github.run_attempt }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "/repos/$REPO/git/ref/heads/$REF_NAME" --jq '.object.sha')
+          # Creating and deleting a ref is the least destructive proof of
+          # contents: write. It touches no branch anyone uses and no history.
+          gh api --method POST "/repos/$REPO/git/refs" \
+            -f "ref=refs/heads/$BRANCH" -f "sha=$sha" >/dev/null
+          echo "created refs/heads/$BRANCH"
+          gh api --method DELETE "/repos/$REPO/git/refs/heads/$BRANCH"
+          echo "contents: write OK (temp ref cleaned up)"
+
+      # The one permission release_tag.yml needs is confirmed above twice over:
+      # by reading the installation grant, and by actually writing a ref. What
+      # is deliberately not checked is anything to do with issues or comments --
+      # those go through the default GITHUB_TOKEN, not this app.
+      - name: Summary
+        run: echo "App token usable for release_tag.yml on this repository." >> "$GITHUB_STEP_SUMMARY"

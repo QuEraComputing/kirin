@@ -14,3 +14,4 @@ from .wrap_const import WrapConst as WrapConst
 from .call2invoke import Call2Invoke as Call2Invoke
 from .sort_blocks import SortBlocks as SortBlocks
 from .type_assert import InlineTypeAssert as InlineTypeAssert
+from .specialize_invoke import SpecializeInvoke as SpecializeInvoke

@@ -10,6 +10,26 @@ from ._dialect import dialect
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
+    def lower_IfExp(self, state: lowering.State, node: ast.IfExp) -> lowering.Result:
+        cond = state.lower(node.test).expect_one()
+        regions: list[ir.Region] = []
+        values: list[ir.SSAValue] = []
+        for expression in (node.body, node.orelse):
+            with state.frame([], finalize_next=False) as branch_frame:
+                branch_frame.entr_block.args.append_from(cond.type, cond.name)
+                value = state.lower(expression).expect_one()
+                if branch_frame.defs:
+                    raise lowering.BuildError(
+                        "Assignment expressions in conditional branches are not supported"
+                    )
+                branch_frame.push(Yield(value))
+                regions.append(branch_frame.curr_region)
+                values.append(value)
+
+        stmt = IfElse(cond, then_body=regions[0], else_body=regions[1])
+        stmt.results[0].type = values[0].type.join(values[1].type)
+        return state.current_frame.push(stmt)
+
     @staticmethod
     def _frame_or_any_parent_has_def(frame, name) -> ir.SSAValue | None:
         # NOTE: this recursively checks all parents of the current frame for the
