@@ -3,9 +3,9 @@
 //!
 //! In-crate because the stale-metadata tests have to desync a mirror first,
 //! which a pass cannot do through a [`Rewriter`](crate::Rewriter), and the
-//! detached-code tests need [`Rewriter::build_statement`], which no public API
-//! exposes yet. The rest of the boundary's behaviour is covered through the
-//! public API in `tests/pass.rs`.
+//! detached-code tests build their detached statements directly with
+//! [`Rewriter::build_statement`]. The rest of the boundary's behaviour is
+//! covered through the public API in `tests/pass.rs`.
 
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};

@@ -58,7 +58,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`RewriteError::CannotInsert`], naming `insertion_pt` and the reason.
     ///
     /// The new statement becomes the parent of every body `definition` names,
-    /// such as blocks from [`Rewriter::new_block`]. Each must be live
+    /// such as blocks from [`Rewriter::new_block`] or a CFG from
+    /// [`Rewriter::clone_cfg`]. Each must be live
     /// ([`RewriteError::UnknownBody`]), owned by nothing
     /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
     /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not

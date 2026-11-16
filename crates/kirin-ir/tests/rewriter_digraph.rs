@@ -533,3 +533,30 @@ fn rewriter_maintains_edges_of_an_attached_digraph() {
     assert!(edges(&stage, dg).is_empty());
     verify_derived(&stage).unwrap();
 }
+
+#[test]
+fn a_producer_inserted_after_its_consumers_gets_their_edges() {
+    let mut stage = new_stage();
+    let (split, x, _) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (p, rp) = make_compute(&mut stage, x);
+    let dg = stage.digraph().node(p).new();
+    let mut stage = stage.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    // A detached copy of `p`, whose result is already usable.
+    let mut map = IRMap::default();
+    let p2 = rw.clone_statement(p, &mut map).unwrap();
+    let rp2 = map.value(rp).unwrap();
+    // A consumer reading it from two slots, placed before the producer.
+    let q = rw
+        .create(InsertionPoint::DiGraph(dg), BuilderDialect::Add(rp2, rp2))
+        .unwrap();
+    assert!(edges(rw.stage(), dg).is_empty());
+
+    // Placing the producer adds one edge per consumer slot.
+    rw.insert(InsertionPoint::DiGraph(dg), p2).unwrap();
+    assert_eq!(edges(rw.stage(), dg), HashMap::from([((p2, q, rp2), 2)]));
+    assert_members(rw.stage(), dg, &[p, q, p2]);
+    verify_derived(rw.stage()).unwrap();
+}
