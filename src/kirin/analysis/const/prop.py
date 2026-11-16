@@ -56,6 +56,13 @@ def _fact_key(fact: Result) -> Hashable:
     return (type(fact), id(fact))
 
 
+def _holds_closure(fact: Result) -> bool:
+    """Whether `fact` is a closure fact, possibly inside a partial tuple."""
+    if isinstance(fact, PartialLambda):
+        return True
+    return isinstance(fact, PartialTuple) and any(map(_holds_closure, fact.data))
+
+
 @dataclass(frozen=True)
 class _CallSummary:
     """What an analyzed call returned and left in its frame."""
@@ -101,8 +108,8 @@ class Propagate(ForwardExtra[Frame, Result]):
     constants when they are the same object, closures when their code and
     captured facts are, partial tuples when their elements are. A run starts
     whenever a frame is created without a caller; the IR may change between
-    runs, so nothing is reused across them. Calls cut off at the depth limit
-    are analyzed every time.
+    runs, so nothing is reused across them. Calls cut off at the depth limit,
+    and calls that return a closure, are analyzed every time.
     """
 
     keys = ("constprop",)
@@ -111,7 +118,8 @@ class Propagate(ForwardExtra[Frame, Result]):
     cache_calls: bool = field(default=False, kw_only=True)
     """Whether identical calls within a run reuse one analysis. Off unless asked
     for: a reused call skips the method tables that would have run for it, and
-    hands out the same facts where the callee would have produced fresh ones."""
+    hands out the same facts where the callee would have produced fresh ones.
+    Closures returned by a call are never shared."""
 
     _interp: interp.Interpreter = field(init=False)
     _call_summaries: dict[Hashable, _CallSummary] = field(
@@ -157,8 +165,9 @@ class Propagate(ForwardExtra[Frame, Result]):
         cutoffs = self._cutoffs
         frame, result = ForwardExtra.call(self, node, *args, **kwargs)
         # Skip caching if the call hit the recursion limit: its result depends
-        # on the call stack.
-        if self._cutoffs == cutoffs:
+        # on the call stack. Also skip calls that return a closure: closures
+        # are told apart by identity, so each call site needs its own.
+        if self._cutoffs == cutoffs and not _holds_closure(result):
             self._call_summaries[key] = _CallSummary(
                 facts,
                 result,
