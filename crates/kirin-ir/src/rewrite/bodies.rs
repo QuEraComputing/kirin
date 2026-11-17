@@ -5,10 +5,8 @@
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
-use crate::node::linked_list::LinkedListNode;
 use crate::{
-    Block, BlockArgument, BlockInfo, BlockParent, Body, Dialect, RewriteError, Rewriter, Statement,
-    StatementParent,
+    Block, BlockParent, Body, Dialect, RewriteError, Rewriter, Statement, StatementParent,
 };
 
 impl<L: Dialect> Rewriter<'_, L> {
@@ -41,21 +39,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
     /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
-        let block = self.stage.nodes.blocks.alloc_with_id(|id| {
-            BlockInfo::builder()
-                .node(LinkedListNode::new(id))
-                .arguments(Vec::new())
-                .predecessors(SmallVec::new())
-                .new()
-        });
-        let args: Vec<BlockArgument> = arg_types
-            .into_iter()
-            .enumerate()
-            .map(|(index, ty)| self.alloc_block_argument(block, index, ty))
-            .collect();
-        if let Some(info) = block.get_info_mut(self.stage) {
-            info.arguments = args;
-        }
+        let block = self.alloc_block(None, None, None, arg_types);
         self.unowned_blocks.insert(block);
         block
     }
