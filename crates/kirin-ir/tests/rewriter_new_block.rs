@@ -262,3 +262,66 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
     );
     assert_eq!(rewriter.events(), []);
 }
+
+#[test]
+fn erase_block_discards_an_unowned_new_block() {
+    let mut f = fixture();
+    let (block, used, events) = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        let block = rewriter.new_block([TestType::I32]);
+        let used = fill(&mut rewriter, block, f.x);
+        rewriter.drain_events();
+        rewriter.erase_block(block).unwrap();
+        (block, used, rewriter.drain_events())
+    };
+
+    assert_eq!(events, [], "the block was never part of the IR");
+    assert!(block.get_info(&f.stage).is_none());
+    assert!(used.get_info(&f.stage).is_none());
+    assert!(
+        f.x.expect_info(&f.stage).uses().is_empty(),
+        "the erased statement's use of `x` is dropped at once"
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn erase_block_rejects_an_unowned_new_block_still_in_use() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+
+    // Its argument read outside it.
+    let block = rewriter.new_block([TestType::I32]);
+    let arg: SSAValue = block.expect_info(rewriter.stage()).arguments()[0].into();
+    rewriter
+        .insert_after(f.owner, BuilderDialect::Use(arg))
+        .unwrap();
+    assert_eq!(
+        rewriter.erase_block(block),
+        Err(RewriteError::BlockArgumentInUse { block, index: 0 })
+    );
+
+    // Another block branching to it.
+    let target = rewriter.new_block([]);
+    let source = rewriter.new_block([]);
+    rewriter
+        .insert_terminator(
+            source,
+            BuilderDialect::Branch(Successor::from_block(target)),
+        )
+        .unwrap();
+    assert_eq!(
+        rewriter.erase_block(target),
+        Err(RewriteError::BlockHasPredecessors {
+            block: target,
+            pred: source
+        })
+    );
+
+    for kept in [block, target] {
+        assert!(
+            kept.get_info(rewriter.stage()).is_some(),
+            "a rejected erase changes nothing"
+        );
+    }
+}
