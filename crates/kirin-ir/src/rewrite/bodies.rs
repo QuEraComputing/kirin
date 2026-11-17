@@ -21,12 +21,16 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// Statements can be added to it like any block, starting with its
     /// terminator ([`Rewriter::insert_terminator`]).
     ///
-    /// To discard it early, use [`Rewriter::erase_block`]. A block no
-    /// statement owns when the `Rewriter` is dropped is tombstoned together
-    /// with everything it holds, unless the pass panicked, in which case it
-    /// is left for inspection. Unlike [`Rewriter::erase_block`], the drop does
-    /// not check that nothing outside still refers to the block: a branch to
-    /// it, or a use of a value it defines, is left dangling, for
+    /// Until the block is attached or erased, its statements count as uses of
+    /// the values they read: such a value cannot be erased, dead-code
+    /// elimination keeps it, and [`Rewriter::replace_all_uses`] rewrites those
+    /// uses too. To abandon the block early, call [`Rewriter::erase_block`].
+    ///
+    /// A block no statement owns when the `Rewriter` is dropped is tombstoned
+    /// together with everything it holds, unless the pass panicked, in which
+    /// case it is left for inspection. Unlike [`Rewriter::erase_block`], the
+    /// drop does not check that nothing outside still refers to the block: a
+    /// branch to it, or a use of a value it defines, is left dangling, for
     /// [`verify_derived`](crate::verify_derived) to report at the pass
     /// boundary.
     ///
