@@ -10,7 +10,7 @@ use kirin_arith::Arith;
 use kirin_cf::ControlFlow;
 use kirin_ir::walk::{PreOrder, ReverseBFS, WalkOrder, WalkResult};
 use kirin_rewrite::{
-    BlockRule, DriverError, RewriteDriver, RewriteSummary, RuleSet, StatementRule,
+    AnalysisCache, BlockRule, DriverError, RewriteDriver, RewriteSummary, RuleSet, StatementRule,
 };
 use kirin_scf::StructuredControlFlow;
 use kirin_test_languages::ScfFunctionLanguage as L;
@@ -174,9 +174,9 @@ impl BlockRule<L> for DedupNeg {
 }
 
 /// The recipe for [`DedupNeg`], counting the copies it builds in `built`.
-fn counted_dedup(built: &Rc<Cell<usize>>) -> impl Fn() -> DedupNeg + 'static {
+fn counted_dedup(built: &Rc<Cell<usize>>) -> impl Fn(&AnalysisCache) -> DedupNeg + 'static {
     let built = Rc::clone(built);
-    move || {
+    move |_| {
         built.set(built.get() + 1);
         DedupNeg::default()
     }
@@ -356,14 +356,14 @@ fn a_block_rule_is_fresh_for_each_block() {
 #[test]
 fn rules_at_an_if_see_the_edits_of_the_rules_before_them() {
     let mut rules = no_rules();
-    rules.add_statement_rule("prune_arms", || PruneArms);
-    rules.add_block_rule("dedup_neg", DedupNeg::default);
+    rules.add_statement_rule("prune_arms", |_| PruneArms);
+    rules.add_block_rule("dedup_neg", |_| DedupNeg::default());
     let (output, _) = run::<PreOrder>(&rules, IF_WITH_DUPLICATES).unwrap();
     assert_eq!(output, printed(IF_PRUNED_THEN_MERGED));
 
     let mut rules = no_rules();
-    rules.add_block_rule("dedup_neg", DedupNeg::default);
-    rules.add_statement_rule("prune_arms", || PruneArms);
+    rules.add_block_rule("dedup_neg", |_| DedupNeg::default());
+    rules.add_statement_rule("prune_arms", |_| PruneArms);
     let (output, _) = run::<PreOrder>(&rules, IF_WITH_DUPLICATES).unwrap();
     assert_eq!(output, printed(IF_MERGED_THEN_PRUNED));
 }
@@ -376,7 +376,7 @@ fn rules_at_an_if_see_the_edits_of_the_rules_before_them() {
 fn a_statement_rule_erasing_an_if_first_leaves_block_rules_no_arms() {
     let built = Rc::new(Cell::new(0));
     let mut rules = no_rules();
-    rules.add_statement_rule("erase_if", || EraseIf);
+    rules.add_statement_rule("erase_if", |_| EraseIf);
     rules.add_block_rule("dedup_neg", counted_dedup(&built));
     let (output, _) = run::<ReverseBFS>(&rules, UNUSED_IF).unwrap();
     assert_eq!(output, printed(IF_ERASED));
@@ -386,7 +386,7 @@ fn a_statement_rule_erasing_an_if_first_leaves_block_rules_no_arms() {
     let built = Rc::new(Cell::new(0));
     let mut rules = no_rules();
     rules.add_block_rule("dedup_neg", counted_dedup(&built));
-    rules.add_statement_rule("erase_if", || EraseIf);
+    rules.add_statement_rule("erase_if", |_| EraseIf);
     let (output, _) = run::<ReverseBFS>(&rules, UNUSED_IF).unwrap();
     assert_eq!(output, printed(IF_ERASED));
     // The two arms and the function's block, then the function's block.
@@ -403,12 +403,12 @@ fn a_block_rules_interrupt_ends_the_sweep_and_skip_does_nothing() {
     let steering = |walk_result: WalkResult| {
         let mut rules = no_rules();
         let built = Rc::clone(&built);
-        rules.add_block_rule("steer", move || {
+        rules.add_block_rule("steer", move |_| {
             built.set(built.get() + 1);
             Steer(walk_result)
         });
         let visited = Rc::clone(&visited);
-        rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&visited)));
+        rules.add_statement_rule("count_visits", move |_| CountVisits(Rc::clone(&visited)));
         rules
     };
 
@@ -433,7 +433,7 @@ fn a_block_erased_by_an_earlier_copy_is_skipped() {
     let built = Rc::new(Cell::new(0));
     let mut rules = no_rules();
     let counter = Rc::clone(&built);
-    rules.add_block_rule("merge_successor", move || {
+    rules.add_block_rule("merge_successor", move |_| {
         counter.set(counter.get() + 1);
         MergeSuccessor
     });

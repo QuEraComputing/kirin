@@ -36,4 +36,6 @@ pub use analysis::{
 };
 pub use driver::{DriverError, RewriteDriver, RewriteSummary};
 pub use kirin_wildcard::{ActionFn, CheckFn, NativeError, NativeFailure, NativeValue, PatternRule};
-pub use rule::{BlockRule, CheckedRule, RuleError, RuleErrorKind, RuleSet, StatementRule};
+pub use rule::{
+    AddedRule, BlockRule, CheckedRule, RuleError, RuleErrorKind, RuleSet, StatementRule,
+};

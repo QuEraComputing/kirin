@@ -150,7 +150,7 @@ fn folded() -> String {
 #[test]
 fn a_statement_rule_is_fresh_each_sweep() {
     let mut rules = no_patterns();
-    rules.add_statement_rule("fold_once", FoldOnce::default);
+    rules.add_statement_rule("fold_once", |_| FoldOnce::default());
     let (output, summary) = run(&rules).unwrap();
     assert_eq!(output, folded());
     assert_eq!(summary.sweeps, 3);
@@ -163,7 +163,7 @@ fn a_statement_rule_is_fresh_each_sweep() {
 #[test]
 fn statement_rules_run_in_list_order_with_patterns() {
     let (mut rules, rule) = with_double_neg();
-    rules.add_statement_rule("interrupt", || InterruptAtDoubleNeg);
+    rules.add_statement_rule("interrupt", |_| InterruptAtDoubleNeg);
     rules.add_pattern_rule(rule).unwrap();
     let (output, summary) = run(&rules).unwrap();
     assert_eq!(output, {
@@ -176,7 +176,7 @@ fn statement_rules_run_in_list_order_with_patterns() {
 
     let (mut rules, rule) = with_double_neg();
     rules.add_pattern_rule(rule).unwrap();
-    rules.add_statement_rule("interrupt", || InterruptAtDoubleNeg);
+    rules.add_statement_rule("interrupt", |_| InterruptAtDoubleNeg);
     let (output, summary) = run(&rules).unwrap();
     assert_eq!(output, folded());
     assert_eq!(summary.sweeps, 3);
@@ -186,7 +186,7 @@ fn statement_rules_run_in_list_order_with_patterns() {
 #[test]
 fn a_failing_statement_rule_fails_the_run_with_its_name() {
     let mut rules = no_patterns();
-    rules.add_statement_rule("erase_used_neg", || EraseUsedNeg);
+    rules.add_statement_rule("erase_used_neg", |_| EraseUsedNeg);
     let Err(DriverError::Rewrite { rule, stmt, error }) = run(&rules) else {
         panic!("the run fails with a rewrite error");
     };
