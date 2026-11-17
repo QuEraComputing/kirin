@@ -79,7 +79,9 @@ pub struct CallEffect<V> {
 }
 
 /// Callee designators understood by [`Linker`](crate::Linker)s.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Ordered by arena id, which carries no meaning but is deterministic, so
+/// callees can key ordered maps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Callee {
     /// A stage-local symbol, resolved through the symbol table.
     Named(Symbol),

@@ -5,7 +5,7 @@ use crate::intern::InternKey;
 /// Used for SSA value names, block names, and other identifiers that are
 /// local to a single compilation stage's [`StageInfo`](crate::StageInfo).
 /// Interned via `Context.symbols`.
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Symbol(usize);
 

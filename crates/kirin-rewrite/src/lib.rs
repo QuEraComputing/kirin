@@ -18,13 +18,22 @@
 //! every block for a block rule. Rules of all kinds share one list and are
 //! tried in its order.
 //!
+//! A pass reads analysis results, such as constant propagation, through a
+//! [`Database`]: it owns the program, caches each analysis's result per key,
+//! computes the results a pass requires before the pass starts, and drops
+//! every cached result once a pass edits the IR.
+//!
 //! Concrete IR mutation stays in `kirin-ir`, and the rule data in
 //! `kirin-wildcard`.
 #![forbid(unsafe_code)]
 
+mod analysis;
 mod driver;
 mod rule;
 
+pub use analysis::{
+    Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, Requirement, RunPassError,
+};
 pub use driver::{DriverError, RewriteDriver, RewriteSummary};
 pub use kirin_wildcard::{ActionFn, CheckFn, NativeError, NativeFailure, NativeValue, PatternRule};
 pub use rule::{BlockRule, CheckedRule, RuleError, RuleErrorKind, RuleSet, StatementRule};

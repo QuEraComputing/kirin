@@ -6,7 +6,7 @@ use crate::signature::Signature;
 use super::staged::StagedFunction;
 
 /// A specialized version of a function, identified by its function ID and specialization ID.
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpecializedFunction(pub(crate) StagedFunction, pub(crate) usize);
 
