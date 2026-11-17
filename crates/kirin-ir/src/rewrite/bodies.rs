@@ -15,7 +15,8 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// Create an empty block with arguments of `arg_types`, owned by nothing.
     ///
     /// The block is meant to become a statement's body, such as a branch of
-    /// an `scf.if`: fill it, then name it in a definition passed to
+    /// an `scf.if`: fill it, then name it in a definition passed to an insert
+    /// (such as [`Rewriter::insert_before`]) or to
     /// [`Rewriter::replace_statement`], which makes the statement its parent.
     /// Statements can be added to it like any block, starting with its
     /// terminator ([`Rewriter::insert_terminator`]).
@@ -25,7 +26,8 @@ impl<L: Dialect> Rewriter<'_, L> {
     ///
     /// Records no event: a block owned by nothing is not part of the IR yet.
     /// The statement that adopts it records
-    /// [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
+    /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
+    /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
         let block = self.stage.nodes.blocks.alloc_with_id(|id| {
             BlockInfo::builder()
@@ -63,19 +65,41 @@ impl<L: Dialect> Rewriter<'_, L> {
         }
     }
 
-    /// Check that `owner` can adopt `body`: it is live, owned by nothing else,
-    /// and does not enclose `owner`.
-    pub(super) fn check_can_adopt(&self, body: Body, owner: Statement) -> Result<(), RewriteError> {
+    /// Check that the existing statement `owner` can keep or adopt `body`: it
+    /// already owns it, or the body is live, owned by nothing, and does not
+    /// contain `owner`.
+    pub(super) fn check_can_keep_or_adopt(
+        &self,
+        body: Body,
+        owner: Statement,
+    ) -> Result<(), RewriteError> {
         match self.body_owner(body)? {
-            Some(other) if other != owner => Err(RewriteError::BodyOwnedElsewhere(body)),
-            Some(_) => Ok(()),
-            // Owning a body it is nested in would make `owner` its own
-            // ancestor. An owned body enclosing `owner` belongs to one of its
-            // ancestors and is rejected above, so only an unowned one needs
-            // the walk up.
-            None if self.body_encloses(body, owner) => Err(RewriteError::BodyEnclosesOwner(body)),
-            None => Ok(()),
+            Some(current) if current == owner => Ok(()),
+            Some(_) => Err(RewriteError::BodyOwnedElsewhere(body)),
+            None => match owner.expect_info(self.stage).parent {
+                Some(parent) if self.body_contains(body, parent) => {
+                    Err(RewriteError::BodyEnclosesOwner(body))
+                }
+                _ => Ok(()),
+            },
         }
+    }
+
+    /// Check that a new statement under `parent` can adopt `body`: it is live,
+    /// owned by nothing, and does not contain `parent`, which would make the
+    /// statement its own ancestor.
+    pub(super) fn check_can_adopt(
+        &self,
+        body: Body,
+        parent: StatementParent,
+    ) -> Result<(), RewriteError> {
+        if self.body_owner(body)?.is_some() {
+            return Err(RewriteError::BodyOwnedElsewhere(body));
+        }
+        if self.body_contains(body, parent) {
+            return Err(RewriteError::BodyEnclosesOwner(body));
+        }
+        Ok(())
     }
 
     /// The statement owning `body`, or `None` if nothing does. A block in a
@@ -95,11 +119,11 @@ impl<L: Dialect> Rewriter<'_, L> {
         }
     }
 
-    /// Whether `stmt` is nested, at any depth, in `body`.
-    fn body_encloses(&self, body: Body, stmt: Statement) -> bool {
-        let mut current = stmt;
-        while let Some(parent) = current.get_info(self.stage).and_then(|item| item.parent) {
-            let owner = match parent {
+    /// Whether `parent` is `body` or nested in it at any depth.
+    fn body_contains(&self, body: Body, parent: StatementParent) -> bool {
+        let mut current = parent;
+        loop {
+            let owner = match current {
                 StatementParent::Block(block) => {
                     if body == Body::Block(block) {
                         return true;
@@ -131,9 +155,11 @@ impl<L: Dialect> Rewriter<'_, L> {
             let Some(owner) = owner else {
                 return false;
             };
-            current = owner;
+            let Some(next) = owner.get_info(self.stage).and_then(|item| item.parent) else {
+                return false;
+            };
+            current = next;
         }
-        false
     }
 
     /// Make `owner` the parent of `body`.

@@ -70,6 +70,14 @@
 //! `StageInfo::statement_arena_mut` is still public, so that bypass is
 //! currently reachable.
 //!
+//! # Bodies of inserted statements
+//!
+//! An inserted statement becomes the parent of the bodies its definition
+//! names, which must be owned by nothing yet: blocks from
+//! [`Rewriter::new_block`], or bodies the builder left unowned. A
+//! [`Rewriter::new_block`] block that no statement owns when the `Rewriter`
+//! drops is tombstoned with everything it holds.
+//!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
 //! removed. Erasure is eager: the statement-owned blocks, `CFG`s, `DiGraph`s,
@@ -108,6 +116,9 @@ pub enum MutationEvent {
     /// A new statement was spliced into a block's statement list or added to a
     /// graph: a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
     /// statement.
+    ///
+    /// Covers the bodies it names, which now have `stmt` as their parent; no
+    /// separate [`MutationEvent::ChangedBodyNesting`] is recorded for them.
     InsertedStatement { stmt: Statement },
     /// A statement was tombstoned and removed from its block or graph.
     ///
@@ -1143,6 +1154,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// value, which becomes a result of the new statement. On success the new
     /// statement is spliced into the block, its operand uses are recorded, and
     /// [`MutationEvent::InsertedStatement`] is emitted; the new id is returned.
+    ///
+    /// The new statement becomes the parent of every body `definition` names,
+    /// such as blocks from [`Rewriter::new_block`]. Each must be live
+    /// ([`RewriteError::UnknownBody`]), owned by nothing
+    /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
+    /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not
+    /// contain the block or graph the statement is inserted into, which would
+    /// make the statement its own ancestor ([`RewriteError::BodyEnclosesOwner`]).
     pub fn insert_after(
         &mut self,
         anchor: Statement,
@@ -1189,7 +1208,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.successors().next().is_some() {
             return Err(RewriteError::NonTerminatorWithSuccessors);
         }
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::Block(block))?;
         let new_stmt = self.alloc_statement(
             definition,
             StatementParent::Block(block),
@@ -1243,7 +1263,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `block` is unknown or already
     /// has a terminator, or if `definition` is not a terminator, declares
-    /// results, or names a dead operand or successor.
+    /// results, names a dead operand or successor, or names a body the new
+    /// statement cannot own (as for [`Rewriter::insert_after`]).
     ///
     /// Records [`MutationEvent::InsertedStatement`] then
     /// [`MutationEvent::ChangedTerminator`].
@@ -1264,7 +1285,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.results().next().is_some() {
             return Err(RewriteError::CannotInsertTerminatorWithResults);
         }
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::Block(block))?;
         let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
         for &target in &targets {
             self.live_block(target)?;
@@ -1424,7 +1446,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 return Err(RewriteError::BodyListedTwice(body));
             }
             if !old_bodies.contains(&body) {
-                self.check_can_adopt(body, stmt)?;
+                self.check_can_keep_or_adopt(body, stmt)?;
             }
         }
         let dropped_bodies = old_bodies

@@ -20,8 +20,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// left for [`verify_derived`](crate::verify_derived) to report; such a
     /// wire has no edge.
     ///
-    /// Rejects, leaving the stage untouched, if `graph` is unknown or a check
-    /// above fails. Records
+    /// Rejects, leaving the stage untouched, if `graph` is unknown, a check
+    /// above fails, or `definition` names a body the new statement cannot own
+    /// (as for [`Rewriter::insert_after`]). Records
     /// [`MutationEvent::InsertedStatement`] then
     /// [`MutationEvent::ChangedUnGraphTopology`].
     pub fn insert_ungraph_node(
@@ -31,7 +32,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ) -> Result<Statement, RewriteError> {
         self.live_ungraph(graph)?;
         Self::check_ungraph_member(&definition, UnGraphRole::Node)?;
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::UnGraph(graph))?;
 
         let wires = self.snapshot_wires(graph, operands.iter().copied());
 
@@ -64,8 +66,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// value. The new wires have no endpoints yet, so the petgraph gains no
     /// edge until nodes read them.
     ///
-    /// Rejects, leaving the stage untouched, if `graph` is unknown or a check
-    /// above fails. Records [`MutationEvent::InsertedStatement`] then
+    /// Rejects, leaving the stage untouched, if `graph` is unknown, a check
+    /// above fails, or `definition` names a body the new statement cannot own
+    /// (as for [`Rewriter::insert_after`]). Records [`MutationEvent::InsertedStatement`] then
     /// [`MutationEvent::ChangedUnGraphTopology`].
     pub fn insert_ungraph_edge(
         &mut self,
@@ -77,7 +80,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.arguments().next().is_some() {
             return Err(RewriteError::EdgeStatementWithOperands);
         }
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::UnGraph(graph))?;
 
         let stmt = self.alloc_statement(
             definition,

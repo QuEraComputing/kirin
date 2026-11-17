@@ -1,6 +1,7 @@
 //! `Rewriter::new_block` makes a block owned by nothing, to become a
 //! statement's body; one still unowned when the `Rewriter` drops is
-//! tombstoned.
+//! tombstoned. Inserting a statement that names such blocks makes it their
+//! parent.
 
 mod common;
 
@@ -35,6 +36,13 @@ fn fixture() -> Fixture {
         old_else,
         x,
     }
+}
+
+/// A stage holding only an empty `DiGraph` owned by nothing.
+fn unowned_graph() -> (StageInfo<BuilderDialect>, DiGraph) {
+    let mut stage = new_stage();
+    let graph = stage.digraph().new();
+    (stage.finalize().unwrap(), graph)
 }
 
 /// Fill `block` with `use(x)` then `return`.
@@ -130,4 +138,127 @@ fn unowned_new_block_is_tombstoned_on_drop() {
         MutationEvent::ChangedBlockList { .. } | MutationEvent::ChangedBodyNesting { .. }
     )));
     assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+fn parent(stage: &StageInfo<BuilderDialect>, block: Block) -> Option<BlockParent> {
+    block.expect_info(stage).parent()
+}
+
+#[test]
+fn inserted_statement_adopts_new_blocks() {
+    let mut f = fixture();
+    let (then_block, else_block, new_owner, events) = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        let then_block = rewriter.new_block([]);
+        fill(&mut rewriter, then_block, f.x);
+        let else_block = rewriter.new_block([]);
+        fill(&mut rewriter, else_block, f.x);
+        rewriter.drain_events();
+        let new_owner = rewriter
+            .insert_after(f.owner, BuilderDialect::OwnBlocks(then_block, else_block))
+            .unwrap();
+        (then_block, else_block, new_owner, rewriter.drain_events())
+    };
+
+    assert_eq!(
+        events,
+        [MutationEvent::InsertedStatement { stmt: new_owner }],
+        "the insertion covers the bodies the statement gains"
+    );
+    for block in [then_block, else_block] {
+        assert_eq!(
+            parent(&f.stage, block),
+            Some(BlockParent::Statement(new_owner))
+        );
+        assert_eq!(block.statements(&f.stage).count(), 1, "the drop keeps it");
+    }
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn inserted_graph_member_adopts_new_blocks() {
+    let (mut stage, graph) = unowned_graph();
+    let (then_block, else_block, node) = {
+        let mut rewriter = Rewriter::new(&mut stage);
+        let then_block = rewriter.new_block([]);
+        let else_block = rewriter.new_block([]);
+        let node = rewriter
+            .insert_node(graph, BuilderDialect::OwnBlocks(then_block, else_block))
+            .unwrap();
+        (then_block, else_block, node)
+    };
+
+    for block in [then_block, else_block] {
+        assert_eq!(parent(&stage, block), Some(BlockParent::Statement(node)));
+    }
+}
+
+#[test]
+fn insert_rejects_a_body_owned_elsewhere() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let fresh = rewriter.new_block([]);
+    assert_eq!(
+        rewriter.insert_after(f.owner, BuilderDialect::OwnBlocks(fresh, f.old_then)),
+        Err(RewriteError::BodyOwnedElsewhere(Body::Block(f.old_then)))
+    );
+    assert_eq!(rewriter.events(), [], "nothing was inserted");
+    assert_eq!(parent(rewriter.stage(), fresh), None, "nothing was adopted");
+}
+
+#[test]
+fn insert_rejects_a_body_named_twice() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let fresh = rewriter.new_block([]);
+    assert_eq!(
+        rewriter.insert_after(f.owner, BuilderDialect::OwnBlocks(fresh, fresh)),
+        Err(RewriteError::BodyListedTwice(Body::Block(fresh)))
+    );
+    assert_eq!(rewriter.events(), []);
+}
+
+#[test]
+fn insert_rejects_a_body_holding_the_new_statement() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+
+    // Into the block itself.
+    let block = rewriter.new_block([]);
+    let other = rewriter.new_block([]);
+    let ret = rewriter
+        .insert_terminator(block, BuilderDialect::Return)
+        .unwrap();
+    assert_eq!(
+        rewriter.insert_before(ret, BuilderDialect::OwnBlocks(block, other)),
+        Err(RewriteError::BodyEnclosesOwner(Body::Block(block)))
+    );
+
+    // Two levels down: `block` holds `holder`, which owns `inner`.
+    let inner = rewriter.new_block([]);
+    let inner_ret = rewriter
+        .insert_terminator(inner, BuilderDialect::Return)
+        .unwrap();
+    let spare = rewriter.new_block([]);
+    rewriter
+        .insert_before(ret, BuilderDialect::OwnBlocks(inner, spare))
+        .unwrap();
+    assert_eq!(
+        rewriter.insert_before(inner_ret, BuilderDialect::OwnBlocks(block, other)),
+        Err(RewriteError::BodyEnclosesOwner(Body::Block(block)))
+    );
+    for unowned in [block, other] {
+        assert_eq!(parent(rewriter.stage(), unowned), None);
+    }
+}
+
+#[test]
+fn insert_rejects_a_graph_member_owning_its_graph() {
+    let (mut stage, graph) = unowned_graph();
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(
+        rewriter.insert_node(graph, BuilderDialect::OwnDiGraph(graph)),
+        Err(RewriteError::BodyEnclosesOwner(Body::DiGraph(graph)))
+    );
+    assert_eq!(rewriter.events(), []);
 }
