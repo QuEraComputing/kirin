@@ -475,6 +475,8 @@ pub struct Rewriter<'a, L: Dialect> {
     pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
     /// Blocks from [`Rewriter::new_block`] that no statement owns yet.
     pub(super) unowned_blocks: FxHashSet<Block>,
+    /// Leave detached code in place on drop, set after a caught panic.
+    pub(super) keep_detached_on_drop: bool,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -484,6 +486,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
             unowned_blocks: FxHashSet::default(),
+            keep_detached_on_drop: false,
         }
     }
 

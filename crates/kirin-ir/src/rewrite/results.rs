@@ -59,13 +59,30 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 }
 
+impl<'a, L: Dialect> Rewriter<'a, L> {
+    /// Leave detached code in place when this `Rewriter` drops. Called by the
+    /// pass boundary after it catches a panic.
+    pub(crate) fn keep_detached_on_drop(&mut self) {
+        self.keep_detached_on_drop = true;
+    }
+}
+
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every [`new_result`](Rewriter::new_result) value no insert
     /// bound and every [`new_block`](Rewriter::new_block) block no statement
     /// owns, so neither outlives the `Rewriter`.
+    ///
+    /// After a caught panic the blocks are left in place: a panic part-way
+    /// through an edit can leave them inconsistent, so tombstoning them could
+    /// panic again, outside the boundary that caught the first. The stage is
+    /// quarantined, so they remain only for inspection.
     fn drop(&mut self) {
-        for block in std::mem::take(&mut self.unowned_blocks) {
-            self.tombstone_block(block);
+        // TODO: when the insertion API is updated later, skip tombstoning
+        // detached statements under this same condition.
+        if !self.keep_detached_on_drop {
+            for block in std::mem::take(&mut self.unowned_blocks) {
+                self.tombstone_block(block);
+            }
         }
         for (value, _) in self.unbound_ssa_results.drain() {
             let _ = self.stage.ssas.delete(value);

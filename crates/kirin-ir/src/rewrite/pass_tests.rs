@@ -124,3 +124,31 @@ fn a_pass_error_is_reported_even_when_the_mirrors_are_also_stale() {
     // rather than a stale mirror that was already there.
     assert!(matches!(f.quarantined().cause(), QuarantineCause::Pass(_)));
 }
+
+#[test]
+fn a_panicking_pass_leaves_its_detached_code_in_place() {
+    let mut f = fixture();
+    let mut detached = None;
+
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let (_, result) =
+        crate::rewrite::pass::drive_pass(f.stage_mut(), |rw| -> Result<(), RewriteError> {
+            let block = rw.new_block([]);
+            let ret = rw.insert_terminator(block, TestLang::Return)?;
+            let nop = rw.insert_before(ret, TestLang::Nop)?;
+            // Leave the block half-built, as a panic part-way through an edit
+            // could: its chain still names a statement whose slot is gone.
+            let _ = rw.stage.statement_arena_mut().delete(nop);
+            detached = Some(block);
+            panic!("rule gave up")
+        });
+    std::panic::set_hook(previous_hook);
+
+    assert!(matches!(result, Err(QuarantineCause::Panic(_))));
+    let block = detached.expect("the pass made a block before panicking");
+    assert!(
+        block.get_info(f.stage()).is_some(),
+        "the drop left the detached block for inspection instead of tombstoning it"
+    );
+}

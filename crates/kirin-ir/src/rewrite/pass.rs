@@ -44,7 +44,12 @@ where
 
     let pass_result = match panic_or_result {
         Ok(pass_result) => pass_result,
-        Err(payload) => return (events, Err(QuarantineCause::from_panic(payload))),
+        Err(payload) => {
+            // The panic may have left detached code half-built; dropping the
+            // rewriter must not panic again outside `catch_unwind`.
+            rewriter.keep_detached_on_drop();
+            return (events, Err(QuarantineCause::from_panic(payload)));
+        }
     };
 
     // Check the pass did not fail
