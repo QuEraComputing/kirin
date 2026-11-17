@@ -77,7 +77,7 @@ fn swapping_the_bodies_keeps_them() {
                 BuilderDialect::OwnBlocks(f.else_block, f.then_block),
             )
             .unwrap();
-        rewriter.drain_events()
+        rewriter.events().to_vec()
     };
     assert_eq!(
         events,
@@ -103,7 +103,7 @@ fn a_dropped_body_is_erased_and_a_gained_one_adopted() {
         rewriter
             .replace_statement(f.owner, BuilderDialect::OwnBlocks(f.then_block, f.spare))
             .unwrap();
-        rewriter.drain_events()
+        rewriter.events().to_vec()
     };
     assert_eq!(
         events,
@@ -132,7 +132,7 @@ fn assert_rejected(f: &mut Fixture, definition: BuilderDialect, error: RewriteEr
     let (result, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         let result = rewriter.replace_statement(f.owner, definition);
-        (result, rewriter.drain_events())
+        (result, rewriter.events().to_vec())
     };
     assert_eq!(result, Err(error));
     assert!(events.is_empty());

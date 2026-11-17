@@ -38,7 +38,9 @@ where
     let mut rewriter = Rewriter::new(stage);
 
     let panic_or_result = catch_unwind(AssertUnwindSafe(|| pass(&mut rewriter)));
-    let events = rewriter.drain_events();
+    // Taking the events drops the rewriter, tombstoning the results the pass
+    // never bound and ending the borrow of `stage` before it is verified.
+    let events = rewriter.into_events();
 
     let pass_result = match panic_or_result {
         Ok(pass_result) => pass_result,
@@ -50,10 +52,6 @@ where
         Ok(output) => output,
         Err(error) => return (events, Err(QuarantineCause::Pass(Box::new(error)))),
     };
-
-    // Tombstone the results the pass never bound, ending the borrow of
-    // `stage` before it is verified.
-    drop(rewriter);
 
     // Verify the generated IR
     if let Err(error) = verify_derived(stage) {
