@@ -76,7 +76,8 @@
 //! names, which must be owned by nothing yet: blocks from
 //! [`Rewriter::new_block`], or bodies the builder left unowned. A
 //! [`Rewriter::new_block`] block that no statement owns when the `Rewriter`
-//! drops is tombstoned with everything it holds.
+//! drops is tombstoned with everything it holds, unless the drop follows a
+//! panic; [`Rewriter::erase_block`] discards one earlier.
 //!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
@@ -225,17 +226,19 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A `replace_statement` definition names a body that does not resolve to
-    /// a live body in this stage.
+    /// A definition passed to an insert or `replace_statement` names a body
+    /// that does not resolve to a live body in this stage.
     UnknownBody(Body),
-    /// A `replace_statement` definition names a body that belongs to another
-    /// statement or, for a block, to a CFG. A body has one owner; detach it
-    /// from the other one first.
+    /// A definition passed to an insert or `replace_statement` names a body
+    /// that belongs to another statement or, for a block, to a CFG. A body has
+    /// one owner; detach it from the other one first.
     BodyOwnedElsewhere(Body),
-    /// A `replace_statement` definition names the same body in two fields.
+    /// A definition passed to an insert or `replace_statement` names the same
+    /// body in two fields.
     BodyListedTwice(Body),
-    /// A `replace_statement` definition names a body the statement itself is
-    /// nested in, which would make the statement its own ancestor.
+    /// A definition passed to an insert or `replace_statement` names a body
+    /// that contains the statement (for an insert, the block or graph it is
+    /// inserted into), which would make the statement its own ancestor.
     BodyEnclosesOwner(Body),
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
@@ -380,12 +383,12 @@ impl fmt::Display for RewriteError {
                 write!(f, "body {body:?} already belongs to something else")
             }
             RewriteError::BodyListedTwice(body) => {
-                write!(f, "the replacement names body {body:?} twice")
+                write!(f, "the definition names body {body:?} twice")
             }
             RewriteError::BodyEnclosesOwner(body) => {
                 write!(
                     f,
-                    "the replacement names body {body:?}, which encloses the statement"
+                    "the definition names body {body:?}, which encloses the statement"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
