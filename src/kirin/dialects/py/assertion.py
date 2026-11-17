@@ -84,6 +84,8 @@ class ConstProp(interp.MethodTable):
         condition = frame.get(stmt.condition)
         if isinstance(condition, const.Value) and condition.data is True:
             frame.should_be_pure.add(stmt)
+        else:
+            frame.should_be_pure.discard(stmt)
         return ()
 
 
