@@ -3,6 +3,7 @@
 import os
 import sys
 import subprocess
+from pathlib import Path
 
 from kirin.prelude import basic
 from kirin.serialization import JSONSerializer
@@ -23,10 +24,10 @@ print(JSONSerializer().encode(add_one.dialects.encode(add_one)), end="")
 """
 
 
-def _encode_with_hash_seed(seed: int) -> str:
+def _encode_with_hash_seed(script: Path, seed: int) -> str:
     env = {**os.environ, "PYTHONHASHSEED": str(seed)}
     return subprocess.run(
-        [sys.executable, "-c", _ENCODE_SCRIPT],
+        [sys.executable, str(script)],
         env=env,
         check=True,
         capture_output=True,
@@ -34,8 +35,12 @@ def _encode_with_hash_seed(seed: int) -> str:
     ).stdout
 
 
-def test_payload_is_identical_across_hash_seeds():
-    payloads = {seed: _encode_with_hash_seed(seed) for seed in (1, 2, 3)}
+def test_payload_is_identical_across_hash_seeds(tmp_path: Path):
+    # NOTE: run from a file rather than `python -c`: before Python 3.13,
+    # `inspect.getsource` cannot read `-c` code, which lowering relies on.
+    script = tmp_path / "encode.py"
+    script.write_text(_ENCODE_SCRIPT)
+    payloads = {seed: _encode_with_hash_seed(script, seed) for seed in (1, 2, 3)}
     assert payloads[1]
     assert payloads[1] == payloads[2] == payloads[3]
 
