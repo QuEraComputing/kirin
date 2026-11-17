@@ -50,6 +50,8 @@
 //! is bounded, so one shared worklist converges — recursion included — with no
 //! nested fixpoints, no widening, and no frames for structured control.
 
+use super::results::SparseBackwardResults;
+
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -63,8 +65,8 @@ use kirin_ir::{
 use super::DemandFrame;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, AnalysisResults, Analyzed, Body, CallEffect, Callee, ContextInsensitive,
-    EnvIndex, EnvStore, FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError,
+    AbstractInterpreter, Analyzed, Body, CallEffect, Callee, ContextInsensitive, EnvIndex,
+    EnvStore, FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError,
     LinkTarget, Linker, SameStageLinker, SparseBackwardSemantic, StageQuery,
     StandardFixpointInterpreter, StrongDemand, TerminatorArgs, WorkAnalysis,
 };
@@ -453,13 +455,6 @@ where
             "no demand context is being dispatched",
         ))
     }
-
-    /// The environment of a discovered context.
-    pub(super) fn discovered(&self, key: &P::Key) -> Option<EnvIndex> {
-        self.env
-            .context_env(key)
-            .filter(|env| self.contexts.contains_key(env))
-    }
 }
 
 impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>
@@ -822,7 +817,7 @@ where
 /// resolved [`LinkTarget`](crate::LinkTarget)).
 ///
 /// `analyze` consumes the engine and returns the converged [`Analyzed`]
-/// state, read through [`AnalysisResults`]. Each analysis is fresh: analyzing
+/// state, read through [`AnalysisResults`](crate::AnalysisResults). Each analysis is fresh: analyzing
 /// another root takes another engine.
 ///
 /// ```ignore
@@ -846,7 +841,6 @@ pub struct SparseBackwardInterpreter<
     Sem: SparseBackwardSemantic,
 {
     pub(super) driver: SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
-    pub(super) root: Option<P::Key>,
 }
 
 impl<'ir, S, V, E, P, Sem> SparseBackwardInterpreter<'ir, S, V, E, SameStageLinker, P, Sem>
@@ -872,7 +866,6 @@ where
 {
     fn from_transfer(transfer: SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>) -> Self {
         Self {
-            root: None,
             driver: StandardFixpointInterpreter::new(transfer, DemandCallers::new()),
         }
     }
@@ -922,7 +915,7 @@ where
         stage_name: &str,
         function_name: &str,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<Analyzed<SparseBackwardResults<P::Key, V, Sem>>, E> {
         let stage = self
             .program()
             .stage_by_name(stage_name)
@@ -941,7 +934,7 @@ where
         stage: CompileStage,
         symbol: Symbol,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<Analyzed<SparseBackwardResults<P::Key, V, Sem>>, E> {
         self.analyze(stage, symbol.into(), result_values)
     }
 
@@ -952,13 +945,13 @@ where
     /// for its return rules, then drain the shared fixpoint worklist. Bottom
     /// output facts still allow intrinsic roots to contribute parameter facts.
     /// The parameter facts are the root's
-    /// [`response`](AnalysisResults::response); an error drops the engine.
+    /// [`response`](crate::AnalysisResults::response); an error drops the engine.
     pub fn analyze(
         mut self,
         stage: CompileStage,
         callee: Callee,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<Analyzed<SparseBackwardResults<P::Key, V, Sem>>, E> {
         let outputs: Product<V> = result_values.into_iter().collect();
         let (_, root, _) = self
             .driver
@@ -975,94 +968,20 @@ where
             .iter()
             .map(|(env, context)| (context.target, *env))
             .collect();
-        self.root = Some(root);
-        Ok(Analyzed::new(self, contexts))
-    }
-}
-
-impl<'ir, S, V, E, Lk, P, Sem> AnalysisResults
-    for Analyzed<SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>>
-where
-    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom,
-    E: From<InterpreterError>,
-    Lk: Linker<S>,
-    P: DemandContext<V>,
-    Sem: SparseBackwardSemantic,
-{
-    type Context = P::Key;
-    type Anchor = SSAValue;
-    type Value = V;
-
-    fn root(&self) -> &P::Key {
-        self.engine
-            .root
-            .as_ref()
-            .expect("`analyze` sets the root before building `Analyzed`")
-    }
-
-    /// The discovered callable contexts.
-    fn contexts(&self) -> impl Iterator<Item = &P::Key> {
-        let transfer = self.engine.driver.inner();
-        transfer
-            .env
-            .contexts()
-            .filter(|(_, env)| transfer.contexts.contains_key(env))
-            .map(|(key, _)| key)
-    }
-
-    fn callable_of(&self, context: &P::Key) -> Option<LinkTarget> {
-        let transfer = self.engine.driver.inner();
-        let env = transfer.discovered(context)?;
-        Some(transfer.contexts.get(&env)?.target)
-    }
-
-    fn contexts_of(&self, callable: LinkTarget) -> impl Iterator<Item = &P::Key> {
-        let transfer = self.engine.driver.inner();
-        self.envs_of(callable)
-            .filter_map(|env| transfer.env.key(env))
-    }
-
-    fn fact(&self, context: &P::Key, value: SSAValue) -> Option<&V> {
-        let transfer = self.engine.driver.inner();
-        let env = transfer.discovered(context)?;
-        transfer.env.environment(env).ok()?.get(value)
-    }
-
-    fn facts(&self, context: &P::Key) -> impl Iterator<Item = (SSAValue, &V)> {
-        let transfer = self.engine.driver.inner();
-        transfer
-            .discovered(context)
-            .and_then(|env| transfer.env.environment(env).ok())
-            .into_iter()
-            .flat_map(|facts| facts.iter())
-    }
-
-    /// The demand on each entry parameter, in parameter order.
-    fn response(&self, context: &P::Key) -> Option<Product<V>> {
-        let transfer = self.engine.driver.inner();
-        let env = transfer.discovered(context)?;
-        let target = transfer.contexts.get(&env)?.target;
-        let params = transfer.entry_params(target).ok()?;
-        transfer.param_facts(env, &params).ok()
-    }
-}
-
-impl<'ir, S, V, E, Lk, P, Sem> Analyzed<SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>>
-where
-    S: StageMeta,
-    V: Clone + PartialEq + Lattice + HasBottom,
-    E: From<InterpreterError>,
-    P: DemandContext<V>,
-    Sem: SparseBackwardSemantic,
-{
-    /// `true` iff `value` carries a non-bottom demand fact in `context`.
-    pub fn is_demanded(&self, context: &P::Key, value: impl Into<SSAValue>) -> bool {
-        let transfer = self.engine.driver.inner();
-        transfer
-            .discovered(context)
-            .and_then(|env| transfer.env.environment(env).ok())
-            .and_then(|facts| facts.get(value.into()))
-            .is_some_and(|fact| *fact != V::bottom())
+        // Save parameter identities while the program is still available.
+        // Responses remain projections of the converged fact store.
+        let transfer = self.driver.inner();
+        let parameters = contexts
+            .iter()
+            .map(|&(target, env)| Ok((env, (target, transfer.entry_params(target)?))))
+            .collect::<Result<HashMap<_, _>, E>>()?;
+        let transfer = self.driver.into_inner();
+        let state = SparseBackwardResults {
+            _semantics: PhantomData,
+            root,
+            env: transfer.env,
+            contexts: parameters,
+        };
+        Ok(Analyzed::new(state, contexts))
     }
 }

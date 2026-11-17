@@ -31,6 +31,8 @@
 //! each use outside the defining unit (uses in nested structured bodies map to
 //! their enclosing unit), so direct dominated cross-block uses see it.
 
+use super::results::SparseForwardResults;
+
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -42,12 +44,12 @@ use kirin_ir::{
 
 use crate::core::query;
 use crate::{
-    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
-    AnalysisResults, Analyzed, BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee,
-    DiGraphQueries, Env, EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine,
-    ForwardEval, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget,
-    Linker, SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
-    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
+    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter, Analyzed,
+    BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
+    EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, SSABinding,
+    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
+    StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -987,7 +989,7 @@ where
 /// behavior are owned by the policy `P`.
 ///
 /// `analyze` consumes the engine and returns the converged [`Analyzed`]
-/// state, read through [`AnalysisResults`]. Each analysis is fresh: analyzing
+/// state, read through [`AnalysisResults`](crate::AnalysisResults). Each analysis is fresh: analyzing
 /// another root takes another engine.
 ///
 /// ```ignore
@@ -1012,8 +1014,6 @@ pub struct SparseForwardInterpreter<
     Sem: SparseForwardSemantic,
 {
     driver: ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
-    /// The analyzed root's context key, set by `analyze`.
-    root: Option<P::Key>,
 }
 
 impl<'ir, S: StageMeta, V, E, P, F, Sem>
@@ -1027,7 +1027,6 @@ where
     pub fn new(program: &'ir Program<S>) -> Self {
         Self {
             driver: StandardFixpointInterpreter::new(SparseForwardTransfer::new(program), ()),
-            root: None,
         }
     }
 }
@@ -1048,7 +1047,6 @@ where
         let transfer = self.driver.into_inner().with_linker(linker);
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::new(transfer, ()),
-            root: None,
         }
     }
 
@@ -1066,7 +1064,6 @@ where
         let transfer = self.driver.into_inner().with_analysis(analysis);
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::new(transfer, ()),
-            root: None,
         }
     }
 
@@ -1076,19 +1073,11 @@ where
         let transfer = self.driver.into_inner().with_policy(analysis);
         Self {
             driver: StandardFixpointInterpreter::new(transfer, ()),
-            root: None,
         }
     }
 
     pub fn program(&self) -> &'ir Program<S> {
         self.driver.inner().program()
-    }
-
-    /// A selected context's environment and metadata.
-    fn selected(&self, key: &P::Key) -> Option<(EnvIndex, &ForwardContext<V>)> {
-        let transfer = self.driver.inner();
-        let env = transfer.env.context_env(key)?;
-        Some((env, transfer.contexts.get(&env)?))
     }
 }
 
@@ -1126,7 +1115,7 @@ where
         stage_name: &str,
         function_name: &str,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<Analyzed<SparseForwardResults<P::Key, V, Sem>>, E> {
         let stage = self
             .driver
             .inner()
@@ -1150,20 +1139,20 @@ where
         stage: CompileStage,
         symbol: Symbol,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<Analyzed<SparseForwardResults<P::Key, V, Sem>>, E> {
         self.analyze(stage, symbol.into(), args)
     }
 
     /// Run the fixpoint from a single entry. Seeds the entry function's entry unit
     /// and drains the worklist. The inferred return product is the root's
-    /// [`response`](AnalysisResults::response) (`None` if it never returns);
+    /// [`response`](crate::AnalysisResults::response) (`None` if it never returns);
     /// an error drops the engine.
     pub fn analyze(
         mut self,
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<Analyzed<SparseForwardResults<P::Key, V, Sem>>, E> {
         let args: Product<V> = args.into_iter().collect();
         let env = self.driver.contribute_call_entry(stage, &callee, args)?;
         self.driver.wake_changed()?;
@@ -1181,69 +1170,18 @@ where
             .iter()
             .map(|(env, context)| (context.target, *env))
             .collect();
-        self.root = Some(root);
-        Ok(Analyzed::new(self, contexts))
-    }
-}
-
-impl<'ir, S, V, E, Lk, P, F, Sem> AnalysisResults
-    for Analyzed<SparseForwardInterpreter<'ir, S, V, E, Lk, P, F, Sem>>
-where
-    S: StageMeta,
-    V: Clone + Widen,
-    E: From<InterpreterError>,
-    P: CallContext<V>,
-    Sem: SparseForwardSemantic,
-{
-    type Context = P::Key;
-    type Anchor = SSAValue;
-    type Value = V;
-
-    fn root(&self) -> &P::Key {
-        self.engine
-            .root
-            .as_ref()
-            .expect("`analyze` sets the root before building `Analyzed`")
-    }
-
-    /// The selected function contexts.
-    fn contexts(&self) -> impl Iterator<Item = &P::Key> {
-        let transfer = self.engine.driver.inner();
-        transfer
-            .env
-            .contexts()
-            .filter(|(_, env)| transfer.contexts.contains_key(env))
-            .map(|(key, _)| key)
-    }
-
-    fn callable_of(&self, context: &P::Key) -> Option<LinkTarget> {
-        Some(self.engine.selected(context)?.1.target)
-    }
-
-    fn contexts_of(&self, callable: LinkTarget) -> impl Iterator<Item = &P::Key> {
-        let transfer = self.engine.driver.inner();
-        self.envs_of(callable)
-            .filter_map(|env| transfer.env.key(env))
-    }
-
-    fn fact(&self, context: &P::Key, value: SSAValue) -> Option<&V> {
-        let (env, _) = self.engine.selected(context)?;
-        let transfer = self.engine.driver.inner();
-        transfer.env.environment(env).ok()?.get(value)
-    }
-
-    fn facts(&self, context: &P::Key) -> impl Iterator<Item = (SSAValue, &V)> {
-        let transfer = self.engine.driver.inner();
-        self.engine
-            .selected(context)
-            .and_then(|(env, _)| transfer.env.environment(env).ok())
-            .into_iter()
-            .flat_map(|facts| facts.iter())
-    }
-
-    /// The join of every reached return; `None` if no return was reached.
-    fn response(&self, context: &P::Key) -> Option<Product<V>> {
-        self.engine.selected(context)?.1.ret.clone()
+        let transfer = self.driver.into_inner();
+        let state = SparseForwardResults {
+            _semantics: PhantomData,
+            root,
+            env: transfer.env,
+            contexts: transfer
+                .contexts
+                .into_iter()
+                .map(|(env, context)| (env, (context.target, context.ret)))
+                .collect(),
+        };
+        Ok(Analyzed::new(state, contexts))
     }
 }
 

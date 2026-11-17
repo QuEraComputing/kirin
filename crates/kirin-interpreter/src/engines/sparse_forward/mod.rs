@@ -13,3 +13,6 @@ pub use interp::{
     CallContext, ContextInsensitive, SparseForwardInterpreter, SparseForwardTransfer,
     WideningStrategy,
 };
+
+mod results;
+pub use results::SparseForwardResults;

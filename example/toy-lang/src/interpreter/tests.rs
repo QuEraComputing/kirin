@@ -1087,11 +1087,14 @@ mod dense {
 
     /// Run classic dense liveness with the toy total frame, returning the
     /// analyzed root's CFG alongside the result.
-    fn analyze_dense_toy<'ir>(
-        program: &'ir Program<Stage>,
+    fn analyze_dense_toy(
+        program: &Program<Stage>,
         caller_stage: CompileStage,
         callee: Callee,
-    ) -> (Analyzed<ToyDenseLiveness<'ir>>, CFG) {
+    ) -> (
+        Analyzed<kirin_interpreter::DenseBackwardResults<kirin_liveness::LiveSet>>,
+        CFG,
+    ) {
         let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
         let analyzed = engine
             .analyze(caller_stage, callee)

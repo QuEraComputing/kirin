@@ -642,9 +642,18 @@ engine, so a failed discovery is never reused.
 ### Reading results — `Analyzed` and `AnalysisResults`
 
 Every abstract engine's `analyze` consumes the engine and returns
-`Analyzed<Engine>`: the converged state of exactly one analysis. It has no
+`Analyzed<Results>`: an owned snapshot of exactly one converged analysis. It has no
 `analyze` of its own, so it always has one root and never mixes two runs.
-All three engines implement one read-only trait on it:
+Each engine moves its fact store into its own result state:
+`SparseForwardResults<K, V, Sem = ForwardEval>`,
+`SparseBackwardResults<K, V, Sem = StrongDemand>`, or
+`DenseBackwardResults<V, Sem = ClassicLiveness>`. These states retain no engine or borrow of
+`Program<S>`; keys and lattice values retain only their own type constraints.
+Each result preserves the engine's semantic key through a zero-sized marker, so
+two keys sharing a solver shape still produce distinct result types. The
+`is_demanded()` helper exists only for `SparseBackwardResults<_, _, StrongDemand>`;
+other sparse-backward semantics use the generic fact queries.
+The three result states keep separate implementations of the same read-only trait:
 
 ```rust
 pub trait AnalysisResults {
@@ -700,7 +709,7 @@ environments and are never stored. They join the contexts **reached from the
 root**: they claim nothing about callers the analysis did not visit, and
 whether that is safe for a rewrite is the client's decision.
 
-`Analyzed` stores one thing beside the engine: an index from each reached
+`Analyzed` stores one thing beside the owned result state: an index from each reached
 callable to its contexts' environments, built once when `analyze` finishes.
 The sparse engines' `contexts_of` reads it and maps each environment back to
 its context through `EnvStore::key`, so a per-callable query visits only that
@@ -709,6 +718,19 @@ callable's contexts. Liveness has one context and keeps the provided scan.
 Every per-context query is keyed by context, so a context is a query key and
 `response`/`facts` its value. That keeps the API compatible with a later
 query-based (memoized, incremental) engine, which this is not.
+
+Forward results retain each reached context's callable and return summary.
+Backward results retain the callable and ordered entry-parameter IDs;
+`response` gathers their facts on demand, substituting bottom for absent
+facts, without consulting the program. Dense results retain the root and
+point-fact environment; their response remains `None`. Worklists, caller
+dependencies, frame stacks, linkers, and program references are discarded.
+
+The program may be edited or dropped while results remain readable. These
+are facts about the analyzed snapshot, not automatically valid facts about
+edited IR; clients are responsible for invalidation. Existing
+`AnalysisResults` calls are unchanged, but explicitly named return types
+must use the result state rather than the borrowing engine.
 
 The analysis crates add no result types: `kirin-constprop`, `kirin-demand`
 and `kirin-liveness` export a lattice, a policy, and an engine alias

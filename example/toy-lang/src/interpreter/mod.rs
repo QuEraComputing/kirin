@@ -22,8 +22,9 @@ use kirin::prelude::{CFG, CompileStage, Program};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_demand::DemandAnalysis;
 use kirin_interpreter::engine::{
-    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
-    SparseForwardInterpreter, expect_single,
+    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, DenseBackwardResults,
+    LinkTarget, Linker, SameStageLinker, SparseBackwardResults, SparseForwardInterpreter,
+    expect_single,
 };
 use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
 use kirin_liveness::{DenseLiveness, LiveSet};
@@ -171,11 +172,11 @@ where
 ///
 /// Stage-pinned: a `function_name` with no live specialization at `stage_name`
 /// is an error, not a cue to analyze some other stage's body.
-pub fn analyze_classic_liveness<'ir>(
-    program: &'ir Program<Stage>,
+pub fn analyze_classic_liveness(
+    program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(CompileStage, CFG, Analyzed<ToyDenseLiveness<'ir>>), InterpreterError> {
+) -> Result<(CompileStage, CFG, Analyzed<DenseBackwardResults<LiveSet>>), InterpreterError> {
     let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
     let analyzed = analysis.analyze_by_name(stage_name, function_name)?;
     let root = *analyzed.root();
@@ -190,11 +191,16 @@ pub fn analyze_classic_liveness<'ir>(
 /// Run strong liveness (sparse backward demand) over `function_name`'s body
 /// at `stage_name`. Independent of [`analyze_classic_liveness`], and
 /// stage-pinned in the same way.
-pub fn analyze_demand<'ir>(
-    program: &'ir Program<Stage>,
+pub fn analyze_demand(
+    program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<Analyzed<DemandAnalysis<'ir, Stage>>, InterpreterError> {
+) -> Result<
+    Analyzed<
+        SparseBackwardResults<(LinkTarget, kirin_demand::DemandCallCtx), kirin_demand::Demand>,
+    >,
+    InterpreterError,
+> {
     let stage = program
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;

@@ -11,3 +11,6 @@ pub use interp::{
     DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardProfile,
     DenseBackwardTransfer, PointFacts, SuccessorEdge,
 };
+
+mod results;
+pub use results::DenseBackwardResults;
