@@ -61,8 +61,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every [`new_result`](Rewriter::new_result) value no insert
-    /// bound, so no empty, live-looking slot outlives the `Rewriter`.
+    /// bound and every [`new_block`](Rewriter::new_block) block no statement
+    /// owns, so neither outlives the `Rewriter`.
     fn drop(&mut self) {
+        for block in std::mem::take(&mut self.unowned_blocks) {
+            self.tombstone_block(block);
+        }
         for (value, _) in self.unbound_ssa_results.drain() {
             let _ = self.stage.ssas.delete(value);
         }

@@ -1,12 +1,51 @@
-//! Bodies owned by a statement, for [`Rewriter::replace_statement`] and
-//! statement erasure.
+//! Bodies owned by a statement: creating a block for one, and adopting or
+//! tombstoning bodies for [`Rewriter::replace_statement`] and statement
+//! erasure.
 
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
-use crate::{BlockParent, Body, Dialect, RewriteError, Rewriter, Statement, StatementParent};
+use crate::node::linked_list::LinkedListNode;
+use crate::{
+    Block, BlockArgument, BlockInfo, BlockParent, Body, Dialect, RewriteError, Rewriter, Statement,
+    StatementParent,
+};
 
 impl<L: Dialect> Rewriter<'_, L> {
+    /// Create an empty block with arguments of `arg_types`, owned by nothing.
+    ///
+    /// The block is meant to become a statement's body, such as a branch of
+    /// an `scf.if`: fill it, then name it in a definition passed to
+    /// [`Rewriter::replace_statement`], which makes the statement its parent.
+    /// Statements can be added to it like any block, starting with its
+    /// terminator ([`Rewriter::insert_terminator`]).
+    ///
+    /// A block no statement owns when the `Rewriter` is dropped is tombstoned
+    /// together with everything it holds.
+    ///
+    /// Records no event: a block owned by nothing is not part of the IR yet.
+    /// The statement that adopts it records
+    /// [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
+    pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
+        let block = self.stage.nodes.blocks.alloc_with_id(|id| {
+            BlockInfo::builder()
+                .node(LinkedListNode::new(id))
+                .arguments(Vec::new())
+                .predecessors(SmallVec::new())
+                .new()
+        });
+        let args: Vec<BlockArgument> = arg_types
+            .into_iter()
+            .enumerate()
+            .map(|(index, ty)| self.alloc_block_argument(block, index, ty))
+            .collect();
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.arguments = args;
+        }
+        self.unowned_blocks.insert(block);
+        block
+    }
+
     /// Tombstone `body` and everything nested in it.
     pub(super) fn tombstone_body(&mut self, body: Body) {
         match body {
@@ -101,6 +140,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     pub(super) fn adopt_body(&mut self, body: Body, owner: Statement) {
         match body {
             Body::Block(block) => {
+                self.unowned_blocks.remove(&block);
                 if let Some(item) = block.get_info_mut(self.stage) {
                     item.parent = Some(BlockParent::Statement(owner));
                 }

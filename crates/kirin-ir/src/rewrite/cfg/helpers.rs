@@ -171,7 +171,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Allocate block argument `index` of `block`.
-    pub(super) fn alloc_block_argument(
+    pub(in crate::rewrite) fn alloc_block_argument(
         &mut self,
         block: Block,
         index: usize,

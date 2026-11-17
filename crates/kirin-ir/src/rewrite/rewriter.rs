@@ -80,7 +80,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use indexmap::{IndexMap, IndexSet};
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use crate::arena::{GetInfo, GetInfoMut};
 use smallvec::SmallVec;
@@ -462,6 +462,8 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
     /// their types. Their arena slots stay empty until bound.
     pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
+    /// Blocks from [`Rewriter::new_block`] that no statement owns yet.
+    pub(super) unowned_blocks: FxHashSet<Block>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -470,6 +472,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             stage,
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
+            unowned_blocks: FxHashSet::default(),
         }
     }
 
