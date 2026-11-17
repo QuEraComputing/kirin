@@ -105,6 +105,12 @@ use crate::{
 /// Events are the typed replacement for a single "something changed" flag:
 /// analyses can subscribe to the event kinds that invalidate them, and
 /// worklist drivers can re-enqueue the statements named in the events.
+///
+/// Edits to detached code, such as a [`Rewriter::new_block`] block no
+/// statement owns yet, record events like any other edit. Creating detached
+/// code records nothing, and neither does tombstoning it when the `Rewriter`
+/// drops; the statement that attaches it records its usual event. An id an
+/// event names may therefore be dead by the time the log is read.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum MutationEvent {
     /// One or more operand slots of `stmt` were rewritten in place.

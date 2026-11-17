@@ -35,7 +35,8 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// nothing reports it.
     ///
     /// Records no event: a block owned by nothing is not part of the IR yet.
-    /// The statement that adopts it records
+    /// Edits inside it record their usual events. The statement that adopts it
+    /// records
     /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
     /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
