@@ -14,6 +14,7 @@ This dialect maps `ast.Assert` nodes to the `Assert` statement.
 import ast
 
 from kirin import ir, types, interp, lowering
+from kirin.analysis import const
 from kirin.decl import info, statement
 from kirin.print import Printer
 
@@ -22,8 +23,12 @@ dialect = ir.Dialect("py.assert")
 
 @statement(dialect=dialect)
 class Assert(ir.Statement):
+    # MaybePure: an assert whose condition is known to be True has no effect, so
+    # constant propagation can treat it as pure (see ConstProp below).
+    traits = frozenset({ir.MaybePure()})
     condition: ir.SSAValue
     message: ir.SSAValue = info.argument(types.String)
+    purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
@@ -68,6 +73,18 @@ class Concrete(interp.MethodTable):
             raise AssertionError(frame.get(stmt.message))
         else:
             raise AssertionError("Assertion failed")
+
+
+@dialect.register(key="constprop")
+class ConstProp(interp.MethodTable):
+
+    @interp.impl(Assert)
+    def assert_stmt(self, interp_: const.Propagate, frame: const.Frame, stmt: Assert):
+        # Same test as the concrete impl: only a condition that is exactly True passes.
+        condition = frame.get(stmt.condition)
+        if isinstance(condition, const.Value) and condition.data is True:
+            frame.should_be_pure.add(stmt)
+        return ()
 
 
 @dialect.register(key="typeinfer")
