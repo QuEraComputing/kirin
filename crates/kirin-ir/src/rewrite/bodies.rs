@@ -27,12 +27,14 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// uses too. To abandon the block early, call [`Rewriter::erase_block`].
     ///
     /// A block no statement owns when the `Rewriter` is dropped is tombstoned
-    /// together with everything it holds, unless the pass panicked, in which
-    /// case it is left for inspection. Unlike [`Rewriter::erase_block`], the
-    /// drop does not check that nothing outside still refers to the block: a
-    /// branch to it, or a use of a value it defines, is left dangling, for
-    /// [`verify_derived`](crate::verify_derived) to report at the pass
-    /// boundary.
+    /// together with everything it holds, unless the drop follows a panic, in
+    /// which case it is left for inspection. Unlike [`Rewriter::erase_block`],
+    /// the drop does not check that nothing outside still refers to the block:
+    /// a branch to it, or a use of a value it defines, is left dangling. When
+    /// a pass run by [`Program::run_pass`](crate::Program::run_pass) succeeds,
+    /// [`verify_derived`](crate::verify_derived) then finds it and the stage is
+    /// quarantined. When the pass fails, or the `Rewriter` is used directly,
+    /// nothing reports it.
     ///
     /// Records no event: a block owned by nothing is not part of the IR yet.
     /// The statement that adopts it records

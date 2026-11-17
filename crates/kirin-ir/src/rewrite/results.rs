@@ -77,7 +77,7 @@ impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// again. Two cases are covered. When this `Rewriter` is dropped while a
     /// panic unwinds, a second panic would abort the process. When the pass
     /// boundary has caught the panic, the unwind is over before this drop
-    /// runs, so it sets [`keep_detached_on_drop`](Rewriter::keep_detached_on_drop)
+    /// runs, so it sets `keep_detached_on_drop`
     /// instead; a second panic would escape the boundary and lose the
     /// quarantined stage, which keeps the blocks for inspection.
     fn drop(&mut self) {
