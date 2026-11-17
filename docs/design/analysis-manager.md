@@ -289,10 +289,13 @@ db.register::<ConstPropFacts>().register::<DemandFacts>();
 // The rule set says which analyses its rules read; the database computes the
 // missing ones, then runs the pass. Afterwards it drops them if anything
 // changed.
-db.run_pass(stage, rules.required(), |rewriter, cache| driver.run(rewriter, cache))?;
+let fold = |rewriter: &mut Rewriter<_>, cache: &AnalysisCache| {
+    RewriteDriver::new(&rules).with_cache(cache).run(rewriter)
+};
+db.run_pass(stage, rules.required(), fold)?;
 
 // The fold edited the IR, so this pass gets a fresh constprop result.
-db.run_pass(stage, rules.required(), |rewriter, cache| driver.run(rewriter, cache))?;
+db.run_pass(stage, rules.required(), fold)?;
 
 let pipeline = db.into_pipeline();
 ```
@@ -411,8 +414,10 @@ pass, is therefore kept.
 
 As in MLIR, where a pattern receives analysis results in its constructor, a
 native rule receives them in its **recipe**: the function the rule set calls
-to build a fresh rule for each sweep (or each block). The rule keeps the
-`Arc`s it needs. A rule also declares what it requires:
+to build a fresh rule for each sweep (or each block). A recipe is a
+`Fn(&AnalysisCache) -> R`, and the rule keeps the `Arc`s it needs. Adding a
+native rule returns an `AddedRule`, through which the rule declares what it
+requires:
 
 ```rust
 // Sound only if `main` is the program's only entry point.
@@ -432,18 +437,20 @@ A rule is built knowing the keys it reads. A rule that reads several
 analyses, or one analysis for several keys, declares each with its own
 `.requires`.
 
-`rules.required()` lists every rule's requirements, each once, for
-`Database::run_pass`. As a safety net, before its first sweep the driver also
-checks every requirement against the `AnalysisCache` it was given and fails
-with `DriverError::MissingAnalysis` naming the rule and the analysis. That
-catches a driver run through a plain `Pipeline::run_pass`, or a pass handing
-`run_pass` a different list. A rule's `apply` signature does not change.
+`rules.required()` lists every rule's requirements, in rule order, for
+`Database::run_pass`. A result two rules read is listed twice; computing it
+the second time is a cache hit.
+
+The driver gets the cache through `RewriteDriver::with_cache(cache)`, and
+builds native rules from an empty cache without it. As a safety net, before
+its first sweep the driver checks every requirement against its cache and
+fails with `DriverError::MissingAnalysis` naming the rule and the analysis,
+before editing anything. That catches a driver run through a plain
+`Pipeline::run_pass`, or a pass handing `run_pass` a different list. A rule's
+`apply` signature does not change.
 
 In M3 only native rules read results. Pattern rules can use the same recipe
 approach later, if a client needs it.
-
-The details (the exact recipe signature, and how the driver receives
-`AnalysisCache`) are settled in step 2.
 
 ## Roots and reads
 
@@ -591,8 +598,10 @@ Each step is reviewed before the next starts.
    a failed pass drops everything; `pipeline_mut()` drops everything; a pass
    reads the results computed before it.
 2. **Rules read results.** Recipes receive `&AnalysisCache`;
-   `.requires::<A>(key)`; `RuleSet::required()`; the driver checks
-   requirements and fails with `MissingAnalysis`.
+   `AddedRule::requires::<A>(key)`; `RuleSet::required()`;
+   `RewriteDriver::with_cache`; the driver checks requirements and fails with
+   `MissingAnalysis`. Tests in
+   `crates/kirin-rewrite/tests/rule_requirements.rs`.
 3. **Constprop client.** Needs the [interpreter
    changes](#interpreter-changes-for-review). The `ConstPropFacts` analysis
    type and its `Analysis` impl for a test language; a test-only
