@@ -65,34 +65,37 @@ impl<L: Dialect> Rewriter<'_, L> {
         }
     }
 
-    /// Check that the existing statement `owner` can keep or adopt `body`: it
-    /// already owns it, or the body is live, owned by nothing, and does not
-    /// contain `owner`.
-    pub(super) fn check_can_keep_or_adopt(
+    /// Check the bodies a definition names, for a statement under `parent`.
+    ///
+    /// `bodies` is every body the definition names, in order. `kept` is the
+    /// bodies the statement already owns and keeps: empty for a statement
+    /// being inserted, and the old definition's bodies for a replacement.
+    ///
+    /// Each body in `bodies` must be named once
+    /// ([`RewriteError::BodyListedTwice`]), and each one not in `kept` must be
+    /// adoptable by a statement under `parent` (see
+    /// [`check_can_adopt`](Self::check_can_adopt)).
+    pub(super) fn check_new_bodies(
         &self,
-        body: Body,
-        owner: Statement,
-    ) -> Result<(), RewriteError> {
-        match self.body_owner(body)? {
-            Some(current) if current == owner => Ok(()),
-            Some(_) => Err(RewriteError::BodyOwnedElsewhere(body)),
-            None => match owner.expect_info(self.stage).parent {
-                Some(parent) if self.body_contains(body, parent) => {
-                    Err(RewriteError::BodyEnclosesOwner(body))
-                }
-                _ => Ok(()),
-            },
-        }
-    }
-
-    /// Check that a new statement under `parent` can adopt `body`: it is live,
-    /// owned by nothing, and does not contain `parent`, which would make the
-    /// statement its own ancestor.
-    pub(super) fn check_can_adopt(
-        &self,
-        body: Body,
+        bodies: &[Body],
+        kept: &[Body],
         parent: StatementParent,
     ) -> Result<(), RewriteError> {
+        for (index, &body) in bodies.iter().enumerate() {
+            if bodies[..index].contains(&body) {
+                return Err(RewriteError::BodyListedTwice(body));
+            }
+            if !kept.contains(&body) {
+                self.check_can_adopt(body, parent)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Check that a statement under `parent` can adopt `body`: it is live,
+    /// owned by nothing, and does not contain `parent`, which would make the
+    /// statement its own ancestor.
+    fn check_can_adopt(&self, body: Body, parent: StatementParent) -> Result<(), RewriteError> {
         if self.body_owner(body)?.is_some() {
             return Err(RewriteError::BodyOwnedElsewhere(body));
         }

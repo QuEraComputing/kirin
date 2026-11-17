@@ -1444,14 +1444,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // Bodies kept from the old definition stay as they are; a body the
         // new one gains must be free for `stmt` to own.
         let new_bodies = bodies_of(definition);
-        for (index, &body) in new_bodies.iter().enumerate() {
-            if new_bodies[..index].contains(&body) {
-                return Err(RewriteError::BodyListedTwice(body));
-            }
-            if !old_bodies.contains(&body) {
-                self.check_can_keep_or_adopt(body, stmt)?;
-            }
-        }
+        self.check_new_bodies(&new_bodies, &old_bodies, parent)?;
         let dropped_bodies = old_bodies
             .iter()
             .copied()

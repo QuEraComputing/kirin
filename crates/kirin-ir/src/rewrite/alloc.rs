@@ -37,13 +37,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 return Err(RewriteError::UnknownValue(operand));
             }
         }
-        let bodies = bodies_of(definition);
-        for (index, &body) in bodies.iter().enumerate() {
-            if bodies[..index].contains(&body) {
-                return Err(RewriteError::BodyListedTwice(body));
-            }
-            self.check_can_adopt(body, parent)?;
-        }
+        self.check_new_bodies(&bodies_of(definition), &[], parent)?;
         Ok((results, operands))
     }
 
