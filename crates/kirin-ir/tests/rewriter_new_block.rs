@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{BuilderDialect, TestType, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, new_stage};
 use kirin_ir::*;
 
 /// `owner = own_blocks { } { }` in `outer`, whose argument `x` the new blocks
@@ -121,7 +121,7 @@ fn unowned_new_block_is_tombstoned_on_drop() {
         let block = rewriter.new_block([TestType::I32]);
         let arg: SSAValue = block.expect_info(rewriter.stage()).arguments()[0].into();
         let used = fill(&mut rewriter, block, f.x);
-        (block, arg, used, rewriter.drain_events())
+        (block, arg, used, rewriter.events().to_vec())
     };
 
     assert!(block.get_info(&f.stage).is_none());
@@ -149,15 +149,21 @@ fn inserted_statement_adopts_new_blocks() {
     let mut f = fixture();
     let (then_block, else_block, new_owner, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
+        let mut cursor = EventCursor::default();
         let then_block = rewriter.new_block([]);
         fill(&mut rewriter, then_block, f.x);
         let else_block = rewriter.new_block([]);
         fill(&mut rewriter, else_block, f.x);
-        rewriter.drain_events();
+        cursor.advance(&rewriter);
         let new_owner = rewriter
             .insert_after(f.owner, BuilderDialect::OwnBlocks(then_block, else_block))
             .unwrap();
-        (then_block, else_block, new_owner, rewriter.drain_events())
+        (
+            then_block,
+            else_block,
+            new_owner,
+            cursor.read_and_advance(&rewriter),
+        )
     };
 
     assert_eq!(
@@ -268,11 +274,12 @@ fn erase_block_discards_an_unowned_new_block() {
     let mut f = fixture();
     let (block, used, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
+        let mut cursor = EventCursor::default();
         let block = rewriter.new_block([TestType::I32]);
         let used = fill(&mut rewriter, block, f.x);
-        rewriter.drain_events();
+        cursor.advance(&rewriter);
         rewriter.erase_block(block).unwrap();
-        (block, used, rewriter.drain_events())
+        (block, used, cursor.read_and_advance(&rewriter))
     };
 
     assert_eq!(events, [], "the block was never part of the IR");
