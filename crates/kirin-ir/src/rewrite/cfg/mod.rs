@@ -25,7 +25,7 @@
 //!
 //! Every block-level method requires its blocks to be members of a `CFG`
 //! block list; statement-owned single-block bodies are rejected with
-//! [`RewriteError::NotInCfgBody`](super::RewriteError::NotInCfgBody). The one
+//! [`RewriteError::BlockNotInCfg`](super::RewriteError::BlockNotInCfg). The one
 //! exception is [`Rewriter::erase_block`](super::Rewriter::erase_block), which
 //! also erases a [`Rewriter::new_block`](super::Rewriter::new_block) block no
 //! statement owns yet.

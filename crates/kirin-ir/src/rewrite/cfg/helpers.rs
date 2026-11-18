@@ -16,11 +16,11 @@ use crate::rewrite::rewriter::{
 /// Shared lookups and block-list plumbing for the CFG surgery methods.
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// The CFG whose block list holds the live block `block`, or
-    /// [`RewriteError::UnknownBlock`] / [`RewriteError::NotInCfgBody`].
+    /// [`RewriteError::UnknownBlock`] / [`RewriteError::BlockNotInCfg`].
     pub(super) fn owning_cfg(&self, block: Block) -> Result<CFG, RewriteError> {
         match self.live_block(block)?.parent {
             Some(BlockParent::CFG(cfg)) => Ok(cfg),
-            _ => Err(RewriteError::NotInCfgBody(block)),
+            _ => Err(RewriteError::BlockNotInCfg(block)),
         }
     }
 

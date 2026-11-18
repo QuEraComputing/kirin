@@ -1984,7 +1984,7 @@ axis — hence the column.
 | `UnexpectedEdgeStatement` | guard | `insert_ungraph_node` was given an edge statement | `insert_ungraph_node` |
 | `ExpectedEdgeStatement` | guard | `insert_ungraph_edge` was given a node | `insert_ungraph_edge` |
 | `EdgeStatementWithOperands` | guard | an edge statement has operands; a wire consumes no values | `insert_ungraph_edge`, `replace_statement` |
-| `NotInCfgBody(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods (`erase_block` also accepts an unowned `new_block` block) |
+| `BlockNotInCfg(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods (`erase_block` also accepts an unowned `new_block` block) |
 | `CfgMismatch { block, expected }` | guard | the block belongs to a different `Cfg` than required | `merge_blocks` |
 | `CannotMergeBlockIntoItself(block)` | guard | `merge_blocks` was given the same block twice | `merge_blocks` |
 | `ExpectedTerminator` | guard | the definition is not a terminator | `insert_terminator` |

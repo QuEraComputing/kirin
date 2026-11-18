@@ -115,7 +115,7 @@ fn append_and_insert_blocks_reject_unknown_and_non_cfg_anchors() {
     );
     assert_eq!(
         rw.insert_block_after(lone, []),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     assert_eq!(
         rw.insert_block_before(dead_block, []),
@@ -524,7 +524,7 @@ fn split_block_rejects_unknown_and_non_cfg_statements() {
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
         rw.split_block(lone_nop),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     assert_eq!(
         rw.split_block(dead_stmt),
@@ -873,7 +873,7 @@ fn merge_blocks_rejects_illegal_merges() {
     );
     assert_eq!(
         rw.merge_blocks(lone, succ, &[real_arg]),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     assert!(rw.events().is_empty());
     assert!(succ.get_info(rw.stage()).is_some());
