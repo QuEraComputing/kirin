@@ -1,5 +1,5 @@
 use crate::arena::GetInfo;
-use crate::{Block, CFG, Dialect};
+use crate::{Block, Body, CFG, Dialect};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
 
@@ -71,7 +71,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// For a block in a CFG, records [`MutationEvent::ChangedBlockList`] then
     /// [`MutationEvent::ChangedCfg`].
     pub fn erase_block(&mut self, block: Block) -> Result<(), RewriteError> {
-        let cfg = if self.unowned_blocks.contains(&block) {
+        let cfg = if self.unowned_bodies.contains(&Body::Block(block)) {
             None
         } else {
             Some(self.owning_cfg(block)?)
@@ -87,7 +87,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 self.events.push(MutationEvent::ChangedCfg { cfg });
             }
             None => {
-                self.unowned_blocks.remove(&block);
+                self.unowned_bodies.remove(&Body::Block(block));
                 self.tombstone_block(block);
             }
         }

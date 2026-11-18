@@ -498,8 +498,9 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
     /// their types. Their arena slots stay empty until bound.
     pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
-    /// Blocks from [`Rewriter::new_block`] that no statement owns yet.
-    pub(super) unowned_blocks: FxHashSet<Block>,
+    /// Bodies this `Rewriter` created, such as [`Rewriter::new_block`]
+    /// blocks, that no statement owns yet.
+    pub(super) unowned_bodies: FxHashSet<Body>,
     /// Leave detached code in place on drop, set after a caught panic.
     pub(super) keep_detached_on_drop: bool,
 }
@@ -510,7 +511,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             stage,
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
-            unowned_blocks: FxHashSet::default(),
+            unowned_bodies: FxHashSet::default(),
             keep_detached_on_drop: false,
         }
     }

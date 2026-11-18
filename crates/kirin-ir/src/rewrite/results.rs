@@ -69,23 +69,24 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every [`new_result`](Rewriter::new_result) value no insert
-    /// bound and every [`new_block`](Rewriter::new_block) block no statement
-    /// owns, so neither outlives the `Rewriter`.
+    /// bound and every body this `Rewriter` created (such as a
+    /// [`new_block`](Rewriter::new_block) block) that no statement owns, so
+    /// neither outlives the `Rewriter`.
     ///
-    /// After a panic the blocks are left in place: a panic part-way through
+    /// After a panic the bodies are left in place: a panic part-way through
     /// an edit can leave them inconsistent, so tombstoning them could panic
     /// again. Two cases are covered. When this `Rewriter` is dropped while a
     /// panic unwinds, a second panic would abort the process. When the pass
     /// boundary has caught the panic, the unwind is over before this drop
     /// runs, so it sets `keep_detached_on_drop`
     /// instead; a second panic would escape the boundary and lose the
-    /// quarantined stage, which keeps the blocks for inspection.
+    /// quarantined stage, which keeps the bodies for inspection.
     fn drop(&mut self) {
         // TODO: when the insertion API is updated later, skip tombstoning
         // detached statements under this same condition.
         if !self.keep_detached_on_drop && !std::thread::panicking() {
-            for block in std::mem::take(&mut self.unowned_blocks) {
-                self.tombstone_block(block);
+            for body in std::mem::take(&mut self.unowned_bodies) {
+                self.tombstone_body(body);
             }
         }
         for (value, _) in self.unbound_ssa_results.drain() {
