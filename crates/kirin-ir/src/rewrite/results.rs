@@ -70,10 +70,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every detached statement no [`insert`](Rewriter::insert)
-    /// placed, with its results, operand uses and bodies, every
-    /// [`new_block`](Rewriter::new_block) block no statement owns, every
-    /// detached CFG (such as a [`clone_cfg`](Rewriter::clone_cfg) copy) no
-    /// statement adopted, and every
+    /// placed, with its results, operand uses and bodies, every body this
+    /// `Rewriter` created (such as a [`new_block`](Rewriter::new_block) block)
+    /// that no statement owns, every detached CFG (such as a
+    /// [`clone_cfg`](Rewriter::clone_cfg) copy) no statement adopted, and every
     /// [`new_result`](Rewriter::new_result) value no statement bound, so
     /// nothing detached or empty outlives the `Rewriter`.
     ///
@@ -90,8 +90,8 @@ impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
             for stmt in std::mem::take(&mut self.detached) {
                 self.tombstone_statement(stmt, None);
             }
-            for block in std::mem::take(&mut self.unowned_blocks) {
-                self.tombstone_block(block);
+            for body in std::mem::take(&mut self.unowned_bodies) {
+                self.tombstone_body(body);
             }
             for cfg in std::mem::take(&mut self.detached_cfgs) {
                 self.tombstone_body(Body::CFG(cfg));

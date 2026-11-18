@@ -41,7 +41,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
         let block = self.alloc_block(None, arg_types);
-        self.unowned_blocks.insert(block);
+        self.unowned_bodies.insert(Body::Block(block));
         block
     }
 
@@ -177,9 +177,9 @@ impl<L: Dialect> Rewriter<'_, L> {
 
     /// Make `owner` the parent of `body`, which is no longer detached.
     pub(super) fn adopt_body(&mut self, body: Body, owner: Statement) {
+        self.unowned_bodies.remove(&body);
         match body {
             Body::Block(block) => {
-                self.unowned_blocks.remove(&block);
                 if let Some(item) = block.get_info_mut(self.stage) {
                     item.parent = Some(BlockParent::Statement(owner));
                 }
