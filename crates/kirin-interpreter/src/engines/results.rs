@@ -37,7 +37,7 @@ pub struct AnalysisResults<K, A: LatticeAnchor, V, Sem> {
     _semantics: PhantomData<fn() -> Sem>,
 }
 
-impl<K, A: LatticeAnchor, V, Sem> AnalysisResults<K, A, V, Sem> {
+impl<K: Clone + Eq + Hash, A: LatticeAnchor, V, Sem> AnalysisResults<K, A, V, Sem> {
     /// Take ownership of a converged engine's fact store, with each reached
     /// context's environment, callable and response. Every engine builds its
     /// result here, including a downstream engine.
@@ -46,16 +46,17 @@ impl<K, A: LatticeAnchor, V, Sem> AnalysisResults<K, A, V, Sem> {
     /// context's facts, each environment registered under its context key;
     /// `contexts` lists each reached context once, as its environment in
     /// `env`, the callable it analyzes, and its response (`None` if it has no
-    /// answer). Contexts left out of `contexts` are not reached: reads skip
-    /// them.
+    /// answer). Keyed environments left out of `contexts` are freed here.
+    ///
+    /// Panics if `root` is not a reached context.
     pub fn new(
         root: K,
-        env: EnvStore<K, A, V>,
+        mut env: EnvStore<K, A, V>,
         contexts: impl IntoIterator<Item = (EnvIndex, LinkTarget, Option<Product<V>>)>,
     ) -> Self {
         let mut by_callable: HashMap<LinkTarget, Vec<EnvIndex>> = HashMap::new();
         let mut by_stage: HashMap<CompileStage, Vec<EnvIndex>> = HashMap::new();
-        let contexts = contexts
+        let contexts: HashMap<_, _> = contexts
             .into_iter()
             .map(|(index, callable, response)| {
                 by_callable.entry(callable).or_default().push(index);
@@ -63,6 +64,18 @@ impl<K, A: LatticeAnchor, V, Sem> AnalysisResults<K, A, V, Sem> {
                 (index, (callable, response))
             })
             .collect();
+        assert!(
+            env.context_env(&root)
+                .is_some_and(|index| contexts.contains_key(&index)),
+            "the root must be a reached context"
+        );
+        let unreached: Vec<_> = env
+            .contexts()
+            .filter_map(|(_, index)| (!contexts.contains_key(&index)).then_some(index))
+            .collect();
+        for index in unreached {
+            env.free(index).expect("context environments are live");
+        }
         Self {
             root,
             env,
@@ -88,10 +101,7 @@ where
     /// Every context reached from the root, the root included, in no
     /// particular order.
     pub fn contexts(&self) -> impl Iterator<Item = &K> {
-        self.env
-            .contexts()
-            .filter(|(_, index)| self.contexts.contains_key(index))
-            .map(|(key, _)| key)
+        self.env.contexts().map(|(key, _)| key)
     }
 
     /// Which callable `context` is a copy of; `None` if the analysis did not
@@ -190,9 +200,7 @@ where
 
     /// The environment of `key`, if the analysis reached it.
     fn reached(&self, key: &K) -> Option<EnvIndex> {
-        self.env
-            .context_env(key)
-            .filter(|index| self.contexts.contains_key(index))
+        self.env.context_env(key)
     }
 
     /// The join of the fact at `anchor` over the environments of one index
