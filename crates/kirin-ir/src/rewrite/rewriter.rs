@@ -291,7 +291,7 @@ pub enum RewriteError {
     CfgSplicedIntoItself { source: CFG, anchor: Block },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
-    NotInCfgBody(Block),
+    BlockNotInCfg(Block),
     /// The block belongs to a different CFG than the operation's CFG.
     CfgMismatch { block: Block, expected: CFG },
     /// `merge_blocks` was asked to merge a block into itself.
@@ -466,7 +466,7 @@ impl fmt::Display for RewriteError {
             RewriteError::YieldIndexOutOfRange { graph, index } => {
                 write!(f, "yield index {index} is out of range for DiGraph {graph}")
             }
-            RewriteError::NotInCfgBody(block) => {
+            RewriteError::BlockNotInCfg(block) => {
                 write!(f, "block {block:?} is not part of a CFG block list")
             }
             RewriteError::CfgMismatch { block, expected } => {

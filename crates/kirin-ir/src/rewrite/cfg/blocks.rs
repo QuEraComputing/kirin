@@ -62,7 +62,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `block` is unknown, is neither
     /// in a CFG nor an unowned [`Rewriter::new_block`] block
-    /// ([`RewriteError::NotInCfgBody`]), if another block still branches to it
+    /// ([`RewriteError::BlockNotInCfg`]), if another block still branches to it
     /// ([`RewriteError::BlockHasPredecessors`]; retarget those edges first,
     /// a self-loop is fine), or if a value it defines is used outside it
     /// ([`RewriteError::BlockArgumentInUse`] /

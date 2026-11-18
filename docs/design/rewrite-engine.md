@@ -2024,7 +2024,7 @@ axis — hence the column.
 | `YieldIndexOutOfRange { graph, index }` | liveness | yield index past the graph's yield list | `replace_yield` |
 | `UnknownUnGraph(graph)` | liveness | the `UnGraph` id does not resolve to a live `UnGraph` | `create`/`insert` at `UnGraph` |
 | `EdgeStatementWithOperands` | guard | an edge statement has operands; a wire consumes no values | `create`/`insert` at `UnGraph`, `replace_statement` |
-| `NotInCfgBody(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods (`erase_block` also accepts an unowned `new_block` block) |
+| `BlockNotInCfg(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods (`erase_block` also accepts an unowned `new_block` block) |
 | `CfgMismatch { block, expected }` | guard | the block belongs to a different `Cfg` than required | `merge_blocks` |
 | `CannotMergeBlockIntoItself(block)` | guard | `merge_blocks` was given the same block twice | `merge_blocks` |
 | `ExpectedTerminator` | guard | the inserted statement is not a terminator | `create`/`insert` at `Terminator` |
