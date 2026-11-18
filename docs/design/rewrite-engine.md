@@ -31,8 +31,9 @@ The first implementation should be conservative:
    and verify its incrementally maintained derived mirrors before returning it.
 3. Add the permanent native-rule path with a simple walk/fixpoint scheduler.
 4. Add structural single-statement wildcard matching and ordered replacements.
-5. Drop cached analyses when mutation begins; defer persistent revision-based
-   caching.
+5. Compute analysis results before a pass and keep them across passes that
+   don't edit; drop all of them after a pass that does. Defer keeping the
+   results an edit did not affect.
 6. Leave rule constraints, semantic proofs, SMT integration, CFG-wide matching,
    graph matching, and equality saturation as later layers.
 
@@ -104,7 +105,7 @@ flowchart TB
     RD["RewriteDriver<br/>Walk · Chain · Fixpoint"]:::partial
     WM["WildcardMatcher"]:::planned
     RI["RuleIndex<br/>root-op indexing"]:::planned
-    AM["AnalysisManager<br/>drop cache on mutation"]:::planned
+    AM["Database<br/>caches analysis results · drops them after an edit"]:::partial
   end
 
   subgraph L2["kirin-wildcard — rule data"]
@@ -163,7 +164,7 @@ Diagram C.
 
 ```mermaid
 flowchart TB
-  PUB["Owned StageInfo"] --> OWN["run_pass owns stage<br/>drop cached analyses"]
+  PUB["Owned StageInfo"] --> OWN["run_pass owns stage"]
   RR["RewriteRule<br/>(kirin-wildcard)"] --> M["WildcardMatcher<br/>(kirin-rewrite)"]
   RI["RuleIndex root-op"] --> M
   OWN --> IRIN["Current in-place IR<br/>(operationally coherent,<br/>possibly verification-invalid)"]
@@ -185,8 +186,9 @@ flowchart TB
   OUT -.->|optional future program step| VER["Independent whole-stage Verifier"]
   VER -->|success| VOUT["Verified StageInfo"]
   VER -->|failure| ABT
-  OWN --> AM["AnalysisManager<br/>drop cached results"]
-  ANA["Analyses: constprop · liveness"] -->|only before mutation| M
+  OUT -->|the pass edited| AM["Database<br/>drop cached results"]
+  ABT --> AM
+  ANA["Analyses: constprop · demand"] -->|computed before the pass · a snapshot| M
   AM -.->|recompute at later pass boundary| ANA
   RB["RuleProver · SMT/Z3 — future"] -.->|discharges proofs| CHK
 
@@ -213,15 +215,12 @@ sequenceDiagram
   participant D as RewriteDriver
   participant RS as RuleSet
   participant M as WildcardMatcher
-  participant AM as AnalysisManager
   participant RW as Rewriter
   participant IR as StageInfo
-  D->>IR: take ownership · drop cached analyses
+  D->>IR: take ownership
   Note over D: visiting %r = arith.add %x, %zero
   D->>RS: rules_for(op_key arith.add)
   RS-->>D: [add_zero, ...]
-  D->>AM: require(add_zero.analyses = none)
-  AM-->>D: facts
   D->>M: match(add_zero.pattern, candidate %r)
   M->>IR: follow %zero to its def, read operands
   IR-->>M: %zero defined by constant 0, operands read
@@ -303,8 +302,10 @@ Owns execution of rewrite rules:
 Constraint evaluation and optional proof backends are future responsibilities
 of this layer, not first-draft APIs.
 
-Concrete analyses may integrate through registered keys or traits. Do not make
-`kirin-ir` depend on the interpreter or the rewrite scheduler.
+Concrete analyses integrate by implementing `Analysis` for the program's
+stage type, in the language crate that knows how to run them (see
+[`analysis-manager.md`](analysis-manager.md)). Do not make `kirin-ir` depend
+on the interpreter or the rewrite scheduler.
 
 ---
 
@@ -329,7 +330,7 @@ Concrete analyses may integrate through registered keys or traits. Do not make
 | **semantic preservation** | Preservation of observable program meaning under the compiler's declared equivalence or refinement relation, including values, effects, control behavior, memory/concurrency, and domain protocols. |
 | **verification condition** | A logical obligation generated from a proposed rewrite and discharged before mutation by a future solver or proof checker. Structural IR verification is a different concern. |
 | **scheduler** | The driver that decides which rules to try, where, in what order, and when to stop. |
-| **analysis manager** | A component that runs, caches, and invalidates typed analyses. |
+| **analysis manager** | A component that runs, caches, and invalidates typed analyses: the `Database` in `kirin-rewrite`. |
 | **action contract** | What must still hold between two `Rewriter` calls, so the next call can traverse and edit the stage. Weaker than whole-IR validity by design. |
 | **authoritative IR** | Arena fields that directly express program structure and semantics. Derived structures must be reproducible from them. |
 | **derived mirror** | An incrementally maintained query representation of authoritative IR, such as reverse uses, block summaries, or petgraph topology. |
@@ -524,7 +525,8 @@ Which analyses are stale after an edit?
 The dependency direction should be:
 
 ```text
-RewriteDriver -> AnalysisManager -> interpreter-based analyses
+Database -> interpreter-based analyses
+Database -> pass -> RewriteDriver, which reads an AnalysisCache
 RewriteDriver -> PatternMatcher
 RewriteDriver -> Rewriter
 ```
@@ -1106,8 +1108,11 @@ auditing every existing rewrite rule.
 For v1:
 
 1. Every rewrite records mutation events through `Rewriter`.
-2. The first mutation drops every cached whole-stage analysis.
-3. New whole-stage analyses run only at a later pass boundary.
+2. The facts a pass is given are a snapshot: nothing updates or drops them
+   while the pass runs, so after its first edit they may be stale.
+3. Once a pass that edited the IR ends, every cached result is dropped, at
+   every stage.
+4. New results are computed only at a later pass boundary.
 
 ### Mutation Events
 
@@ -1145,18 +1150,17 @@ published as a successful commit record. The driver relies on these events
 twice: each rewrite's events decide which statements go back on the worklist,
 and the fixpoint ends at the first sweep that records none.
 
-The first `AnalysisManager` must not attempt fine-grained event-to-analysis
-mapping. Its safe policy is:
+The first analysis manager does not map events to analyses. Its policy is:
 
 ```text
-first in-place mutation
-    -> drop every cached analysis for that stage
+a pass that edited the IR ends
+    -> drop every cached result, at every stage
 ```
 
-Stage revisions and persistent cross-pass caches are deferred. Fine-grained
-invalidation is an optimization for later, after concrete analysis clients
-demonstrate which distinctions are useful. Analyses, rather than individual
-rewrite rules, should eventually decide whether an event invalidates them.
+A pass with no edits keeps every result. Fine-grained invalidation is an
+optimization for later, after concrete analysis clients demonstrate which
+distinctions are useful. Analyses, rather than individual rewrite rules,
+should eventually decide whether an event invalidates them.
 
 Kirin-python has no general freshness manager. `RewriteResult` carries a
 `has_done_something` bit for brute-force fixpoints. Analysis-driven passes run
@@ -1165,7 +1169,7 @@ before folding) and commonly copy results into `SSAValue.hints`. A later
 rewrite does not centrally invalidate those hints; correctness relies on pass
 ordering, rerunning the analysis by convention, or manually propagating hints
 to replacement values. Kirin-rust should keep the simple fixpoint baseline but
-must not retain cached whole-stage facts after mutation in v1.
+must not keep cached facts past a pass that edits the IR in v1.
 
 ### Analysis Invalidation Policy
 
@@ -1197,26 +1201,29 @@ type info invalidated by:
   InsertedStatement with fresh result definitions
 ```
 
-Start coarse. The first implementation drops all cached analyses when mutation
-begins. Refine only after the basic engine is correct.
+Start coarse. The first implementation drops every cached result once a pass
+that edited the IR ends. Refine only after the basic engine is correct.
 
 ### Ensuring Fresh Analyses
 
-The driver asks the analysis manager for required analyses before it transfers
-the stage into the pass:
+`Database::run_pass` computes the results a pass requires before it moves the
+stage out of the program, then hands them to the pass:
 
 ```text
-facts = analysis_manager.require(pass.required_analyses)
-move stage into run_pass; drop cached analyses
-for rule in candidate_rules:
-    if matcher.matches(rule, facts):
-        rewriter.apply(rule)  # facts become stale after mutation
+compute every result in rules.required() not already cached
+move stage into run_pass
+driver.with_cache(cache).run(rewriter):
+    fail with MissingAnalysis if a rule's requirement is not cached
+    for rule in candidate_rules:  # native rules built from the cache
+        if matcher.matches(rule):
+            rewriter.apply(rule)  # the cache may be stale after an edit
 derive expected mirrors and compare them with installed mirrors
+if the pass edited the IR or failed: drop every cached result
 ```
 
-The manager must not silently rerun a whole-IR analysis inside the mutation
-phase. Split analysis and rewriting into separate pass boundaries when a
-transformation needs refreshed facts.
+No analysis runs inside a pass: the pass holds the stage, and an analysis
+needs the whole program. Split analysis and rewriting into separate pass
+boundaries when a transformation needs refreshed facts.
 
 This is the generalization of Kirin-python's manual `HintConst` pattern:
 
@@ -1226,7 +1233,7 @@ Kirin-python:
 
 Kirin-rust:
   Constant-folding rule declares constprop as a requirement.
-  AnalysisManager ensures constprop is available and fresh.
+  Database::run_pass computes constprop, fresh, before the pass.
 ```
 
 ---
@@ -1282,7 +1289,7 @@ This is the first correctness baseline.
 More precise:
 
 ```text
-move StageInfo into run_pass; drop cached analyses
+move StageInfo into run_pass
 repeat:                                    # a sweep; at most max_sweeps
     worklist = all statements, in walk order (a snapshot)
     while worklist not empty:
@@ -1658,7 +1665,7 @@ One rewrite pass owns and mutates one `StageInfo`:
 
 ```text
 owned StageInfo
-  -> move into run_pass; drop cached analyses
+  -> move into run_pass
   -> for each statement popped from the worklist, for each rule that matches:
        run its rewrite body in place through Rewriter, then push the owner,
        producers, and users of each rewritten statement onto the worklist
@@ -1997,9 +2004,9 @@ to one in-place stage:
 - I7 is never established by the mutation layer.
 - erasures tombstone and ids stay stable while bindings/worklists exist;
   optional compaction occurs only at a controlled pass boundary.
-- mutation drops cached analyses; success returns the owned stage, while a
-  rewrite, driver, derivation, mismatch, or panic failure quarantines it and
-  requires the caller to abandon that compilation unit.
+- a pass that edits drops cached analyses; success returns the owned stage,
+  while a rewrite, driver, derivation, mismatch, or panic failure quarantines
+  it and requires the caller to abandon that compilation unit.
 
 #### `RewriteError`
 
@@ -2115,8 +2122,7 @@ individual action:
 ```text
 1. Begin
    - move `StageInfo<L>` into `run_pass`;
-   - lend `&mut StageInfo<L>` only to the closure executing the pass;
-   - drop cached whole-stage analyses.
+   - lend `&mut StageInfo<L>` only to the closure executing the pass.
 
 2. Rewrite
    - after each match, run the rule's rewrite body in place through
@@ -2132,7 +2138,8 @@ individual action:
    - derive expected mirrors from authoritative IR and compare without repair;
    - return `(StageInfo<L>, RewriteChange)` on success;
    - on any error or panic, return `Quarantined<StageInfo<L>>` with the cause
-     and event log.
+     and event log;
+   - if the pass edited the IR or failed, drop every cached analysis result.
 ```
 
 A rule's rewrite body runs inside step 2, one `Rewriter` call per step, right
@@ -2420,9 +2427,10 @@ kirin-rewrite
     NativeRule
     RuleSet
   analysis
-    AnalysisManager
-    AnalysisKey
-    InvalidationPolicy
+    Database
+    Analysis, AnalysisKind
+    AnalysisCache
+    Requirement
   schedule
     RewriteDriver
     Worklist
@@ -2455,10 +2463,14 @@ A later version may add applicability constraints and analysis requirements.
 An executable Rust rule used when matching or replacement cannot yet be
 expressed as declarative `RewriteRule` data. It has a name, which driver
 errors report, and its scope is the trait it implements: `StatementRule` or
-`BlockRule`. Once the analysis manager (M3) lands, it will also declare the
-analyses it requires, which the driver checks before running it. Native rules
-remain subject to restricted in-place mutation through the pass's
-`Rewriter`; “native” is not raw mutable arena access.
+`BlockRule`. It declares the analysis results it reads with
+`.requires::<A>(key)` on the handle `add_statement_rule` or `add_block_rule`
+returns, and its recipe builds it from those results, handed over as an
+`AnalysisCache`. Before its first sweep, the driver checks that the cache
+holds every declared result, and fails with `MissingAnalysis` before editing
+anything otherwise. Native rules remain subject to restricted in-place
+mutation through the pass's `Rewriter`; “native” is not raw mutable arena
+access.
 
 Native rules are a supported long-term extension point for stateful,
 algorithmic, analysis-driven, and larger-scope transformations. Declarative
@@ -2529,22 +2541,21 @@ The restricted in-place mutation capability. Rules should not mutate
 invariants, exact mirror maintenance, fresh-id allocation, and change events; it does not
 prove whole-IR validity after each action.
 
-### `AnalysisManager`
+### `Database`
 
 Owns:
 
-- cached typed results;
-- freshness state;
-- invalidation from mutation events;
-- rerun policy.
+- the program;
+- the cached analysis results, one per analysis and key, each recording the
+  revision it was computed at;
+- a registry of how to compute each analysis a pass may require.
 
-Start with conservative invalidation:
-
-```text
-first mutation drops all cached analyses
-```
-
-Then refine.
+`Database::run_pass` computes the results a pass requires, then runs the
+pass, handing it the cached results. Invalidation is conservative: a pass
+that edits the IR, or fails, bumps the revision, which drops every cached
+result, and a pass with no edits keeps them. An edit outside a pass goes
+through `Database::program_mut`, which bumps the revision the same way. See
+[`analysis-manager.md`](analysis-manager.md).
 
 ### `RewriteDriver`
 
@@ -2952,13 +2963,19 @@ This provides a Kirin-python-equivalent baseline over Kirin-rust.
 
 ### M3: Analysis Manager
 
-- Add typed analysis cache.
-- Drop all cached whole-stage analyses when mutation starts.
-- Support `require(AnalysisKey)` before a rewrite rule runs.
-- Wire constprop and demand/liveness as first clients.
-- Defer stage revisions and persistent cross-pass caches.
-- Defer fine-grained event-to-analysis policies until concrete clients justify
-  them.
+Designed in [`analysis-manager.md`](analysis-manager.md).
+
+- [x] Add a typed analysis cache, one result per analysis and key
+  (`Database`, `AnalysisCache`).
+- [x] Compute the results a pass requires before it runs; drop every cached
+  result once a pass edits the IR, and keep them after a pass with no edits.
+- [x] Let native rules declare the results they read
+  (`.requires::<A>(key)`) and read them through their recipe; have the
+  driver check the cache holds them before editing.
+- [ ] Wire constprop and demand as first clients, caching the interpreter's
+  owned `AnalysisResults`.
+- Defer selective invalidation (keeping the results an edit did not affect)
+  until concrete clients justify it.
 
 ### M4: Wildcard IR MVP
 
@@ -3157,7 +3174,7 @@ prior art for one input to matching.
   [The `?` sigil marks pattern text](#the--sigil-marks-pattern-text).
 - `Rewrite { searcher, applier }` ≈ `RewriteRule { pattern, replacement }`; a
   custom `Applier` ≈ `NativeRule`; `Analysis` (`make` / `merge` / `modify`,
-  monotone e-class data) ≈ `AnalysisManager`.
+  monotone e-class data) ≈ the analysis manager (`Database`).
 - `egg` is non-destructive, value/expression-level, and assumes operations are
   pure and congruent. It has no SSA-external-use, CFG, dominance, effect, linear
   value, or arena-mutation model. It therefore maps to the **M8** equality-
