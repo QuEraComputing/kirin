@@ -85,14 +85,13 @@ pub use kirin_ir::Body;
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, CallContext,
-    ContextInsensitive, SparseForwardInterpreter, SparseForwardResults, SparseForwardTransfer,
-    StandardAbstractFrame, WideningStrategy,
+    ContextInsensitive, SparseForwardInterpreter, SparseForwardTransfer, StandardAbstractFrame,
+    WideningStrategy,
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
     DemandContext, DemandFrame, DemandInterp, SparseBackwardDriver, SparseBackwardEffect,
-    SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile, SparseBackwardResults,
-    SparseBackwardTransfer,
+    SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile, SparseBackwardTransfer,
 };
 // The read-only view of a converged analysis, shared by the abstract engines.
 pub use engines::{AnalysisResults, Analyzed};
@@ -100,8 +99,7 @@ pub use engines::{AnalysisResults, Analyzed};
 pub use engines::dense_backward::{
     ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardEffect,
     DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardProfile,
-    DenseBackwardResults, DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts,
-    SuccessorEdge,
+    DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts, SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
@@ -151,12 +149,11 @@ pub mod engine {
         CFGFrame, CFGQueries, CallBodyTraversal, CallContext, CallFrame, CallRequest, CallServices,
         Callee, Completion, ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive,
         CrossStageLinker, DefaultCallBodyTraversal, DemandContext, DenseBackwardCompletion,
-        DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
-        DenseBackwardResults, DenseBlockFrame, DiGraphFrame, DiGraphQueries, Env,
-        ForwardDataflowFrameEngine, ForwardFrameEngine, Frame, FrameEffect, FrameEngine, Interp,
-        InterpDispatch, InterpreterError, LinkTarget, Linker, SSABinding, SameStageLinker,
-        SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardResults,
-        SparseForwardInterp, SparseForwardInterpreter, SparseForwardResults, StandardAbstractFrame,
-        StatementDispatch, WideningStrategy, drive_frames, expect_single,
+        DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter, DenseBlockFrame,
+        DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
+        FrameEffect, FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker,
+        SSABinding, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
+        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch,
+        WideningStrategy, drive_frames, expect_single,
     };
 }

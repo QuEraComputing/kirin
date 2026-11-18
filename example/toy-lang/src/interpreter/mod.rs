@@ -18,15 +18,17 @@ use frame::ToyFrame;
 
 use std::hash::Hash;
 
-use kirin::prelude::{CFG, CompileStage, Program};
+use kirin::prelude::{CFG, CompileStage, Program, SSAValue};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
-use kirin_demand::DemandAnalysis;
+use kirin_demand::{Demand, DemandAnalysis, DemandCallCtx};
 use kirin_interpreter::engine::{
-    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, DenseBackwardResults,
-    LinkTarget, Linker, SameStageLinker, SparseBackwardResults, SparseForwardInterpreter,
-    expect_single,
+    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, LinkTarget, Linker,
+    SameStageLinker, SparseForwardInterpreter, expect_single,
 };
-use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
+use kirin_interpreter::{
+    Body, Callee, ClassicLiveness, InterpDispatch, InterpreterError, ProgramPoint,
+    SparseForwardTransfer, StrongDemand,
+};
 use kirin_liveness::{DenseLiveness, LiveSet};
 use kirin_scf::ForLoopValue;
 
@@ -176,7 +178,14 @@ pub fn analyze_classic_liveness(
     program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(CompileStage, CFG, Analyzed<DenseBackwardResults<LiveSet>>), InterpreterError> {
+) -> Result<
+    (
+        CompileStage,
+        CFG,
+        Analyzed<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>,
+    ),
+    InterpreterError,
+> {
     let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
     let analyzed = analysis.analyze_by_name(stage_name, function_name)?;
     let root = *analyzed.root();
@@ -195,21 +204,13 @@ pub fn analyze_demand(
     program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<
-    Analyzed<
-        SparseBackwardResults<(LinkTarget, kirin_demand::DemandCallCtx), kirin_demand::Demand>,
-    >,
-    InterpreterError,
-> {
+) -> Result<Analyzed<(LinkTarget, DemandCallCtx), SSAValue, Demand, StrongDemand>, InterpreterError>
+{
     let stage = program
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
     let function = program
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    DemandAnalysis::<_>::new(program).analyze(
-        stage,
-        Callee::Function(function),
-        [kirin_demand::Demand::Live],
-    )
+    DemandAnalysis::<_>::new(program).analyze(stage, Callee::Function(function), [Demand::Live])
 }

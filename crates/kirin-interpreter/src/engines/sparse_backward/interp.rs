@@ -50,8 +50,6 @@
 //! is bounded, so one shared worklist converges — recursion included — with no
 //! nested fixpoints, no widening, and no frames for structured control.
 
-use super::results::SparseBackwardResults;
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -915,7 +913,7 @@ where
         stage_name: &str,
         function_name: &str,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<SparseBackwardResults<P::Key, V, Sem>>, E> {
+    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
         let stage = self
             .program()
             .stage_by_name(stage_name)
@@ -934,7 +932,7 @@ where
         stage: CompileStage,
         symbol: Symbol,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<SparseBackwardResults<P::Key, V, Sem>>, E> {
+    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
         self.analyze(stage, symbol.into(), result_values)
     }
 
@@ -951,7 +949,7 @@ where
         stage: CompileStage,
         callee: Callee,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<SparseBackwardResults<P::Key, V, Sem>>, E> {
+    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
         let outputs: Product<V> = result_values.into_iter().collect();
         let (_, root, _) = self
             .driver
@@ -961,27 +959,19 @@ where
         self.driver.wake_changed()?;
         self.driver
             .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
-        let contexts: Vec<_> = self
-            .driver
-            .inner()
+        // Each context's response is its parameter facts, read once here
+        // while the program is still available.
+        let transfer = self.driver.inner();
+        let contexts = transfer
             .contexts
             .iter()
-            .map(|(env, context)| (context.target, *env))
-            .collect();
-        // Save parameter identities while the program is still available.
-        // Responses remain projections of the converged fact store.
-        let transfer = self.driver.inner();
-        let parameters = contexts
-            .iter()
-            .map(|&(target, env)| Ok((env, (target, transfer.entry_params(target)?))))
-            .collect::<Result<HashMap<_, _>, E>>()?;
+            .map(|(&env, context)| {
+                let params = transfer.entry_params(context.target)?;
+                let response = transfer.param_facts(env, &params)?;
+                Ok((env, context.target, Some(response)))
+            })
+            .collect::<Result<Vec<_>, E>>()?;
         let transfer = self.driver.into_inner();
-        let state = SparseBackwardResults {
-            _semantics: PhantomData,
-            root,
-            env: transfer.env,
-            contexts: parameters,
-        };
-        Ok(Analyzed::new(state, contexts))
+        Ok(Analyzed::new(root, transfer.env, contexts))
     }
 }

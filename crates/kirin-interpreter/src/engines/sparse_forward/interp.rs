@@ -31,8 +31,6 @@
 //! each use outside the defining unit (uses in nested structured bodies map to
 //! their enclosing unit), so direct dominated cross-block uses see it.
 
-use super::results::SparseForwardResults;
-
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -1115,7 +1113,7 @@ where
         stage_name: &str,
         function_name: &str,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<SparseForwardResults<P::Key, V, Sem>>, E> {
+    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
         let stage = self
             .driver
             .inner()
@@ -1139,7 +1137,7 @@ where
         stage: CompileStage,
         symbol: Symbol,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<SparseForwardResults<P::Key, V, Sem>>, E> {
+    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
         self.analyze(stage, symbol.into(), args)
     }
 
@@ -1152,7 +1150,7 @@ where
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<SparseForwardResults<P::Key, V, Sem>>, E> {
+    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
         let args: Product<V> = args.into_iter().collect();
         let env = self.driver.contribute_call_entry(stage, &callee, args)?;
         self.driver.wake_changed()?;
@@ -1165,23 +1163,12 @@ where
             .key(env)
             .cloned()
             .ok_or_else(|| E::from(UNSELECTED))?;
-        let contexts: Vec<_> = transfer
-            .contexts
-            .iter()
-            .map(|(env, context)| (context.target, *env))
-            .collect();
         let transfer = self.driver.into_inner();
-        let state = SparseForwardResults {
-            _semantics: PhantomData,
-            root,
-            env: transfer.env,
-            contexts: transfer
-                .contexts
-                .into_iter()
-                .map(|(env, context)| (env, (context.target, context.ret)))
-                .collect(),
-        };
-        Ok(Analyzed::new(state, contexts))
+        let contexts = transfer
+            .contexts
+            .into_iter()
+            .map(|(env, context)| (env, context.target, context.ret));
+        Ok(Analyzed::new(root, transfer.env, contexts))
     }
 }
 

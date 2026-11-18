@@ -1073,7 +1073,9 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 mod dense {
     use kirin::prelude::{CFG, CompileStage, Program, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{AnalysisResults, Analyzed, Body, Callee, ProgramPoint};
+    use kirin_interpreter::{
+        AnalysisResults, Analyzed, Body, Callee, ClassicLiveness, LinkTarget, ProgramPoint,
+    };
     use kirin_liveness::LiveSet;
     use kirin_scf::StructuredControlFlow;
 
@@ -1092,7 +1094,7 @@ mod dense {
         caller_stage: CompileStage,
         callee: Callee,
     ) -> (
-        Analyzed<kirin_interpreter::DenseBackwardResults<kirin_liveness::LiveSet>>,
+        Analyzed<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>,
         CFG,
     ) {
         let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);

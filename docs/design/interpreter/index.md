@@ -642,18 +642,17 @@ engine, so a failed discovery is never reused.
 ### Reading results — `Analyzed` and `AnalysisResults`
 
 Every abstract engine's `analyze` consumes the engine and returns
-`Analyzed<Results>`: an owned snapshot of exactly one converged analysis. It has no
-`analyze` of its own, so it always has one root and never mixes two runs.
-Each engine moves its fact store into its own result state:
-`SparseForwardResults<K, V, Sem = ForwardEval>`,
-`SparseBackwardResults<K, V, Sem = StrongDemand>`, or
-`DenseBackwardResults<V, Sem = ClassicLiveness>`. These states retain no engine or borrow of
-`Program<S>`; keys and lattice values retain only their own type constraints.
-Each result preserves the engine's semantic key through a zero-sized marker, so
-two keys sharing a solver shape still produce distinct result types. The
-`is_demanded()` helper exists only for `SparseBackwardResults<_, _, StrongDemand>`;
-other sparse-backward semantics use the generic fact queries.
-The three result states keep separate implementations of the same read-only trait:
+`Analyzed<K, A, V, Sem>`: the owned result of exactly one converged analysis,
+with context key `K`, anchor `A`, lattice value `V` and semantic key `Sem`. It
+has no `analyze` of its own, so it always has one root and never mixes two
+runs. Every engine produces the same type: constprop
+`Analyzed<P::Key, SSAValue, V, ForwardEval>`, demand
+`Analyzed<P::Key, SSAValue, V, StrongDemand>`, liveness
+`Analyzed<LinkTarget, ProgramPoint, V, ClassicLiveness>`. It holds no engine
+and no borrow of `Program<S>`. `Sem` is a zero-sized marker, so two keys
+sharing a solver shape still produce distinct result types; the
+`is_demanded()` helper exists only for `Analyzed<_, SSAValue, _, StrongDemand>`.
+One implementation of the read-only trait serves all three engines:
 
 ```rust
 pub trait AnalysisResults {
@@ -709,28 +708,23 @@ environments and are never stored. They join the contexts **reached from the
 root**: they claim nothing about callers the analysis did not visit, and
 whether that is safe for a rewrite is the client's decision.
 
-`Analyzed` stores one thing beside the owned result state: an index from each reached
-callable to its contexts' environments, built once when `analyze` finishes.
-The sparse engines' `contexts_of` reads it and maps each environment back to
+`Analyzed` owns four things, all built once when `analyze` finishes: the root,
+the engine's fact store (moved, not copied), each reached context's callable
+and response, and an index from each reached callable to its contexts'
+environments. `contexts_of` reads the index and maps each environment back to
 its context through `EnvStore::key`, so a per-callable query visits only that
-callable's contexts. Liveness has one context and keeps the provided scan.
+callable's contexts. Responses are stored per engine: constprop's joined
+return, demand's entry-parameter facts (bottom where absent), and `None` for
+liveness. Worklists, caller dependencies, frame stacks, linkers, and program
+references are discarded.
 
 Every per-context query is keyed by context, so a context is a query key and
 `response`/`facts` its value. That keeps the API compatible with a later
 query-based (memoized, incremental) engine, which this is not.
 
-Forward results retain each reached context's callable and return summary.
-Backward results retain the callable and ordered entry-parameter IDs;
-`response` gathers their facts on demand, substituting bottom for absent
-facts, without consulting the program. Dense results retain the root and
-point-fact environment; their response remains `None`. Worklists, caller
-dependencies, frame stacks, linkers, and program references are discarded.
-
 The program may be edited or dropped while results remain readable. These
-are facts about the analyzed snapshot, not automatically valid facts about
-edited IR; clients are responsible for invalidation. Existing
-`AnalysisResults` calls are unchanged, but explicitly named return types
-must use the result state rather than the borrowing engine.
+are facts about the analyzed program, not automatically valid facts about
+edited IR; clients are responsible for invalidation.
 
 The analysis crates add no result types: `kirin-constprop`, `kirin-demand`
 and `kirin-liveness` export a lattice, a policy, and an engine alias

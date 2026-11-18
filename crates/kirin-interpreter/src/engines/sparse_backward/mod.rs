@@ -10,6 +10,3 @@ pub use interp::{
     DemandContext, DemandInterp, SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp,
     SparseBackwardInterpreter, SparseBackwardProfile, SparseBackwardTransfer,
 };
-
-mod results;
-pub use results::SparseBackwardResults;

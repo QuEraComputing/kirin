@@ -46,8 +46,6 @@
 //! `BlockEntry` always equals its first statement's `Before`. When a block's
 //! `BlockEntry` rises, the driver rewalks the predecessors that read it.
 
-use super::results::DenseBackwardResults;
-
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -739,7 +737,7 @@ where
         self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<Analyzed<DenseBackwardResults<V, Sem>>, E> {
+    ) -> Result<Analyzed<LinkTarget, ProgramPoint, V, Sem>, E> {
         let stage = self
             .driver
             .inner()
@@ -760,7 +758,7 @@ where
         self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<Analyzed<DenseBackwardResults<V, Sem>>, E> {
+    ) -> Result<Analyzed<LinkTarget, ProgramPoint, V, Sem>, E> {
         self.analyze(stage, symbol.into())
     }
 
@@ -774,7 +772,7 @@ where
         mut self,
         stage: CompileStage,
         callee: Callee,
-    ) -> Result<Analyzed<DenseBackwardResults<V, Sem>>, E> {
+    ) -> Result<Analyzed<LinkTarget, ProgramPoint, V, Sem>, E> {
         let program = self.driver.inner().program();
         let target = self.linker.resolve(program, stage, &callee)?;
         let body = target.body(program)?;
@@ -789,11 +787,6 @@ where
         self.driver
             .solve_many(&mut DenseBackwardWorkAnalysis, work)?;
         let transfer = self.driver.into_inner();
-        let state = DenseBackwardResults {
-            _semantics: PhantomData,
-            root: target,
-            env: transfer.env,
-        };
-        Ok(Analyzed::new(state, [(target, env)]))
+        Ok(Analyzed::new(target, transfer.env, [(env, target, None)]))
     }
 }
