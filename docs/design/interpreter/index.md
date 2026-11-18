@@ -564,10 +564,11 @@ space; a key naming two targets is an error. Facts live in the transfer's
 `EnvStore::join`; the driver holds only the worklist and the call-boundary
 callers. Selecting a context allocates
 its environment at once, so a caller can register on its parameters before the
-deferred discovery scan runs. The per-context metadata (target and the
-return operands per output) lives on the transfer, keyed by `EnvIndex`.
+deferred discovery scan runs. The per-context metadata (target, entry
+parameters read from the IR at discovery, and the return operands per output)
+lives on the transfer, keyed by `EnvIndex`.
 Each context also retains joined output requests so return rules visited later
-receive them. SSA facts remain in `EnvStore`; entry parameters come from the IR.
+receive them. SSA facts remain in `EnvStore`.
 Rules dispatch on the transfer, as forward and dense rules do. Work carries its
 context, so
 the frame dispatching a rule supplies the context that rule's reads and local

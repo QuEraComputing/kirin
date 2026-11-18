@@ -221,10 +221,12 @@ where
 // Callable contexts, work items, and the driver
 // ===========================================================================
 
-/// One callable context: its callable, declared return operands, and
-/// requested output facts. SSA facts live in its environment; parameters come from the IR.
+/// One callable context: its callable, entry parameters, declared return
+/// operands, and requested output facts. SSA facts live in its environment.
 pub struct CallableContext<V> {
     pub(super) target: LinkTarget,
+    /// The callable's entry parameters, read once at discovery.
+    pub(super) params: Vec<SSAValue>,
     /// `outputs[i]` holds operand `i` of each declared return site; `None`
     /// until a return rule declares one.
     pub(super) outputs: Option<Vec<Vec<SSAValue>>>,
@@ -232,9 +234,10 @@ pub struct CallableContext<V> {
 }
 
 impl<V: Clone + Lattice> CallableContext<V> {
-    pub(super) fn new(target: LinkTarget) -> Self {
+    pub(super) fn new(target: LinkTarget, params: Vec<SSAValue>) -> Self {
         Self {
             target,
+            params,
             outputs: None,
             requested: None,
         }
@@ -661,11 +664,12 @@ where
             }
             return Ok(());
         }
-        let (body, _) = self.inner().callable_entry(target)?;
+        let (body, entry) = self.inner().callable_entry(target)?;
+        let stage = target.stage;
+        let params = query::block_params(self.inner().program, stage, entry)?;
         self.inner_mut()
             .contexts
-            .insert(env, CallableContext::new(target));
-        let stage = target.stage;
+            .insert(env, CallableContext::new(target, params));
 
         let mut bodies = VecDeque::from([body]);
         let mut visited = HashSet::new();
@@ -958,15 +962,14 @@ where
         self.driver.wake_changed()?;
         self.driver
             .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
-        // Each context's response is its parameter facts, read once here
-        // while the program is still available.
+        // Each context's response is the facts on the entry parameters
+        // recorded at discovery.
         let transfer = self.driver.inner();
         let contexts = transfer
             .contexts
             .iter()
             .map(|(&env, context)| {
-                let params = transfer.entry_params(context.target)?;
-                let response = transfer.param_facts(env, &params)?;
+                let response = transfer.param_facts(env, &context.params)?;
                 Ok((env, context.target, Some(response)))
             })
             .collect::<Result<Vec<_>, E>>()?;

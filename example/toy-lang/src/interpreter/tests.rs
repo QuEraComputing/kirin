@@ -849,26 +849,23 @@ specialize @source fn @if_body(i64) -> i64 cfg {
         });
 
         assert!(
-            result.fact(result.root(), if_result.into()) == Some(&Demand::Live),
+            result.fact(result.root(), if_result) == Some(&Demand::Live),
             "ret demands the if result"
         );
         assert!(
-            result.fact(result.root(), cond.into()) == Some(&Demand::Live),
+            result.fact(result.root(), cond) == Some(&Demand::Live),
             "condition is a control root"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 1).into())
-                == Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 1)) == Some(&Demand::Live),
             "then-arm yield operand feeds the demanded result"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 2).into())
-                == Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 2)) == Some(&Demand::Live),
             "else-arm yield operand feeds the demanded result"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 9).into())
-                != Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 9)) != Some(&Demand::Live),
             "a dead constant inside a body stays dead"
         );
     }
@@ -911,21 +908,18 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
         });
 
         assert!(
-            result.fact(result.root(), cond.into()) == Some(&Demand::Live),
+            result.fact(result.root(), cond) == Some(&Demand::Live),
             "condition is a control root"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 0).into())
-                == Some(&Demand::Live)
+            result.fact(result.root(), constant_result(&program, cfg, 0)) == Some(&Demand::Live)
         );
-        assert!(result.fact(result.root(), if_result.into()) != Some(&Demand::Live));
+        assert!(result.fact(result.root(), if_result) != Some(&Demand::Live));
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 1).into())
-                != Some(&Demand::Live)
+            result.fact(result.root(), constant_result(&program, cfg, 1)) != Some(&Demand::Live)
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 2).into())
-                != Some(&Demand::Live)
+            result.fact(result.root(), constant_result(&program, cfg, 2)) != Some(&Demand::Live)
         );
     }
 
@@ -987,31 +981,29 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
         };
 
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 0).into())
-                == Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 0)) == Some(&Demand::Live),
             "init"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 1).into())
-                == Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 1)) == Some(&Demand::Live),
             "one"
         );
         assert!(
-            result.fact(result.root(), next.into()) == Some(&Demand::Live),
+            result.fact(result.root(), next) == Some(&Demand::Live),
             "yield slot"
         );
         assert!(
-            result.fact(result.root(), carried.into()) == Some(&Demand::Live),
+            result.fact(result.root(), carried) == Some(&Demand::Live),
             "carried param feeds the add"
         );
         assert!(
-            result.fact(result.root(), induction.into()) != Some(&Demand::Live),
+            result.fact(result.root(), induction) != Some(&Demand::Live),
             "the unused induction variable stays dead"
         );
         assert!(
-            result.fact(result.root(), lo.into()) == Some(&Demand::Live)
-                && result.fact(result.root(), hi.into()) == Some(&Demand::Live)
-                && result.fact(result.root(), step.into()) == Some(&Demand::Live)
+            result.fact(result.root(), lo) == Some(&Demand::Live)
+                && result.fact(result.root(), hi) == Some(&Demand::Live)
+                && result.fact(result.root(), step) == Some(&Demand::Live)
         );
     }
 
@@ -1051,27 +1043,24 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
         });
 
         assert!(
-            result.fact(result.root(), params[0].into()) == Some(&Demand::Live),
+            result.fact(result.root(), params[0]) == Some(&Demand::Live),
             "bounds are control roots"
         );
-        assert!(result.fact(result.root(), params[1].into()) == Some(&Demand::Live));
-        assert!(result.fact(result.root(), params[2].into()) == Some(&Demand::Live));
+        assert!(result.fact(result.root(), params[1]) == Some(&Demand::Live));
+        assert!(result.fact(result.root(), params[2]) == Some(&Demand::Live));
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 7).into())
-                == Some(&Demand::Live)
+            result.fact(result.root(), constant_result(&program, cfg, 7)) == Some(&Demand::Live)
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 0).into())
-                != Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 0)) != Some(&Demand::Live),
             "init dead"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 1).into())
-                != Some(&Demand::Live),
+            result.fact(result.root(), constant_result(&program, cfg, 1)) != Some(&Demand::Live),
             "body interior dead"
         );
         assert!(
-            result.fact(result.root(), next.into()) != Some(&Demand::Live),
+            result.fact(result.root(), next) != Some(&Demand::Live),
             "yield slot dead"
         );
     }
@@ -1124,22 +1113,21 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
         });
 
         assert!(
-            result.fact(result.root(), x.into()) != Some(&Demand::Live),
+            result.fact(result.root(), x) != Some(&Demand::Live),
             "an ignored call demands nothing"
         );
         assert!(
-            result.fact(result.root(), constant_result(&program, cfg, 0).into())
-                == Some(&Demand::Live)
+            result.fact(result.root(), constant_result(&program, cfg, 0)) == Some(&Demand::Live)
         );
         assert!(
-            result.fact(result.root(), unused.into()) != Some(&Demand::Live),
+            result.fact(result.root(), unused) != Some(&Demand::Live),
             "the call result is unused"
         );
         assert!(
-            result.fact(result.root(), y.into()) != Some(&Demand::Live),
+            result.fact(result.root(), y) != Some(&Demand::Live),
             "pure add with dead result"
         );
-        assert!(result.fact(result.root(), deadsum.into()) != Some(&Demand::Live));
+        assert!(result.fact(result.root(), deadsum) != Some(&Demand::Live));
     }
 }
 
