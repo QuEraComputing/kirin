@@ -13,6 +13,11 @@ from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Mapping
+    from pathlib import Path
+    from typing import Any
+
+    from kirin.ir.ssa import SSAValue
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
     from kirin.serialization.core.serializationunit import SerializationUnit
@@ -160,6 +165,19 @@ class Method(Printable, typing.Generic[Param, RetType]):
 
     def print_impl(self, printer: Printer) -> None:
         return printer.print(self.code)
+
+    def visualize(
+        self,
+        file: str | Path,
+        *,
+        analysis: Mapping[SSAValue, Any] | None = None,
+        title: str | None = None,
+    ) -> Path:
+        """Write an interactive HTML inspector for this method's IR."""
+
+        from kirin.visualize import write_html
+
+        return write_html(self, file, analysis=analysis, title=title)
 
     def similar(self, dialects: typing.Optional["DialectGroup"] = None):
         return Method(
