@@ -10,4 +10,4 @@ pub(crate) mod sparse_forward;
 
 mod results;
 
-pub use results::{AnalysisResults, Analyzed};
+pub use results::AnalysisResults;

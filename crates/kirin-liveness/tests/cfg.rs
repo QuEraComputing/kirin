@@ -9,7 +9,7 @@
 use kirin::prelude::{GetInfo, ParseProgramText, Program, SSAValue, StageInfo};
 use kirin_arith::Arith;
 use kirin_demand::{Demand, DemandAnalysis};
-use kirin_interpreter::{AnalysisResults, Body, Callee, ProgramPoint};
+use kirin_interpreter::{Body, Callee, ProgramPoint};
 use kirin_liveness::{DenseLiveness, LiveSet};
 use kirin_test_languages::ArithFunctionLanguage;
 
@@ -225,7 +225,7 @@ fn classic_sets_filtered_by_demand_drop_unneeded_values() {
         .expect("point reconstructed");
     let strong: LiveSet = classic
         .iter()
-        .filter(|value| demand.is_demanded(demand.root(), *value))
+        .filter(|value| demand.fact(demand.root(), (*value).into()) == Some(&Demand::Live))
         .collect();
     assert_eq!(strong, live_set(&[a]));
     assert!(!strong.contains(b));

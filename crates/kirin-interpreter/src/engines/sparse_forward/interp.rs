@@ -42,12 +42,12 @@ use kirin_ir::{
 
 use crate::core::query;
 use crate::{
-    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter, Analyzed,
-    BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
-    EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, SSABinding,
-    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
-    StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
+    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
+    AnalysisResults, BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee,
+    DiGraphQueries, Env, EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine,
+    ForwardEval, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget,
+    Linker, SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -986,7 +986,7 @@ where
 /// Traversal is owned by the total frame type `F`; context keying and merge/widen
 /// behavior are owned by the policy `P`.
 ///
-/// `analyze` consumes the engine and returns the converged [`Analyzed`]
+/// `analyze` consumes the engine and returns the converged [`AnalysisResults`]
 /// state, read through [`AnalysisResults`](crate::AnalysisResults). Each analysis is fresh: analyzing
 /// another root takes another engine.
 ///
@@ -1113,7 +1113,7 @@ where
         stage_name: &str,
         function_name: &str,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
+    ) -> Result<AnalysisResults<P::Key, SSAValue, V, Sem>, E> {
         let stage = self
             .driver
             .inner()
@@ -1137,7 +1137,7 @@ where
         stage: CompileStage,
         symbol: Symbol,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
+    ) -> Result<AnalysisResults<P::Key, SSAValue, V, Sem>, E> {
         self.analyze(stage, symbol.into(), args)
     }
 
@@ -1150,7 +1150,7 @@ where
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
+    ) -> Result<AnalysisResults<P::Key, SSAValue, V, Sem>, E> {
         let args: Product<V> = args.into_iter().collect();
         let env = self.driver.contribute_call_entry(stage, &callee, args)?;
         self.driver.wake_changed()?;
@@ -1168,7 +1168,7 @@ where
             .contexts
             .into_iter()
             .map(|(env, context)| (env, context.target, context.ret));
-        Ok(Analyzed::new(root, transfer.env, contexts))
+        Ok(AnalysisResults::new(root, transfer.env, contexts))
     }
 }
 

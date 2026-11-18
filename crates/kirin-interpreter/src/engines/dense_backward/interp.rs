@@ -58,10 +58,10 @@ use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Analyzed, BlockQueries, Callee, ClassicLiveness, DenseBackwardSemantic,
-    EnvIndex, EnvStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, LinkTarget, Linker, ProgramPoint, SameStageLinker, StageQuery,
-    StandardFixpointInterpreter, StatementDispatch, TerminatorArgs, WorkAnalysis,
+    AbstractInterpreter, AnalysisResults, BlockQueries, Callee, ClassicLiveness,
+    DenseBackwardSemantic, EnvIndex, EnvStore, FixpointProfile, Frame, Interp, InterpDispatch,
+    InterpLocation, InterpreterError, LinkTarget, Linker, ProgramPoint, SameStageLinker,
+    StageQuery, StandardFixpointInterpreter, StatementDispatch, TerminatorArgs, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -737,7 +737,7 @@ where
         self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<Analyzed<LinkTarget, ProgramPoint, V, Sem>, E> {
+    ) -> Result<AnalysisResults<LinkTarget, ProgramPoint, V, Sem>, E> {
         let stage = self
             .driver
             .inner()
@@ -758,7 +758,7 @@ where
         self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<Analyzed<LinkTarget, ProgramPoint, V, Sem>, E> {
+    ) -> Result<AnalysisResults<LinkTarget, ProgramPoint, V, Sem>, E> {
         self.analyze(stage, symbol.into())
     }
 
@@ -766,13 +766,13 @@ where
     /// and drain the block worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
     ///
-    /// It consumes the engine and returns the converged [`Analyzed`] state,
+    /// It consumes the engine and returns the converged [`AnalysisResults`] state,
     /// like the other analysis engines; an error drops the engine.
     pub fn analyze(
         mut self,
         stage: CompileStage,
         callee: Callee,
-    ) -> Result<Analyzed<LinkTarget, ProgramPoint, V, Sem>, E> {
+    ) -> Result<AnalysisResults<LinkTarget, ProgramPoint, V, Sem>, E> {
         let program = self.driver.inner().program();
         let target = self.linker.resolve(program, stage, &callee)?;
         let body = target.body(program)?;
@@ -787,6 +787,10 @@ where
         self.driver
             .solve_many(&mut DenseBackwardWorkAnalysis, work)?;
         let transfer = self.driver.into_inner();
-        Ok(Analyzed::new(target, transfer.env, [(env, target, None)]))
+        Ok(AnalysisResults::new(
+            target,
+            transfer.env,
+            [(env, target, None)],
+        ))
     }
 }

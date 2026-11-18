@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 use kirin_demand::{Demand, DemandAnalysis};
-use kirin_interpreter::{AnalysisResults, Body, Callee, Linker, SameStageLinker};
+use kirin_interpreter::{Body, Callee, Linker, SameStageLinker};
 use kirin_test_languages::GraphFunctionLanguage;
 
 #[test]

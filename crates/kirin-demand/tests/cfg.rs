@@ -5,7 +5,7 @@
 use kirin::prelude::{GetInfo, ParseProgramText, Program, SSAValue, StageInfo};
 use kirin_arith::Arith;
 use kirin_demand::{Demand, DemandAnalysis};
-use kirin_interpreter::{AnalysisResults, Body, Callee};
+use kirin_interpreter::{Body, Callee};
 use kirin_test_languages::ArithFunctionLanguage;
 
 const PROGRAM: &str = r#"
@@ -122,25 +122,25 @@ fn strong_liveness_over_branching_function() {
         Arith::Add { lhs, result, .. } => Some((SSAValue::from(*result), *lhs)),
         _ => None,
     });
-    assert!(!result.is_demanded(result.root(), dead));
+    assert!(result.fact(result.root(), dead.into()) != Some(&Demand::Live));
     assert_eq!(add_lhs, x, "the add reads the entry parameter");
 
     // Roots and their transitive demands: return operands, the branch
     // condition, and the edge arguments feeding demanded successor params.
     assert!(
-        result.is_demanded(result.root(), cond),
+        result.fact(result.root(), cond.into()) == Some(&Demand::Live),
         "branch condition is a root"
     );
     assert!(
-        result.is_demanded(result.root(), then_param),
+        result.fact(result.root(), then_param.into()) == Some(&Demand::Live),
         "ret %a demands ^then's param"
     );
     assert!(
-        result.is_demanded(result.root(), else_param),
+        result.fact(result.root(), else_param.into()) == Some(&Demand::Live),
         "neg feeds ret in ^else"
     );
     assert!(
-        result.is_demanded(result.root(), x),
+        result.fact(result.root(), x.into()) == Some(&Demand::Live),
         "both edges pass %x into demanded params"
     );
 
@@ -149,7 +149,7 @@ fn strong_liveness_over_branching_function() {
         _ => None,
     });
     assert!(
-        result.is_demanded(result.root(), neg),
+        result.fact(result.root(), neg.into()) == Some(&Demand::Live),
         "ret %neg demands the neg result"
     );
 }
@@ -173,15 +173,15 @@ fn unused_successor_block_argument_does_not_keep_edge_arg_live() {
 
     // `^else` returns `%live` directly (a dominated cross-block use), never
     // touching its own parameter — so the `%dead` edge argument stays dead.
-    assert!(result.is_demanded(result.root(), live));
-    assert!(result.is_demanded(result.root(), cond));
-    assert!(result.is_demanded(result.root(), then_param));
+    assert!(result.fact(result.root(), live.into()) == Some(&Demand::Live));
+    assert!(result.fact(result.root(), cond.into()) == Some(&Demand::Live));
+    assert!(result.fact(result.root(), then_param.into()) == Some(&Demand::Live));
     assert!(
-        !result.is_demanded(result.root(), else_param),
+        result.fact(result.root(), else_param.into()) != Some(&Demand::Live),
         "^else's param is unused"
     );
     assert!(
-        !result.is_demanded(result.root(), dead),
+        result.fact(result.root(), dead.into()) != Some(&Demand::Live),
         "an edge arg feeding an undemanded param stays dead"
     );
 }
@@ -236,7 +236,7 @@ fn terminator_operands_become_demanded() {
     };
 
     let x = block_params(&program, cfg, 0)[0];
-    assert!(result.is_demanded(result.root(), x));
+    assert!(result.fact(result.root(), x.into()) == Some(&Demand::Live));
 }
 
 #[test]
@@ -256,9 +256,9 @@ fn demanded_result_marks_operands_demanded() {
         Arith::Add { result, .. } => Some(SSAValue::from(*result)),
         _ => None,
     });
-    assert!(result.is_demanded(result.root(), sum));
-    assert!(result.is_demanded(result.root(), params[0]));
-    assert!(result.is_demanded(result.root(), params[1]));
+    assert!(result.fact(result.root(), sum.into()) == Some(&Demand::Live));
+    assert!(result.fact(result.root(), params[0].into()) == Some(&Demand::Live));
+    assert!(result.fact(result.root(), params[1].into()) == Some(&Demand::Live));
 }
 
 #[test]
@@ -279,15 +279,15 @@ fn dead_result_leaves_operands_dead() {
         _ => None,
     });
     assert!(
-        !result.is_demanded(result.root(), sum),
+        result.fact(result.root(), sum.into()) != Some(&Demand::Live),
         "the add result is never used"
     );
     assert!(
-        result.is_demanded(result.root(), params[0]),
+        result.fact(result.root(), params[0].into()) == Some(&Demand::Live),
         "ret %a demands the param"
     );
     assert!(
-        !result.is_demanded(result.root(), params[1]),
+        result.fact(result.root(), params[1].into()) != Some(&Demand::Live),
         "a pure statement with a dead result demands nothing"
     );
 }

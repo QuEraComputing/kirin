@@ -15,7 +15,6 @@
 //! use kirin_constprop::{ConstProp, ConstPropValue};
 //! use kirin_interpreter::engine::CrossStageLinker;
 //!
-//! use kirin_interpreter::engine::AnalysisResults;
 //!
 //! let analyzed = ConstProp::<Stage, MyConst, MyError>::new(&program)
 //!     .with_linker(CrossStageLinker)

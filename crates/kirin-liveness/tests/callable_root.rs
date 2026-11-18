@@ -4,8 +4,7 @@
 use kirin::prelude::*;
 use kirin_demand::{Demand, DemandAnalysis};
 use kirin_interpreter::{
-    AnalysisResults, Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker,
-    SameStageLinker,
+    Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker, SameStageLinker,
 };
 use kirin_liveness::DenseLiveness;
 use kirin_test_languages::GraphFunctionLanguage;

@@ -22,7 +22,7 @@ use kirin::prelude::{CFG, CompileStage, Program, SSAValue};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_demand::{Demand, DemandAnalysis, DemandCallCtx};
 use kirin_interpreter::engine::{
-    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, LinkTarget, Linker,
+    AnalysisResults, ConcreteInterpreterCore, CrossStageLinker, LinkTarget, Linker,
     SameStageLinker, SparseForwardInterpreter, expect_single,
 };
 use kirin_interpreter::{
@@ -97,6 +97,10 @@ pub(crate) type ToyDenseLiveness<'ir, Lk = SameStageLinker> = DenseLiveness<
     ToyDenseBackwardFrame<LiveSet, InterpreterError>,
     Lk,
 >;
+
+/// What [`ToyDenseLiveness`] returns: the live set at each program point of
+/// the one analyzed callable.
+pub(crate) type ToyLiveness = AnalysisResults<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
 /// language boundaries.
@@ -178,14 +182,7 @@ pub fn analyze_classic_liveness(
     program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<
-    (
-        CompileStage,
-        CFG,
-        Analyzed<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>,
-    ),
-    InterpreterError,
-> {
+) -> Result<(CompileStage, CFG, ToyLiveness), InterpreterError> {
     let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
     let analyzed = analysis.analyze_by_name(stage_name, function_name)?;
     let root = *analyzed.root();
@@ -204,8 +201,10 @@ pub fn analyze_demand(
     program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<Analyzed<(LinkTarget, DemandCallCtx), SSAValue, Demand, StrongDemand>, InterpreterError>
-{
+) -> Result<
+    AnalysisResults<(LinkTarget, DemandCallCtx), SSAValue, Demand, StrongDemand>,
+    InterpreterError,
+> {
     let stage = program
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;

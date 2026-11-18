@@ -615,8 +615,8 @@ these initial visits, including return declarations and calls. Fact raises
 join immediately; later changes schedule dependents through the table above.
 Thus a call may observe demand from an earlier initial visit without depending
 on block storage order.
-The public backward `analyze` methods return the converged `Analyzed` state
-(see [Reading results](#reading-results--analyzed-and-analysisresults)). The
+The public backward `analyze` methods return the converged `AnalysisResults`
+(see [Reading results](#reading-results--analysisresults)). The
 root's `response` is the `Product<V>` of parameter facts in entry-parameter
 order, dual to forward analysis's return product. The two-point fact type is
 `Demand::{Dead, Live}`. Exact products are checked against discovered return
@@ -634,58 +634,61 @@ errors, never opaque fallbacks. There is no opaque-call policy. Indirect calls
 and closures are unsupported: like their forward rules, the `Lambda`/`Bind`
 demand rules return errors.
 Each `analyze` is one fresh analysis: it consumes the engine, and the
-`Analyzed` state it returns cannot run again. Within that analysis shared
+`AnalysisResults` it returns cannot run again. Within that analysis shared
 callees are discovered and solved once, and a request whose policy key matches
 an earlier context of the same analysis joins into it. An error drops the
 engine, so a failed discovery is never reused.
 
-### Reading results — `Analyzed` and `AnalysisResults`
+### Reading results — `AnalysisResults`
 
 Every abstract engine's `analyze` consumes the engine and returns
-`Analyzed<K, A, V, Sem>`: the owned result of exactly one converged analysis,
+`AnalysisResults<K, A, V, Sem>`: the owned result of exactly one converged analysis,
 with context key `K`, anchor `A`, lattice value `V` and semantic key `Sem`. It
 has no `analyze` of its own, so it always has one root and never mixes two
 runs. Every engine produces the same type: constprop
-`Analyzed<P::Key, SSAValue, V, ForwardEval>`, demand
-`Analyzed<P::Key, SSAValue, V, StrongDemand>`, liveness
-`Analyzed<LinkTarget, ProgramPoint, V, ClassicLiveness>`. It holds no engine
+`AnalysisResults<P::Key, SSAValue, V, ForwardEval>`, demand
+`AnalysisResults<P::Key, SSAValue, V, StrongDemand>`, liveness
+`AnalysisResults<LinkTarget, ProgramPoint, V, ClassicLiveness>`. It holds no engine
 and no borrow of `Program<S>`. `Sem` is a zero-sized marker, so two keys
-sharing a solver shape still produce distinct result types; the
-`is_demanded()` helper exists only for `Analyzed<_, SSAValue, _, StrongDemand>`.
-One implementation of the read-only trait serves all three engines:
+sharing a solver shape still produce distinct result types. Every read is an
+ordinary method with one body, the same for every engine; there is no trait to
+import and no engine-specific helper (read demand with `fact`):
 
 ```rust
-pub trait AnalysisResults {
-    type Context;                 // sparse engines: the policy key; liveness: LinkTarget
-    type Anchor: LatticeAnchor;   // SSAValue or ProgramPoint
-    type Value: Lattice + Clone;
+impl<K, A, V, Sem> AnalysisResults<K, A, V, Sem> {
+    // per context
+    pub fn root(&self) -> &K;
+    pub fn contexts(&self) -> impl Iterator<Item = &K>;
+    pub fn callable_of(&self, &K) -> Option<LinkTarget>;
+    pub fn fact(&self, &K, A) -> Option<&V>;
+    pub fn facts(&self, &K) -> impl Iterator<Item = (A, &V)>;
+    pub fn response(&self, &K) -> Option<Product<V>>;
 
-    // per context (required)
-    fn root(&self) -> &Self::Context;
-    fn contexts(&self) -> impl Iterator<Item = &Self::Context>;
-    fn callable_of(&self, &Self::Context) -> Option<LinkTarget>;
-    fn fact(&self, &Self::Context, Self::Anchor) -> Option<&Self::Value>;
-    fn facts(&self, &Self::Context) -> impl Iterator<Item = (Self::Anchor, &Self::Value)>;
-    fn response(&self, &Self::Context) -> Option<Product<Self::Value>>;
+    // per callable
+    pub fn callables(&self) -> impl Iterator<Item = LinkTarget>;
+    pub fn contexts_of(&self, LinkTarget) -> impl Iterator<Item = &K>;
+    pub fn joined_fact(&self, LinkTarget, A) -> Option<V>;
+    pub fn joined_facts(&self, LinkTarget) -> FactStore<A, V>;
+    pub fn joined_response(&self, LinkTarget) -> Option<Product<V>>;
 
-    // per callable (provided)
-    fn callables(&self) -> impl Iterator<Item = LinkTarget>;
-    fn contexts_of(&self, LinkTarget) -> impl Iterator<Item = &Self::Context>;
-    fn joined_fact(&self, LinkTarget, Self::Anchor) -> Option<Self::Value>;
-    fn joined_facts(&self, LinkTarget) -> FactStore<Self::Anchor, Self::Value>;
-    fn joined_response(&self, LinkTarget) -> Option<Product<Self::Value>>;
+    // per stage
+    pub fn joined_fact_at(&self, CompileStage, A) -> Option<V>;
 }
 ```
 
+`K` is the context key (the policy key for the sparse engines, `LinkTarget`
+for liveness) and `A` the anchor (`SSAValue` or `ProgramPoint`).
+
 A **context** is one analyzed copy of a callable under specific boundary
-facts. Facts are read at two levels: per context, and per callable (the join
-over the callable's contexts). The **root** is the context `analyze` was asked
+facts. Facts are read at three levels: per context, per callable (the join
+over the callable's contexts), and per stage (the join over the stage's
+contexts). The **root** is the context `analyze` was asked
 for. It is a handle, read like any other context; it exists because the
 root's callable can have other contexts (recursion).
 
 | | Constprop | Demand | Liveness |
 |---|---|---|---|
-| `Context` | `CallContext::Key` | `DemandContext::Key` | `LinkTarget` |
+| `K` | `CallContext::Key` | `DemandContext::Key` | `LinkTarget` |
 | `contexts()` | selected contexts | discovered contexts | the root |
 | `callable_of` | recorded target | recorded target | the context itself |
 | `fact` / `facts` | the context's environment | the context's environment | the root's environment |
@@ -708,13 +711,22 @@ environments and are never stored. They join the contexts **reached from the
 root**: they claim nothing about callers the analysis did not visit, and
 whether that is safe for a rewrite is the client's decision.
 
-`Analyzed` owns four things, all built once when `analyze` finishes: the root,
+`joined_fact_at(stage, anchor)` is the same join for a reader that knows an
+anchor but not its callable, such as a rewrite rule at a statement. It joins
+the anchor's fact over every context at `stage`. Anchors are allocated per
+stage (`%5` at `source` and `%5` at `lowered` are different values, and a
+cross-stage analysis holds both), and the entity an anchor names belongs to
+one callable, whose contexts are the only ones with a fact for it. So the
+answer equals `joined_fact` for that callable.
+
+`AnalysisResults` owns five things, all built once when `analyze` finishes: the root,
 the engine's fact store (moved, not copied), each reached context's callable
-and response, and an index from each reached callable to its contexts'
-environments. `contexts_of` reads the index and maps each environment back to
-its context through `EnvStore::key`, so a per-callable query visits only that
-callable's contexts. Responses are stored per engine: constprop's joined
-return, demand's entry-parameter facts (bottom where absent), and `None` for
+and response, and two indexes of the contexts' environments, by callable and
+by stage. `contexts_of` reads the first and maps each environment back to its
+context through `EnvStore::key`, so a per-callable query visits only that
+callable's contexts; `joined_fact_at` reads the second, so a per-stage query
+visits only that stage's contexts. Responses are stored per engine:
+constprop's joined return, demand's entry-parameter facts (bottom where absent), and `None` for
 liveness. Worklists, caller dependencies, frame stacks, linkers, and program
 references are discarded.
 

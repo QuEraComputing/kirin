@@ -63,7 +63,7 @@ use kirin_ir::{
 use super::DemandFrame;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Analyzed, Body, CallEffect, Callee, ContextInsensitive, EnvIndex,
+    AbstractInterpreter, AnalysisResults, Body, CallEffect, Callee, ContextInsensitive, EnvIndex,
     EnvStore, FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError,
     LinkTarget, Linker, SameStageLinker, SparseBackwardSemantic, StageQuery,
     StandardFixpointInterpreter, StrongDemand, TerminatorArgs, WorkAnalysis,
@@ -814,7 +814,7 @@ where
 /// context the [`DemandContext`] policy `P` selects (default: one context per
 /// resolved [`LinkTarget`](crate::LinkTarget)).
 ///
-/// `analyze` consumes the engine and returns the converged [`Analyzed`]
+/// `analyze` consumes the engine and returns the converged [`AnalysisResults`]
 /// state, read through [`AnalysisResults`](crate::AnalysisResults). Each analysis is fresh: analyzing
 /// another root takes another engine.
 ///
@@ -822,7 +822,7 @@ where
 /// let analyzed = SparseBackwardInterpreter::<Stage, Demand>::new(&program)
 ///     .analyze(stage, callee, [Demand::Live])?;
 /// let params = analyzed.response(analyzed.root());
-/// let demanded = analyzed.is_demanded(analyzed.root(), value);
+/// let demand = analyzed.fact(analyzed.root(), value);
 /// ```
 pub struct SparseBackwardInterpreter<
     'ir,
@@ -913,7 +913,7 @@ where
         stage_name: &str,
         function_name: &str,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
+    ) -> Result<AnalysisResults<P::Key, SSAValue, V, Sem>, E> {
         let stage = self
             .program()
             .stage_by_name(stage_name)
@@ -932,7 +932,7 @@ where
         stage: CompileStage,
         symbol: Symbol,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
+    ) -> Result<AnalysisResults<P::Key, SSAValue, V, Sem>, E> {
         self.analyze(stage, symbol.into(), result_values)
     }
 
@@ -949,7 +949,7 @@ where
         stage: CompileStage,
         callee: Callee,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Analyzed<P::Key, SSAValue, V, Sem>, E> {
+    ) -> Result<AnalysisResults<P::Key, SSAValue, V, Sem>, E> {
         let outputs: Product<V> = result_values.into_iter().collect();
         let (_, root, _) = self
             .driver
@@ -972,6 +972,6 @@ where
             })
             .collect::<Result<Vec<_>, E>>()?;
         let transfer = self.driver.into_inner();
-        Ok(Analyzed::new(root, transfer.env, contexts))
+        Ok(AnalysisResults::new(root, transfer.env, contexts))
     }
 }

@@ -1,8 +1,13 @@
-use kirin::prelude::{GetInfo, HasStageInfo, ParseProgramText, Program, Signature, StageInfo};
+use std::collections::HashMap;
+
+use kirin::prelude::{
+    GetInfo, HasStageInfo, ParseProgramText, Program, SSAValue, Signature, StageInfo,
+};
 use kirin_arith::ArithType;
 use kirin_function::{Call, Function, Return};
+use kirin_interpreter::CrossStageLinker;
 
-use crate::interpreter::{analyze_constprop, run_i64, run_source_i64};
+use crate::interpreter::{ToyConstProp, analyze_constprop, run_i64, run_source_i64};
 use crate::language::LowLevel;
 use crate::stage::Stage;
 
@@ -522,6 +527,53 @@ fn constprop_cross_stage_calls_between_source_and_lowered() {
     assert_eq!(lowered_result, ConstProp::Const(5));
 }
 
+/// One cross-stage analysis holds facts at both stages, and SSA ids are
+/// allocated per stage, so one id names different values at `source` and
+/// `lowered`. The stage-keyed read returns each stage's own facts.
+#[test]
+fn joined_fact_at_reads_each_stages_own_facts_for_overlapping_ssa_ids() {
+    let program = build_program(CROSS_STAGE_CALLS);
+    let source = program.stage_by_name("source").unwrap();
+    let lowered = program.stage_by_name("lowered").unwrap();
+    let engine: ToyConstProp<'_, i64> = ToyConstProp::new(&program).with_linker(CrossStageLinker);
+    let analyzed = engine
+        .analyze_by_name(
+            "source",
+            "source_to_lowered_to_source",
+            [ConstProp::Const(-7)],
+        )
+        .unwrap();
+
+    // Each stage's facts, joined over the callables reached at that stage.
+    let stage_facts = |stage| -> HashMap<SSAValue, ConstProp> {
+        analyzed
+            .callables()
+            .filter(|callable| callable.stage == stage)
+            .flat_map(|callable| {
+                let facts = analyzed.joined_facts(callable);
+                facts
+                    .iter()
+                    .map(|(value, fact)| (value, fact.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    };
+    let source_facts = stage_facts(source);
+    let lowered_facts = stage_facts(lowered);
+
+    // Some SSA id carries a fact at both stages, and the two facts differ.
+    assert!(
+        lowered_facts
+            .iter()
+            .any(|(value, fact)| { source_facts.get(value).is_some_and(|other| other != fact) })
+    );
+    for (stage, facts) in [(source, &source_facts), (lowered, &lowered_facts)] {
+        for (value, fact) in facts {
+            assert_eq!(analyzed.joined_fact_at(stage, *value).as_ref(), Some(fact));
+        }
+    }
+}
+
 #[test]
 fn constprop_cross_stage_call_specialized_uses_direct_target() {
     let program = build_cross_stage_specialized_program();
@@ -580,7 +632,7 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
 /// Analysis-author surface for a custom abstract policy budget.
 mod advanced {
     use kirin_constprop::ConstPropContext;
-    use kirin_interpreter::{AnalysisResults, SameStageLinker, engine::expect_single};
+    use kirin_interpreter::{SameStageLinker, engine::expect_single};
 
     use super::{ConstProp, build_program};
 
@@ -622,9 +674,9 @@ mod demand {
         ParseProgramText, Program, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
-    use kirin_demand::DemandAnalysis;
+    use kirin_demand::{Demand, DemandAnalysis};
     use kirin_function::Lexical;
-    use kirin_interpreter::{AnalysisResults, Body, Callee, LinkTarget};
+    use kirin_interpreter::{Body, Callee, LinkTarget};
 
     use crate::language::HighLevel;
     use crate::stage::Stage;
@@ -797,23 +849,26 @@ specialize @source fn @if_body(i64) -> i64 cfg {
         });
 
         assert!(
-            result.is_demanded(result.root(), if_result),
+            result.fact(result.root(), if_result.into()) == Some(&Demand::Live),
             "ret demands the if result"
         );
         assert!(
-            result.is_demanded(result.root(), cond),
+            result.fact(result.root(), cond.into()) == Some(&Demand::Live),
             "condition is a control root"
         );
         assert!(
-            result.is_demanded(result.root(), constant_result(&program, cfg, 1)),
+            result.fact(result.root(), constant_result(&program, cfg, 1).into())
+                == Some(&Demand::Live),
             "then-arm yield operand feeds the demanded result"
         );
         assert!(
-            result.is_demanded(result.root(), constant_result(&program, cfg, 2)),
+            result.fact(result.root(), constant_result(&program, cfg, 2).into())
+                == Some(&Demand::Live),
             "else-arm yield operand feeds the demanded result"
         );
         assert!(
-            !result.is_demanded(result.root(), constant_result(&program, cfg, 9)),
+            result.fact(result.root(), constant_result(&program, cfg, 9).into())
+                != Some(&Demand::Live),
             "a dead constant inside a body stays dead"
         );
     }
@@ -856,13 +911,22 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
         });
 
         assert!(
-            result.is_demanded(result.root(), cond),
+            result.fact(result.root(), cond.into()) == Some(&Demand::Live),
             "condition is a control root"
         );
-        assert!(result.is_demanded(result.root(), constant_result(&program, cfg, 0)));
-        assert!(!result.is_demanded(result.root(), if_result));
-        assert!(!result.is_demanded(result.root(), constant_result(&program, cfg, 1)));
-        assert!(!result.is_demanded(result.root(), constant_result(&program, cfg, 2)));
+        assert!(
+            result.fact(result.root(), constant_result(&program, cfg, 0).into())
+                == Some(&Demand::Live)
+        );
+        assert!(result.fact(result.root(), if_result.into()) != Some(&Demand::Live));
+        assert!(
+            result.fact(result.root(), constant_result(&program, cfg, 1).into())
+                != Some(&Demand::Live)
+        );
+        assert!(
+            result.fact(result.root(), constant_result(&program, cfg, 2).into())
+                != Some(&Demand::Live)
+        );
     }
 
     pub(super) const FOR_CARRIED_DEMAND: &str = r#"
@@ -923,26 +987,31 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
         };
 
         assert!(
-            result.is_demanded(result.root(), constant_result(&program, cfg, 0)),
+            result.fact(result.root(), constant_result(&program, cfg, 0).into())
+                == Some(&Demand::Live),
             "init"
         );
         assert!(
-            result.is_demanded(result.root(), constant_result(&program, cfg, 1)),
+            result.fact(result.root(), constant_result(&program, cfg, 1).into())
+                == Some(&Demand::Live),
             "one"
         );
-        assert!(result.is_demanded(result.root(), next), "yield slot");
         assert!(
-            result.is_demanded(result.root(), carried),
+            result.fact(result.root(), next.into()) == Some(&Demand::Live),
+            "yield slot"
+        );
+        assert!(
+            result.fact(result.root(), carried.into()) == Some(&Demand::Live),
             "carried param feeds the add"
         );
         assert!(
-            !result.is_demanded(result.root(), induction),
+            result.fact(result.root(), induction.into()) != Some(&Demand::Live),
             "the unused induction variable stays dead"
         );
         assert!(
-            result.is_demanded(result.root(), lo)
-                && result.is_demanded(result.root(), hi)
-                && result.is_demanded(result.root(), step)
+            result.fact(result.root(), lo.into()) == Some(&Demand::Live)
+                && result.fact(result.root(), hi.into()) == Some(&Demand::Live)
+                && result.fact(result.root(), step.into()) == Some(&Demand::Live)
         );
     }
 
@@ -982,21 +1051,29 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
         });
 
         assert!(
-            result.is_demanded(result.root(), params[0]),
+            result.fact(result.root(), params[0].into()) == Some(&Demand::Live),
             "bounds are control roots"
         );
-        assert!(result.is_demanded(result.root(), params[1]));
-        assert!(result.is_demanded(result.root(), params[2]));
-        assert!(result.is_demanded(result.root(), constant_result(&program, cfg, 7)));
+        assert!(result.fact(result.root(), params[1].into()) == Some(&Demand::Live));
+        assert!(result.fact(result.root(), params[2].into()) == Some(&Demand::Live));
         assert!(
-            !result.is_demanded(result.root(), constant_result(&program, cfg, 0)),
+            result.fact(result.root(), constant_result(&program, cfg, 7).into())
+                == Some(&Demand::Live)
+        );
+        assert!(
+            result.fact(result.root(), constant_result(&program, cfg, 0).into())
+                != Some(&Demand::Live),
             "init dead"
         );
         assert!(
-            !result.is_demanded(result.root(), constant_result(&program, cfg, 1)),
+            result.fact(result.root(), constant_result(&program, cfg, 1).into())
+                != Some(&Demand::Live),
             "body interior dead"
         );
-        assert!(!result.is_demanded(result.root(), next), "yield slot dead");
+        assert!(
+            result.fact(result.root(), next.into()) != Some(&Demand::Live),
+            "yield slot dead"
+        );
     }
 
     const CALL_PURITY: &str = r#"
@@ -1047,19 +1124,22 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
         });
 
         assert!(
-            !result.is_demanded(result.root(), x),
+            result.fact(result.root(), x.into()) != Some(&Demand::Live),
             "an ignored call demands nothing"
         );
-        assert!(result.is_demanded(result.root(), constant_result(&program, cfg, 0)));
         assert!(
-            !result.is_demanded(result.root(), unused),
+            result.fact(result.root(), constant_result(&program, cfg, 0).into())
+                == Some(&Demand::Live)
+        );
+        assert!(
+            result.fact(result.root(), unused.into()) != Some(&Demand::Live),
             "the call result is unused"
         );
         assert!(
-            !result.is_demanded(result.root(), y),
+            result.fact(result.root(), y.into()) != Some(&Demand::Live),
             "pure add with dead result"
         );
-        assert!(!result.is_demanded(result.root(), deadsum));
+        assert!(result.fact(result.root(), deadsum.into()) != Some(&Demand::Live));
     }
 }
 
@@ -1073,9 +1153,7 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 mod dense {
     use kirin::prelude::{CFG, CompileStage, Program, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{
-        AnalysisResults, Analyzed, Body, Callee, ClassicLiveness, LinkTarget, ProgramPoint,
-    };
+    use kirin_interpreter::{Body, Callee, ProgramPoint};
     use kirin_liveness::LiveSet;
     use kirin_scf::StructuredControlFlow;
 
@@ -1083,7 +1161,7 @@ mod dense {
     use super::demand::{
         constant_result, entry_params, find_statement, find_value, parse, source_root,
     };
-    use crate::interpreter::ToyDenseLiveness;
+    use crate::interpreter::{ToyDenseLiveness, ToyLiveness};
     use crate::language::HighLevel;
     use crate::stage::Stage;
 
@@ -1093,10 +1171,7 @@ mod dense {
         program: &Program<Stage>,
         caller_stage: CompileStage,
         callee: Callee,
-    ) -> (
-        Analyzed<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>,
-        CFG,
-    ) {
+    ) -> (ToyLiveness, CFG) {
         let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
         let analyzed = engine
             .analyze(caller_stage, callee)
