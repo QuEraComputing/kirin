@@ -17,10 +17,8 @@
 //! there is no structural fallback.
 //!
 //! ```ignore
-//! use kirin_interpreter::AnalysisResults;
-//!
 //! let analyzed = DemandAnalysis::<Stage>::new(&program).analyze(stage, callee, [Demand::Live])?;
-//! assert!(analyzed.is_demanded(analyzed.root(), some_value));
+//! assert_eq!(analyzed.fact(analyzed.root(), some_value), Some(&Demand::Live));
 //! ```
 
 mod context;

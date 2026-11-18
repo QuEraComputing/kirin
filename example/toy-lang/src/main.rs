@@ -5,7 +5,7 @@ mod stage;
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::ProgramPrintExt;
-use kirin_interpreter::{AnalysisResults, ProgramPoint};
+use kirin_interpreter::ProgramPoint;
 
 use stage::Stage;
 
@@ -185,7 +185,7 @@ fn run_program(
 fn print_block_liveness<L: Dialect>(
     info: &StageInfo<L>,
     cfg: CFG,
-    dense: &impl AnalysisResults<Anchor = ProgramPoint, Value = kirin_liveness::LiveSet>,
+    dense: &interpreter::ToyLiveness,
 ) {
     for block in cfg.blocks(info) {
         let point = |item| dense.fact(dense.root(), item);

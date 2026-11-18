@@ -9,7 +9,6 @@
 //! separate sparse backward analysis in `kirin-demand`.
 //!
 //! ```ignore
-//! use kirin_interpreter::AnalysisResults;
 //!
 //! let analyzed = DenseLiveness::<Stage>::new(&program).analyze(stage, callee)?;
 //! let live = analyzed.fact(analyzed.root(), point);

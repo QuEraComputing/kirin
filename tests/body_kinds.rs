@@ -36,11 +36,11 @@ use kirin_constant::Constant;
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-    AnalysisResults, BlockFrame, Body, CFGFrame, CallFrame, CallRequest, Callee, Completion,
-    ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal,
-    DiGraphFrame, Frame, FrameEffect, FrameEngine, Interpretable, InterpreterError,
-    SameStageLinker, SparseForwardInterpreter, expect_single,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
+    Body, CFGFrame, CallFrame, CallRequest, Callee, Completion, ConcreteInterpreter,
+    ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal, DiGraphFrame, Frame,
+    FrameEffect, FrameEngine, Interpretable, InterpreterError, SameStageLinker,
+    SparseForwardInterpreter, expect_single,
 };
 use kirin_scf::{ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;

@@ -18,14 +18,17 @@ use frame::ToyFrame;
 
 use std::hash::Hash;
 
-use kirin::prelude::{CFG, CompileStage, Program};
+use kirin::prelude::{CFG, CompileStage, Program, SSAValue};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
-use kirin_demand::DemandAnalysis;
+use kirin_demand::{Demand, DemandAnalysis, DemandCallCtx};
 use kirin_interpreter::engine::{
-    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
-    SparseForwardInterpreter, expect_single,
+    AnalysisResults, ConcreteInterpreterCore, CrossStageLinker, LinkTarget, Linker,
+    SameStageLinker, SparseForwardInterpreter, expect_single,
 };
-use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
+use kirin_interpreter::{
+    Body, Callee, ClassicLiveness, InterpDispatch, InterpreterError, ProgramPoint,
+    SparseForwardTransfer, StrongDemand,
+};
 use kirin_liveness::{DenseLiveness, LiveSet};
 use kirin_scf::ForLoopValue;
 
@@ -94,6 +97,10 @@ pub(crate) type ToyDenseLiveness<'ir, Lk = SameStageLinker> = DenseLiveness<
     ToyDenseBackwardFrame<LiveSet, InterpreterError>,
     Lk,
 >;
+
+/// What [`ToyDenseLiveness`] returns: the live set at each program point of
+/// the one analyzed callable.
+pub(crate) type ToyLiveness = AnalysisResults<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
 /// language boundaries.
@@ -171,11 +178,11 @@ where
 ///
 /// Stage-pinned: a `function_name` with no live specialization at `stage_name`
 /// is an error, not a cue to analyze some other stage's body.
-pub fn analyze_classic_liveness<'ir>(
-    program: &'ir Program<Stage>,
+pub fn analyze_classic_liveness(
+    program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(CompileStage, CFG, Analyzed<ToyDenseLiveness<'ir>>), InterpreterError> {
+) -> Result<(CompileStage, CFG, ToyLiveness), InterpreterError> {
     let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(program);
     let analyzed = analysis.analyze_by_name(stage_name, function_name)?;
     let root = *analyzed.root();
@@ -190,20 +197,19 @@ pub fn analyze_classic_liveness<'ir>(
 /// Run strong liveness (sparse backward demand) over `function_name`'s body
 /// at `stage_name`. Independent of [`analyze_classic_liveness`], and
 /// stage-pinned in the same way.
-pub fn analyze_demand<'ir>(
-    program: &'ir Program<Stage>,
+pub fn analyze_demand(
+    program: &Program<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<Analyzed<DemandAnalysis<'ir, Stage>>, InterpreterError> {
+) -> Result<
+    AnalysisResults<(LinkTarget, DemandCallCtx), SSAValue, Demand, StrongDemand>,
+    InterpreterError,
+> {
     let stage = program
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
     let function = program
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    DemandAnalysis::<_>::new(program).analyze(
-        stage,
-        Callee::Function(function),
-        [kirin_demand::Demand::Live],
-    )
+    DemandAnalysis::<_>::new(program).analyze(stage, Callee::Function(function), [Demand::Live])
 }

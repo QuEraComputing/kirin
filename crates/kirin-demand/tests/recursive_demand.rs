@@ -1,6 +1,5 @@
 use kirin::prelude::*;
 use kirin_demand::{Demand, DemandAnalysis};
-use kirin_interpreter::AnalysisResults;
 use kirin_test_languages::GraphFunctionLanguage;
 
 #[test]

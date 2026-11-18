@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 use kirin_constprop::{ConstProp, ConstPropValue};
-use kirin_interpreter::{AnalysisResults, InterpreterError, expect_single};
+use kirin_interpreter::{InterpreterError, expect_single};
 use kirin_test_languages::ScalarFunctionLanguage;
 
 #[test]

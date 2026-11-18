@@ -50,7 +50,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Product, Program, SSAValue,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Program, SSAValue,
     StageMeta, Statement, Symbol,
 };
 
@@ -58,7 +58,7 @@ use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, AnalysisResults, Analyzed, BlockQueries, Callee, ClassicLiveness,
+    AbstractInterpreter, AnalysisResults, BlockQueries, Callee, ClassicLiveness,
     DenseBackwardSemantic, EnvIndex, EnvStore, FixpointProfile, Frame, Interp, InterpDispatch,
     InterpLocation, InterpreterError, LinkTarget, Linker, ProgramPoint, SameStageLinker,
     StageQuery, StandardFixpointInterpreter, StatementDispatch, TerminatorArgs, WorkAnalysis,
@@ -737,7 +737,7 @@ where
         self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<AnalysisResults<LinkTarget, ProgramPoint, V, Sem>, E> {
         let stage = self
             .driver
             .inner()
@@ -758,7 +758,7 @@ where
         self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<Analyzed<Self>, E> {
+    ) -> Result<AnalysisResults<LinkTarget, ProgramPoint, V, Sem>, E> {
         self.analyze(stage, symbol.into())
     }
 
@@ -766,9 +766,13 @@ where
     /// and drain the block worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
     ///
-    /// It consumes the engine and returns the converged [`Analyzed`] state,
-    /// like the other analysis engines; an error drops the engine.
-    pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<Analyzed<Self>, E> {
+    /// It consumes the engine and returns an owned [`AnalysisResults`], like
+    /// the other analysis engines; an error drops the engine.
+    pub fn analyze(
+        mut self,
+        stage: CompileStage,
+        callee: Callee,
+    ) -> Result<AnalysisResults<LinkTarget, ProgramPoint, V, Sem>, E> {
         let program = self.driver.inner().program();
         let target = self.linker.resolve(program, stage, &callee)?;
         let body = target.body(program)?;
@@ -782,60 +786,11 @@ where
         let work = blocks.into_iter().map(|block| (env, Body::Block(block)));
         self.driver
             .solve_many(&mut DenseBackwardWorkAnalysis, work)?;
-        Ok(Analyzed::new(self, [(target, env)]))
-    }
-}
-
-/// One callable, one context: the context is the analyzed [`LinkTarget`],
-/// and there is no response because calls are not followed.
-impl<'ir, S, V, E, F, Lk, Sem> AnalysisResults
-    for Analyzed<DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>>
-where
-    S: StageMeta,
-    V: Clone + PartialEq + Lattice,
-    E: From<InterpreterError>,
-    Sem: DenseBackwardSemantic,
-{
-    type Context = LinkTarget;
-    type Anchor = ProgramPoint;
-    type Value = V;
-
-    fn root(&self) -> &LinkTarget {
-        let (target, _) = self
-            .engine
-            .driver
-            .inner()
-            .root
-            .as_ref()
-            .expect("`analyze` sets the root before building `Analyzed`");
-        target
-    }
-
-    fn contexts(&self) -> impl Iterator<Item = &LinkTarget> {
-        std::iter::once(self.root())
-    }
-
-    fn callable_of(&self, context: &LinkTarget) -> Option<LinkTarget> {
-        (context == self.root()).then_some(*context)
-    }
-
-    fn fact(&self, context: &LinkTarget, point: ProgramPoint) -> Option<&V> {
-        let transfer = self.engine.driver.inner();
-        let env = transfer.env.context_env(context)?;
-        transfer.env.environment(env).ok()?.get(point)
-    }
-
-    fn facts(&self, context: &LinkTarget) -> impl Iterator<Item = (ProgramPoint, &V)> {
-        let transfer = self.engine.driver.inner();
-        transfer
-            .env
-            .context_env(context)
-            .and_then(|env| transfer.env.environment(env).ok())
-            .into_iter()
-            .flat_map(|facts| facts.iter())
-    }
-
-    fn response(&self, _context: &LinkTarget) -> Option<Product<V>> {
-        None
+        let transfer = self.driver.into_inner();
+        Ok(AnalysisResults::new(
+            target,
+            transfer.env,
+            [(env, target, None)],
+        ))
     }
 }

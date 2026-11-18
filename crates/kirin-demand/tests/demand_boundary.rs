@@ -2,7 +2,7 @@
 use kirin::prelude::*;
 use kirin_demand::OutputDemandContext;
 use kirin_demand::{Demand, DemandAnalysis};
-use kirin_interpreter::{AnalysisResults, InterpreterError};
+use kirin_interpreter::InterpreterError;
 use kirin_test_languages::GraphFunctionLanguage;
 
 type TestStage = StageInfo<GraphFunctionLanguage>;

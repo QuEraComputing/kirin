@@ -8,6 +8,8 @@ use crate::{Frame, FrameEffect, FrameEngine};
 use super::{BlockFrame, CFGFrame, CallFrame, CallRequest, Completion, DiGraphFrame};
 
 /// Private homogeneous stack element for the default concrete interpreter.
+// `CFG` follows the IR's `CFG`/`CFGFrame` naming.
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) enum FrameStackItem<V, E> {
     Block(BlockFrame<V, E>),
     CFG(CFGFrame<V, E>),

@@ -93,8 +93,8 @@ pub use engines::sparse_backward::{
     DemandContext, DemandFrame, DemandInterp, SparseBackwardDriver, SparseBackwardEffect,
     SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile, SparseBackwardTransfer,
 };
-// The read-only view of a converged analysis, shared by the abstract engines.
-pub use engines::{AnalysisResults, Analyzed};
+// The owned result of a converged analysis, returned by every abstract engine.
+pub use engines::AnalysisResults;
 // Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
 pub use engines::dense_backward::{
     ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardEffect,
@@ -145,9 +145,9 @@ pub mod dialect {
 pub mod engine {
     pub use crate::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-        AbstractInterpreter, AnalysisResults, Analyzed, BlockFrame, BlockQueries, BodyFrameEntry,
-        CFGFrame, CFGQueries, CallBodyTraversal, CallContext, CallFrame, CallRequest, CallServices,
-        Callee, Completion, ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive,
+        AbstractInterpreter, AnalysisResults, BlockFrame, BlockQueries, BodyFrameEntry, CFGFrame,
+        CFGQueries, CallBodyTraversal, CallContext, CallFrame, CallRequest, CallServices, Callee,
+        Completion, ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive,
         CrossStageLinker, DefaultCallBodyTraversal, DemandContext, DenseBackwardCompletion,
         DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter, DenseBlockFrame,
         DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
