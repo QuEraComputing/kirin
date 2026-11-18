@@ -814,9 +814,8 @@ where
 /// context the [`DemandContext`] policy `P` selects (default: one context per
 /// resolved [`LinkTarget`](crate::LinkTarget)).
 ///
-/// `analyze` consumes the engine and returns the converged [`AnalysisResults`]
-/// state, read through [`AnalysisResults`](crate::AnalysisResults). Each analysis is fresh: analyzing
-/// another root takes another engine.
+/// `analyze` consumes the engine and returns an owned [`AnalysisResults`].
+/// Each analysis is fresh: analyzing another root takes another engine.
 ///
 /// ```ignore
 /// let analyzed = SparseBackwardInterpreter::<Stage, Demand>::new(&program)

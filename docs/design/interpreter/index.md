@@ -728,7 +728,9 @@ callable's contexts; `joined_fact_at` reads the second, so a per-stage query
 visits only that stage's contexts. Responses are stored per engine:
 constprop's joined return, demand's entry-parameter facts (bottom where absent), and `None` for
 liveness. Worklists, caller dependencies, frame stacks, linkers, and program
-references are discarded.
+references are discarded. Every engine builds its result with the public
+`AnalysisResults::new(root, env, contexts)`, so a downstream engine returns the
+same type and its readers use the same methods.
 
 Every per-context query is keyed by context, so a context is a query key and
 `response`/`facts` its value. That keeps the API compatible with a later

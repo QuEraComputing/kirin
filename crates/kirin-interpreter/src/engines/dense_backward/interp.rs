@@ -766,8 +766,8 @@ where
     /// and drain the block worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
     ///
-    /// It consumes the engine and returns the converged [`AnalysisResults`] state,
-    /// like the other analysis engines; an error drops the engine.
+    /// It consumes the engine and returns an owned [`AnalysisResults`], like
+    /// the other analysis engines; an error drops the engine.
     pub fn analyze(
         mut self,
         stage: CompileStage,

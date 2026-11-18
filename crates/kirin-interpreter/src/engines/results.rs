@@ -39,8 +39,16 @@ pub struct AnalysisResults<K, A: LatticeAnchor, V, Sem> {
 
 impl<K, A: LatticeAnchor, V, Sem> AnalysisResults<K, A, V, Sem> {
     /// Take ownership of a converged engine's fact store, with each reached
-    /// context's environment, callable and response.
-    pub(crate) fn new(
+    /// context's environment, callable and response. Every engine builds its
+    /// result here, including a downstream engine.
+    ///
+    /// `root` is the context `analyze` was asked for; `env` holds every
+    /// context's facts, each environment registered under its context key;
+    /// `contexts` lists each reached context once, as its environment in
+    /// `env`, the callable it analyzes, and its response (`None` if it has no
+    /// answer). Contexts left out of `contexts` are not reached: reads skip
+    /// them.
+    pub fn new(
         root: K,
         env: EnvStore<K, A, V>,
         contexts: impl IntoIterator<Item = (EnvIndex, LinkTarget, Option<Product<V>>)>,

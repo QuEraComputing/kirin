@@ -986,9 +986,8 @@ where
 /// Traversal is owned by the total frame type `F`; context keying and merge/widen
 /// behavior are owned by the policy `P`.
 ///
-/// `analyze` consumes the engine and returns the converged [`AnalysisResults`]
-/// state, read through [`AnalysisResults`](crate::AnalysisResults). Each analysis is fresh: analyzing
-/// another root takes another engine.
+/// `analyze` consumes the engine and returns an owned [`AnalysisResults`].
+/// Each analysis is fresh: analyzing another root takes another engine.
 ///
 /// ```ignore
 /// let analyzed = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&program)
