@@ -70,6 +70,15 @@
 //! `StageInfo::statement_arena_mut` is still public, so that bypass is
 //! currently reachable.
 //!
+//! # Bodies of inserted statements
+//!
+//! An inserted statement becomes the parent of the bodies its definition
+//! names, which must be owned by nothing yet: blocks from
+//! [`Rewriter::new_block`], or bodies the builder left unowned. A
+//! [`Rewriter::new_block`] block that no statement owns when the `Rewriter`
+//! drops is tombstoned with everything it holds, unless the drop follows a
+//! panic; [`Rewriter::erase_block`] discards one earlier.
+//!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
 //! removed. Erasure is eager: the statement-owned blocks, `CFG`s, `DiGraph`s,
@@ -80,7 +89,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use indexmap::{IndexMap, IndexSet};
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use crate::arena::{GetInfo, GetInfoMut};
 use smallvec::SmallVec;
@@ -96,6 +105,12 @@ use crate::{
 /// Events are the typed replacement for a single "something changed" flag:
 /// analyses can subscribe to the event kinds that invalidate them, and
 /// worklist drivers can re-enqueue the statements named in the events.
+///
+/// Edits to detached code, such as a [`Rewriter::new_block`] block no
+/// statement owns yet, record events like any other edit. Creating detached
+/// code records nothing, and neither does tombstoning it when the `Rewriter`
+/// drops; the statement that attaches it records its usual event. An id an
+/// event names may therefore be dead by the time the log is read.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum MutationEvent {
     /// One or more operand slots of `stmt` were rewritten in place.
@@ -108,6 +123,9 @@ pub enum MutationEvent {
     /// A new statement was spliced into a block's statement list or added to a
     /// graph: a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
     /// statement.
+    ///
+    /// Covers the bodies it names, which now have `stmt` as their parent; no
+    /// separate [`MutationEvent::ChangedBodyNesting`] is recorded for them.
     InsertedStatement { stmt: Statement },
     /// A statement was tombstoned and removed from its block or graph.
     ///
@@ -214,17 +232,19 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A `replace_statement` definition names a body that does not resolve to
-    /// a live body in this stage.
+    /// A definition passed to an insert or `replace_statement` names a body
+    /// that does not resolve to a live body in this stage.
     UnknownBody(Body),
-    /// A `replace_statement` definition names a body that belongs to another
-    /// statement or, for a block, to a CFG. A body has one owner; detach it
-    /// from the other one first.
+    /// A definition passed to an insert or `replace_statement` names a body
+    /// that belongs to another statement or, for a block, to a CFG. A body has
+    /// one owner; detach it from the other one first.
     BodyOwnedElsewhere(Body),
-    /// A `replace_statement` definition names the same body in two fields.
+    /// A definition passed to an insert or `replace_statement` names the same
+    /// body in two fields.
     BodyListedTwice(Body),
-    /// A `replace_statement` definition names a body the statement itself is
-    /// nested in, which would make the statement its own ancestor.
+    /// A definition passed to an insert or `replace_statement` names a body
+    /// that contains the statement (for an insert, the block or graph it is
+    /// inserted into), which would make the statement its own ancestor.
     BodyEnclosesOwner(Body),
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
@@ -369,12 +389,12 @@ impl fmt::Display for RewriteError {
                 write!(f, "body {body:?} already belongs to something else")
             }
             RewriteError::BodyListedTwice(body) => {
-                write!(f, "the replacement names body {body:?} twice")
+                write!(f, "the definition names body {body:?} twice")
             }
             RewriteError::BodyEnclosesOwner(body) => {
                 write!(
                     f,
-                    "the replacement names body {body:?}, which encloses the statement"
+                    "the definition names body {body:?}, which encloses the statement"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
@@ -462,6 +482,10 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
     /// their types. Their arena slots stay empty until bound.
     pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
+    /// Blocks from [`Rewriter::new_block`] that no statement owns yet.
+    pub(super) unowned_blocks: FxHashSet<Block>,
+    /// Leave detached code in place on drop, set after a caught panic.
+    pub(super) keep_detached_on_drop: bool,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -470,6 +494,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             stage,
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
+            unowned_blocks: FxHashSet::default(),
+            keep_detached_on_drop: false,
         }
     }
 
@@ -1140,6 +1166,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// value, which becomes a result of the new statement. On success the new
     /// statement is spliced into the block, its operand uses are recorded, and
     /// [`MutationEvent::InsertedStatement`] is emitted; the new id is returned.
+    ///
+    /// The new statement becomes the parent of every body `definition` names,
+    /// such as blocks from [`Rewriter::new_block`]. Each must be live
+    /// ([`RewriteError::UnknownBody`]), owned by nothing
+    /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
+    /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not
+    /// contain the block or graph the statement is inserted into, which would
+    /// make the statement its own ancestor ([`RewriteError::BodyEnclosesOwner`]).
     pub fn insert_after(
         &mut self,
         anchor: Statement,
@@ -1186,7 +1220,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.successors().next().is_some() {
             return Err(RewriteError::NonTerminatorWithSuccessors);
         }
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::Block(block))?;
         let new_stmt = self.alloc_statement(
             definition,
             StatementParent::Block(block),
@@ -1240,7 +1275,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `block` is unknown or already
     /// has a terminator, or if `definition` is not a terminator, declares
-    /// results, or names a dead operand or successor.
+    /// results, names a dead operand or successor, or names a body the new
+    /// statement cannot own (as for [`Rewriter::insert_after`]).
     ///
     /// Records [`MutationEvent::InsertedStatement`] then
     /// [`MutationEvent::ChangedTerminator`].
@@ -1261,7 +1297,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.results().next().is_some() {
             return Err(RewriteError::CannotInsertTerminatorWithResults);
         }
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::Block(block))?;
         let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
         for &target in &targets {
             self.live_block(target)?;
@@ -1416,14 +1453,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // Bodies kept from the old definition stay as they are; a body the
         // new one gains must be free for `stmt` to own.
         let new_bodies = bodies_of(definition);
-        for (index, &body) in new_bodies.iter().enumerate() {
-            if new_bodies[..index].contains(&body) {
-                return Err(RewriteError::BodyListedTwice(body));
-            }
-            if !old_bodies.contains(&body) {
-                self.check_can_adopt(body, stmt)?;
-            }
-        }
+        self.check_new_bodies(&new_bodies, &old_bodies, parent)?;
         let dropped_bodies = old_bodies
             .iter()
             .copied()

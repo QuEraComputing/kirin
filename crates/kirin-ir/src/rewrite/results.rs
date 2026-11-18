@@ -59,12 +59,74 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 }
 
+impl<'a, L: Dialect> Rewriter<'a, L> {
+    /// Leave detached code in place when this `Rewriter` drops. Called by the
+    /// pass boundary after it catches a panic.
+    pub(crate) fn keep_detached_on_drop(&mut self) {
+        self.keep_detached_on_drop = true;
+    }
+}
+
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every [`new_result`](Rewriter::new_result) value no insert
-    /// bound, so no empty, live-looking slot outlives the `Rewriter`.
+    /// bound and every [`new_block`](Rewriter::new_block) block no statement
+    /// owns, so neither outlives the `Rewriter`.
+    ///
+    /// After a panic the blocks are left in place: a panic part-way through
+    /// an edit can leave them inconsistent, so tombstoning them could panic
+    /// again. Two cases are covered. When this `Rewriter` is dropped while a
+    /// panic unwinds, a second panic would abort the process. When the pass
+    /// boundary has caught the panic, the unwind is over before this drop
+    /// runs, so it sets `keep_detached_on_drop`
+    /// instead; a second panic would escape the boundary and lose the
+    /// quarantined stage, which keeps the blocks for inspection.
     fn drop(&mut self) {
+        // TODO: when the insertion API is updated later, skip tombstoning
+        // detached statements under this same condition.
+        if !self.keep_detached_on_drop && !std::thread::panicking() {
+            for block in std::mem::take(&mut self.unowned_blocks) {
+                self.tombstone_block(block);
+            }
+        }
         for (value, _) in self.unbound_ssa_results.drain() {
             let _ = self.stage.ssas.delete(value);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use crate::arena::GetInfo;
+    use crate::testing::dialect::{TestLang, new_stage};
+    use crate::{Block, Rewriter};
+
+    /// A `Rewriter` used outside the pass boundary, dropped while a panic
+    /// unwinds, leaves its half-built block alone instead of panicking again,
+    /// which would abort the process.
+    #[test]
+    fn dropping_during_a_panic_leaves_unowned_blocks_in_place() {
+        let mut stage = new_stage().finalize().unwrap();
+        let mut detached: Option<Block> = None;
+
+        let previous_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            let mut rw = Rewriter::new(&mut stage);
+            let block = rw.new_block([]);
+            let ret = rw.insert_terminator(block, TestLang::Return).unwrap();
+            let nop = rw.insert_before(ret, TestLang::Nop).unwrap();
+            // Leave the block half-built, as a panic part-way through an edit
+            // could: its chain still names a statement whose slot is gone.
+            let _ = rw.stage.statement_arena_mut().delete(nop);
+            detached = Some(block);
+            panic!("rule gave up")
+        }));
+        std::panic::set_hook(previous_hook);
+
+        assert!(result.is_err());
+        let block = detached.expect("the closure made a block before panicking");
+        assert!(block.get_info(&stage).is_some());
     }
 }

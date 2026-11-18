@@ -38,8 +38,15 @@ where
     let mut rewriter = Rewriter::new(stage);
 
     let panic_or_result = catch_unwind(AssertUnwindSafe(|| pass(&mut rewriter)));
+    if panic_or_result.is_err() {
+        // The panic may have left detached code half-built; dropping the
+        // rewriter must not panic again outside `catch_unwind`.
+        rewriter.keep_detached_on_drop();
+    }
     // Taking the events drops the rewriter, tombstoning the results the pass
-    // never bound and ending the borrow of `stage` before it is verified.
+    // never bound and the `new_block` blocks no statement owns, and ending the
+    // borrow of `stage` before it is verified, so the check sees any reference
+    // the pass left to those blocks.
     let events = rewriter.into_events();
 
     let pass_result = match panic_or_result {

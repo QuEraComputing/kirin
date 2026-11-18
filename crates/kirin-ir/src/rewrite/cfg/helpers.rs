@@ -190,19 +190,19 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .into()
     }
 
-    /// Allocate an empty block in `cfg` and link it between `prev` and `next`.
-    ///
-    /// Records [`MutationEvent::ChangedBlockList`].
-    pub(super) fn create_block(
+    /// Allocate an empty block under `parent` with arguments of `arg_types`
+    /// and list links `prev`/`next`. Linking it into a list is left to the
+    /// caller.
+    pub(in crate::rewrite) fn alloc_block(
         &mut self,
-        cfg: CFG,
+        parent: Option<BlockParent>,
         prev: Option<Block>,
         next: Option<Block>,
         arg_types: impl IntoIterator<Item = L::Type>,
     ) -> Block {
         let block = self.stage.nodes.blocks.alloc_with_id(|id| {
             BlockInfo::builder()
-                .parent(BlockParent::CFG(cfg))
+                .maybe_parent(parent)
                 .node(LinkedListNode {
                     ptr: id,
                     next,
@@ -220,6 +220,20 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if let Some(info) = block.get_info_mut(self.stage) {
             info.arguments = args;
         }
+        block
+    }
+
+    /// Allocate an empty block in `cfg` and link it between `prev` and `next`.
+    ///
+    /// Records [`MutationEvent::ChangedBlockList`].
+    pub(super) fn create_block(
+        &mut self,
+        cfg: CFG,
+        prev: Option<Block>,
+        next: Option<Block>,
+        arg_types: impl IntoIterator<Item = L::Type>,
+    ) -> Block {
+        let block = self.alloc_block(Some(BlockParent::CFG(cfg)), prev, next, arg_types);
 
         match prev {
             Some(p) => {

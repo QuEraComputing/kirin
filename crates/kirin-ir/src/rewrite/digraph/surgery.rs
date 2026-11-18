@@ -15,7 +15,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// edge from that member; operands from outside the graph get none.
     ///
     /// Rejects, leaving the stage untouched, if `graph` is unknown, or
-    /// `definition` is a terminator or fails the operand/result checks.
+    /// `definition` is a terminator, fails the operand/result checks, or names
+    /// a body the new statement cannot own (as for
+    /// [`Rewriter::insert_after`]).
     /// Records [`MutationEvent::InsertedStatement`] then
     /// [`MutationEvent::ChangedDiGraphTopology`].
     pub fn insert_node(
@@ -30,7 +32,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.successors().next().is_some() {
             return Err(RewriteError::NonTerminatorWithSuccessors);
         }
-        let (results, operands) = self.prepare_insert(&definition)?;
+        let (results, operands) =
+            self.prepare_insert(&definition, StatementParent::DiGraph(graph))?;
 
         let stmt = self.alloc_statement(
             definition,
