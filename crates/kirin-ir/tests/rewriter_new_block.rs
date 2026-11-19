@@ -305,7 +305,7 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
 }
 
 #[test]
-fn erase_block_discards_an_unowned_new_block() {
+fn erase_body_discards_an_unowned_new_block() {
     let mut f = fixture();
     let (block, used, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
@@ -313,7 +313,7 @@ fn erase_block_discards_an_unowned_new_block() {
         let block = rewriter.new_block([TestType::I32]);
         let used = fill(&mut rewriter, block, f.x);
         cursor.advance(&rewriter);
-        rewriter.erase_block(block).unwrap();
+        rewriter.erase_body(block).unwrap();
         (block, used, cursor.read_and_advance(&rewriter))
     };
 
@@ -328,7 +328,7 @@ fn erase_block_discards_an_unowned_new_block() {
 }
 
 #[test]
-fn erase_block_rejects_an_unowned_new_block_still_in_use() {
+fn erase_body_rejects_an_unowned_new_block_still_in_use() {
     let mut f = fixture();
     let mut rewriter = Rewriter::new(&mut f.stage);
 
@@ -339,7 +339,7 @@ fn erase_block_rejects_an_unowned_new_block_still_in_use() {
         .create(InsertionPoint::After(f.owner), BuilderDialect::Use(arg))
         .unwrap();
     assert_eq!(
-        rewriter.erase_block(block),
+        rewriter.erase_body(block),
         Err(RewriteError::BlockArgumentInUse { block, index: 0 })
     );
 
@@ -353,7 +353,7 @@ fn erase_block_rejects_an_unowned_new_block_still_in_use() {
         )
         .unwrap();
     assert_eq!(
-        rewriter.erase_block(target),
+        rewriter.erase_body(target),
         Err(RewriteError::BlockHasPredecessors {
             block: target,
             pred: source
@@ -366,4 +366,34 @@ fn erase_block_rejects_an_unowned_new_block_still_in_use() {
             "a rejected erase changes nothing"
         );
     }
+}
+
+#[test]
+fn erase_body_rejects_bodies_it_cannot_erase_on_their_own() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    assert_eq!(
+        rewriter.erase_body(f.old_then),
+        Err(RewriteError::BodyOwnedElsewhere(Body::Block(f.old_then))),
+        "a statement's body goes with the statement"
+    );
+    let block = rewriter.new_block([]);
+    rewriter.erase_body(block).unwrap();
+    assert_eq!(
+        rewriter.erase_body(block),
+        Err(RewriteError::UnknownBody(Body::Block(block)))
+    );
+    assert_eq!(rewriter.events(), []);
+    drop(rewriter);
+    assert!(f.old_then.get_info(&f.stage).is_some());
+
+    let (mut stage, graph) = unowned_graph();
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(
+        rewriter.erase_body(graph),
+        Err(RewriteError::BodyNotDetached(Body::DiGraph(graph))),
+        "a body the builder left unowned is not this rewriter's to erase"
+    );
+    drop(rewriter);
+    assert!(graph.get_info(&stage).is_some());
 }

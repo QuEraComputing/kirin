@@ -142,7 +142,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             SSAKind::Port(PortParent::DiGraph(graph), _) => StatementParent::DiGraph(graph),
             SSAKind::Port(PortParent::UnGraph(graph), _) => StatementParent::UnGraph(graph),
         };
-        bodies.iter().any(|&body| self.body_contains(body, place))
+        self.is_within(place, &mut bodies.iter().copied().collect())
     }
 
     /// The statements directly in `body`: a block's chain then its

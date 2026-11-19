@@ -1,5 +1,6 @@
 //! Adopting the bodies a definition names.
 
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
@@ -40,7 +41,7 @@ impl<L: Dialect> Rewriter<'_, L> {
         if self.body_owner(body)?.is_some() {
             return Err(RewriteError::BodyOwnedElsewhere(body));
         }
-        if self.body_contains(body, parent) {
+        if self.is_within(parent, &mut FxHashSet::from_iter([body])) {
             return Err(RewriteError::BodyEnclosesOwner(body));
         }
         Ok(())

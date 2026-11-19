@@ -14,11 +14,11 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// Until the block is attached or erased, its statements count as uses of
     /// the values they read: such a value cannot be erased, dead-code
     /// elimination keeps it, and [`Rewriter::replace_all_uses`] rewrites those
-    /// uses too. To abandon the block early, call [`Rewriter::erase_block`].
+    /// uses too. To abandon the block early, call [`Rewriter::erase_body`].
     ///
     /// A block no statement owns when the `Rewriter` is dropped is tombstoned
     /// together with everything it holds, unless the drop follows a panic, in
-    /// which case it is left for inspection. Unlike [`Rewriter::erase_block`],
+    /// which case it is left for inspection. Unlike [`Rewriter::erase_body`],
     /// the drop does not check that nothing outside still refers to the block:
     /// a branch to it, or a use of a value it defines, is left dangling. When
     /// a pass run by [`Program::run_pass`](crate::Program::run_pass) succeeds,

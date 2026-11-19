@@ -1,6 +1,7 @@
-//! Bodies owned by a statement: creating them, adopting them for inserts and
+//! Bodies owned by a statement: creating them, adopting them for
+//! [`Rewriter::create`](crate::Rewriter::create) and
 //! [`Rewriter::replace_statement`](crate::Rewriter::replace_statement), and
-//! tombstoning them.
+//! erasing and tombstoning them.
 
 mod adopt;
 mod create;
