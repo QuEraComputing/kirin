@@ -102,8 +102,18 @@ impl<L: Dialect> Rewriter<'_, L> {
             }
             Body::DiGraph(_) | Body::UnGraph(_) => SmallVec::new(),
         };
+        // A set, so checking each predecessor stays constant-time even for a
+        // CFG with many blocks.
+        let own_blocks: FxHashSet<Block> = blocks.iter().copied().collect();
         for &block in &blocks {
-            self.check_no_outside_predecessors(block, &blocks)?;
+            let outside = self
+                .live_block(block)?
+                .predecessors
+                .iter()
+                .find(|pred| !own_blocks.contains(pred));
+            if let Some(&pred) = outside {
+                return Err(RewriteError::BlockHasPredecessors { block, pred });
+            }
         }
 
         let mut inside = FxHashSet::from_iter([body]);
