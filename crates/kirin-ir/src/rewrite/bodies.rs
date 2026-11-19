@@ -40,7 +40,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
     /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
-        let block = self.alloc_block(None, None, None, arg_types);
+        let block = self.alloc_block(None, arg_types);
         self.unowned_blocks.insert(block);
         block
     }

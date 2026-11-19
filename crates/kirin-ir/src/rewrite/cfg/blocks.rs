@@ -81,7 +81,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         match cfg {
             Some(cfg) => {
-                self.unlink_block(cfg, block);
+                self.unlink(block, cfg);
                 self.tombstone_block(block);
                 self.events.push(MutationEvent::ChangedBlockList { cfg });
                 self.events.push(MutationEvent::ChangedCfg { cfg });

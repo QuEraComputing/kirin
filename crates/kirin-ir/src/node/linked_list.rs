@@ -48,6 +48,15 @@ impl<Ptr: Copy + PartialEq> LinkedList<Ptr> {
         }
     }
 
+    /// A list of the one item `ptr`.
+    pub(crate) fn single(ptr: Ptr) -> Self {
+        LinkedList {
+            head: Some(ptr),
+            tail: Some(ptr),
+            len: 1,
+        }
+    }
+
     pub fn head(&self) -> Option<&Ptr> {
         self.head.as_ref()
     }
