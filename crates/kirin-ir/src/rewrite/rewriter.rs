@@ -78,10 +78,11 @@
 //!
 //! An inserted statement becomes the parent of the bodies its definition
 //! names, which must be owned by nothing yet: bodies from
-//! [`Rewriter::new_block`] or [`Rewriter::new_cfg`], or bodies the builder
-//! left unowned. A body from those methods that no statement owns when the
-//! `Rewriter` drops is tombstoned with everything it holds, unless the drop
-//! follows a panic; [`Rewriter::erase_body`] discards one earlier.
+//! [`Rewriter::new_block`], [`Rewriter::new_cfg`], [`Rewriter::new_digraph`]
+//! or [`Rewriter::new_ungraph`], or bodies the builder left unowned. A body
+//! from those methods that no statement owns when the `Rewriter` drops is
+//! tombstoned with everything it holds, unless the drop follows a panic;
+//! [`Rewriter::erase_body`] discards one earlier.
 //!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically

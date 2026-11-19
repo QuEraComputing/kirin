@@ -1,7 +1,7 @@
-//! `Rewriter::new_cfg` makes a CFG owned by nothing, to become a statement's
-//! body. Inserting a statement that names it makes the statement its parent;
-//! one still unowned when the `Rewriter` drops is tombstoned, and
-//! `Rewriter::erase_body` discards one earlier.
+//! `Rewriter::new_cfg`, `new_digraph` and `new_ungraph` make bodies owned by
+//! nothing, to become a statement's body. Inserting a statement that names
+//! one makes the statement its parent; one still unowned when the `Rewriter`
+//! drops is tombstoned, and `Rewriter::erase_body` discards one earlier.
 
 mod common;
 
@@ -190,5 +190,187 @@ fn a_statement_in_a_new_cfg_cannot_adopt_that_cfg() {
             InsertionPoint::After(use_x),
             RewriteError::BodyEnclosesOwner(Body::CFG(cfg))
         ))
+    );
+}
+
+fn port_types(stage: &StageInfo<BuilderDialect>, ports: &[Port]) -> Vec<TestType> {
+    ports
+        .iter()
+        .map(|&port| SSAValue::from(port).expect_info(stage).ty().clone())
+        .collect()
+}
+
+#[test]
+fn new_graphs_have_their_ports_and_record_no_event() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([TestType::I32, TestType::I64], [TestType::Any]);
+    let ug = rewriter.new_ungraph([TestType::Qubit], []);
+
+    let stage = rewriter.stage();
+    let info = dg.expect_info(stage);
+    assert_eq!(
+        port_types(stage, info.edge_ports()),
+        [TestType::I32, TestType::I64]
+    );
+    assert_eq!(port_types(stage, info.capture_ports()), [TestType::Any]);
+    assert_eq!(info.nodes().count(), 0);
+    assert_eq!(info.yields(), []);
+    assert_eq!(info.parent(), None);
+    let info = ug.expect_info(stage);
+    assert_eq!(port_types(stage, info.edge_ports()), [TestType::Qubit]);
+    assert_eq!(info.capture_ports(), []);
+    assert_eq!(info.parent(), None);
+    assert_eq!(
+        rewriter.events(),
+        [],
+        "a graph owned by nothing is not part of the IR yet"
+    );
+}
+
+/// Fill `dg` with `use(x)` and `ug` with a wire `w` and `gate(w, port0)`,
+/// returning `(use(x), w's edge statement, gate)`.
+fn fill_graphs(
+    rewriter: &mut Rewriter<'_, BuilderDialect>,
+    dg: DiGraph,
+    ug: UnGraph,
+    x: SSAValue,
+) -> (Statement, Statement, Statement) {
+    let use_x = rewriter
+        .create(InsertionPoint::DiGraph(dg), BuilderDialect::Use(x))
+        .unwrap();
+    let w = rewriter.new_result(TestType::Qubit);
+    let wire = rewriter
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Wire(w))
+        .unwrap();
+    let port: SSAValue = ug.expect_info(rewriter.stage()).edge_ports()[0].into();
+    let gate = rewriter
+        .create(
+            InsertionPoint::UnGraph(ug),
+            BuilderDialect::Gate(w.into(), port),
+        )
+        .unwrap();
+    (use_x, wire, gate)
+}
+
+#[test]
+fn inserted_statement_adopts_new_graphs() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([], []);
+    let ug = rewriter.new_ungraph([TestType::Qubit], []);
+    let members = fill_graphs(&mut rewriter, dg, ug, f.x);
+
+    let owner = rewriter
+        .create(
+            InsertionPoint::After(f.anchor),
+            BuilderDialect::OwnGraphs(dg, ug),
+        )
+        .unwrap();
+    assert_eq!(
+        rewriter.events().last(),
+        Some(&MutationEvent::InsertedStatement { stmt: owner })
+    );
+    assert_eq!(dg.expect_info(rewriter.stage()).parent(), Some(owner));
+    assert_eq!(ug.expect_info(rewriter.stage()).parent(), Some(owner));
+
+    drop(rewriter);
+    for stmt in [members.0, members.1, members.2] {
+        assert!(stmt.get_info(&f.stage).is_some(), "adopted graphs are kept");
+    }
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn unowned_new_graphs_are_tombstoned_on_drop() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([TestType::I32], []);
+    let ug = rewriter.new_ungraph([TestType::Qubit], []);
+    let members = fill_graphs(&mut rewriter, dg, ug, f.x);
+    let ports: Vec<SSAValue> = [
+        dg.expect_info(rewriter.stage()).ports(),
+        ug.expect_info(rewriter.stage()).ports(),
+    ]
+    .concat()
+    .into_iter()
+    .map(SSAValue::from)
+    .collect();
+    assert_eq!(uses_of(rewriter.stage(), f.x), 1);
+    drop(rewriter);
+
+    assert!(dg.get_info(&f.stage).is_none());
+    assert!(ug.get_info(&f.stage).is_none());
+    for stmt in [members.0, members.1, members.2] {
+        assert!(stmt.get_info(&f.stage).is_none());
+    }
+    for port in ports {
+        assert!(port.get_info(&f.stage).is_none());
+    }
+    assert_eq!(uses_of(&f.stage, f.x), 0, "the use of x is dropped");
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn erase_body_discards_unowned_new_graphs() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([], []);
+    let ug = rewriter.new_ungraph([TestType::Qubit], []);
+    fill_graphs(&mut rewriter, dg, ug, f.x);
+    let events_before = rewriter.events().len();
+
+    rewriter.erase_body(dg).unwrap();
+    rewriter.erase_body(ug).unwrap();
+    assert_eq!(
+        rewriter.events().len(),
+        events_before,
+        "erasing a body owned by nothing records no event"
+    );
+    assert!(dg.get_info(rewriter.stage()).is_none());
+    assert!(ug.get_info(rewriter.stage()).is_none());
+    assert_eq!(uses_of(rewriter.stage(), f.x), 0);
+    drop(rewriter);
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn erase_body_rejects_a_new_graph_whose_values_are_used_outside() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([TestType::I32], []);
+    let port = dg.expect_info(rewriter.stage()).edge_ports()[0];
+
+    // A port read outside the graph.
+    let reader = rewriter
+        .create(
+            InsertionPoint::After(f.anchor),
+            BuilderDialect::Use(port.into()),
+        )
+        .unwrap();
+    assert_eq!(rewriter.erase_body(dg), Err(RewriteError::PortInUse(port)));
+    rewriter.erase_statement(reader).unwrap();
+
+    // A node's result read outside the graph.
+    let r = rewriter.new_result(TestType::I32);
+    let node = rewriter
+        .create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Compute(port.into(), r),
+        )
+        .unwrap();
+    rewriter
+        .create(
+            InsertionPoint::After(f.anchor),
+            BuilderDialect::Use(r.into()),
+        )
+        .unwrap();
+    assert_eq!(
+        rewriter.erase_body(dg),
+        Err(RewriteError::StatementResultsInUse(node))
+    );
+    assert!(
+        dg.get_info(rewriter.stage()).is_some(),
+        "a rejected erase changes nothing"
     );
 }
