@@ -1,21 +1,23 @@
 //! Creating bodies owned by nothing.
 
-use crate::{Block, Body, Dialect, Rewriter};
+use crate::node::CFGInfo;
+use crate::node::linked_list::LinkedList;
+use crate::{Block, Body, CFG, Dialect, Rewriter};
 
 impl<L: Dialect> Rewriter<'_, L> {
     /// Create an empty block with arguments of `arg_types`, owned by nothing.
     ///
     /// The block is meant to become a statement's body, such as a branch of
-    /// an `scf.if`: fill it, then name it in a definition passed to an insert
-    /// (such as [`Rewriter::insert_before`]) or to
-    /// [`Rewriter::replace_statement`], which makes the statement its parent.
-    /// Statements can be added to it like any block, starting with its
-    /// terminator ([`Rewriter::insert_terminator`]).
+    /// an `scf.if`. Add statements to it like any block, starting with its
+    /// terminator ([`Rewriter::insert_terminator`]). Then name the block in
+    /// the definition of a new statement ([`Rewriter::insert_before`] and
+    /// similar) or of a replacement ([`Rewriter::replace_statement`]); that
+    /// statement becomes its parent.
     ///
-    /// Until the block is attached or erased, its statements count as uses of
-    /// the values they read: such a value cannot be erased, dead-code
-    /// elimination keeps it, and [`Rewriter::replace_all_uses`] rewrites those
-    /// uses too. To abandon the block early, call [`Rewriter::erase_body`].
+    /// Its statements count as uses of the values they read as soon as they
+    /// are added, even while the block is owned by nothing: such a value
+    /// cannot be erased while they read it. [`Rewriter::erase_body`] discards
+    /// the block early.
     ///
     /// A block no statement owns when the `Rewriter` is dropped is tombstoned
     /// together with everything it holds, unless the drop follows a panic, in
@@ -28,13 +30,47 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// nothing reports it.
     ///
     /// Records no event: a block owned by nothing is not part of the IR yet.
-    /// Edits inside it record their usual events. The statement that adopts it
-    /// records
+    /// The statement that adopts it records
     /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
     /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
+    /// Edits inside it still record their usual events for now.
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
         let block = self.alloc_block(None, arg_types);
         self.unowned_bodies.insert(Body::Block(block));
         block
+    }
+
+    /// Create an empty CFG, owned by nothing.
+    ///
+    /// The CFG is meant to become a statement's body, such as a lambda's.
+    /// Create its blocks with [`Rewriter::append_block`],
+    /// [`Rewriter::insert_block_before`] or [`Rewriter::insert_block_after`],
+    /// which link them into its block list ([`Rewriter::new_block`] blocks
+    /// cannot be moved into a CFG), and fill them. Then name the CFG in the
+    /// definition of a new statement ([`Rewriter::insert_before`] and similar)
+    /// or of a replacement ([`Rewriter::replace_statement`]); that statement
+    /// becomes its parent.
+    ///
+    /// The rest is as for a [`Rewriter::new_block`] block. Its statements
+    /// count as uses of the values they read as soon as they are added, even
+    /// while the CFG is owned by nothing; [`Rewriter::erase_body`] discards
+    /// it early. A CFG no statement owns when the `Rewriter` is dropped is
+    /// tombstoned together with everything it holds, unless the drop follows a
+    /// panic, without the checks [`Rewriter::erase_body`] makes.
+    ///
+    /// Records no event: a CFG owned by nothing is not part of the IR yet.
+    /// The statement that adopts it records
+    /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
+    /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
+    /// Edits inside it still record their usual events.
+    pub fn new_cfg(&mut self) -> CFG {
+        let cfg = self.stage.nodes.cfgs.alloc_with_id(|id| {
+            CFGInfo::builder()
+                .id(id)
+                .blocks(LinkedList::default())
+                .new()
+        });
+        self.unowned_bodies.insert(Body::CFG(cfg));
+        cfg
     }
 }
