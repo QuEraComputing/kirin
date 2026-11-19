@@ -61,7 +61,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`Rewriter::clone_cfg`]. Each must be live
     /// ([`RewriteError::UnknownBody`]), owned by nothing
     /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
-    /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not
+    /// owned), created by this `Rewriter` ([`RewriteError::BodyNotDetached`]),
+    /// named once ([`RewriteError::BodyListedTwice`]), and must not
     /// contain the block or graph `insertion_pt` is in, which would make the
     /// statement its own ancestor ([`RewriteError::BodyEnclosesOwner`],
     /// wrapped in [`RewriteError::CannotInsert`]).

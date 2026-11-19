@@ -9,7 +9,7 @@
 //! it is gone each result slot is either bound or a real tombstone. It also
 //! tombstones every detached statement it never inserted.
 
-use crate::{Body, Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
+use crate::{Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
 
 use crate::rewrite::rewriter::{RewriteError, Rewriter};
 
@@ -71,10 +71,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every detached statement no [`insert`](Rewriter::insert)
     /// placed, with its results, operand uses and bodies, every body this
-    /// `Rewriter` created (such as a [`new_block`](Rewriter::new_block) block)
-    /// that no statement owns, every detached CFG (such as a
-    /// [`clone_cfg`](Rewriter::clone_cfg) copy) no statement adopted, and every
-    /// [`new_result`](Rewriter::new_result) value no statement bound, so
+    /// `Rewriter` created (such as a [`new_block`](Rewriter::new_block) block
+    /// or a [`clone_cfg`](Rewriter::clone_cfg) copy) that no statement owns,
+    /// and every [`new_result`](Rewriter::new_result) value no statement bound, so
     /// nothing detached or empty outlives the `Rewriter`.
     ///
     /// After a panic the detached statements and bodies are left in place: a
@@ -92,9 +91,6 @@ impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
             }
             for body in std::mem::take(&mut self.unowned_bodies) {
                 self.tombstone_body(body);
-            }
-            for cfg in std::mem::take(&mut self.detached_cfgs) {
-                self.tombstone_body(Body::CFG(cfg));
             }
         }
         for (value, _) in self.unbound_ssa_results.drain() {

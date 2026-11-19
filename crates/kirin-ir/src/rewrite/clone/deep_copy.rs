@@ -86,7 +86,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let mut copied = Copied::default();
         self.fill_body(Body::CFG(source), map, &mut copied);
         self.finish_copy(copied, map);
-        self.detached_cfgs.insert(copy);
+        self.unowned_bodies.insert(Body::CFG(copy));
         Ok(copy)
     }
 

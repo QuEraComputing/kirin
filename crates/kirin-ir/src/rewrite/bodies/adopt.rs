@@ -35,11 +35,14 @@ impl<L: Dialect> Rewriter<'_, L> {
     }
 
     /// Check that a statement under `parent` can adopt `body`: it is live,
-    /// owned by nothing, and does not contain `parent`, which would make the
-    /// statement its own ancestor.
+    /// owned by nothing, created by this `Rewriter`, and does not contain
+    /// `parent`, which would make the statement its own ancestor.
     fn check_can_adopt(&self, body: Body, parent: StatementParent) -> Result<(), RewriteError> {
         if self.body_owner(body)?.is_some() {
             return Err(RewriteError::BodyOwnedElsewhere(body));
+        }
+        if !self.unowned_bodies.contains(&body) {
+            return Err(RewriteError::BodyNotDetached(body));
         }
         if self.is_within(parent, &mut FxHashSet::from_iter([body])) {
             return Err(RewriteError::BodyEnclosesOwner(body));
@@ -74,7 +77,6 @@ impl<L: Dialect> Rewriter<'_, L> {
                 }
             }
             Body::CFG(cfg) => {
-                self.detached_cfgs.remove(&cfg);
                 if let Some(item) = cfg.get_info_mut(self.stage) {
                     item.parent = Some(owner);
                 }
