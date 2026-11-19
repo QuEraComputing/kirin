@@ -101,15 +101,15 @@ mod tests {
 
     use crate::arena::GetInfo;
     use crate::testing::dialect::{TestLang, new_stage};
-    use crate::{Block, Rewriter};
+    use crate::{Body, Rewriter};
 
     /// A `Rewriter` used outside the pass boundary, dropped while a panic
-    /// unwinds, leaves its half-built block alone instead of panicking again,
-    /// which would abort the process.
+    /// unwinds, leaves its unowned bodies alone, including a half-built
+    /// block, instead of panicking again, which would abort the process.
     #[test]
-    fn dropping_during_a_panic_leaves_unowned_blocks_in_place() {
+    fn dropping_during_a_panic_leaves_unowned_bodies_in_place() {
         let mut stage = new_stage().finalize().unwrap();
-        let mut detached: Option<Block> = None;
+        let mut detached: Vec<Body> = Vec::new();
 
         let previous_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
@@ -121,13 +121,30 @@ mod tests {
             // Leave the block half-built, as a panic part-way through an edit
             // could: its chain still names a statement whose slot is gone.
             let _ = rw.stage.statement_arena_mut().delete(nop);
-            detached = Some(block);
+            detached = vec![
+                Body::Block(block),
+                Body::CFG(rw.new_cfg()),
+                Body::DiGraph(rw.new_digraph([], [])),
+                Body::UnGraph(rw.new_ungraph([], [])),
+            ];
             panic!("rule gave up")
         }));
         std::panic::set_hook(previous_hook);
 
         assert!(result.is_err());
-        let block = detached.expect("the closure made a block before panicking");
-        assert!(block.get_info(&stage).is_some());
+        assert_eq!(
+            detached.len(),
+            4,
+            "the closure made the bodies before panicking"
+        );
+        for body in detached {
+            let live = match body {
+                Body::Block(block) => block.get_info(&stage).is_some(),
+                Body::CFG(cfg) => cfg.get_info(&stage).is_some(),
+                Body::DiGraph(graph) => graph.get_info(&stage).is_some(),
+                Body::UnGraph(graph) => graph.get_info(&stage).is_some(),
+            };
+            assert!(live, "{body:?} is left in place");
+        }
     }
 }

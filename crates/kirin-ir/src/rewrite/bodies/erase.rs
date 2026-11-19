@@ -91,15 +91,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     fn check_no_outside_references(&self, body: Body) -> Result<(), RewriteError> {
         let blocks: SmallVec<[Block; 4]> = match body {
             Body::Block(block) => SmallVec::from_slice(&[block]),
-            Body::CFG(cfg) => {
-                let mut blocks = SmallVec::new();
-                let mut current = cfg.get_info(self.stage).and_then(|item| item.blocks.head);
-                while let Some(block) = current {
-                    blocks.push(block);
-                    current = block.get_info(self.stage).and_then(|item| item.node.next);
-                }
-                blocks
-            }
+            Body::CFG(cfg) => cfg.blocks(self.stage).collect(),
             Body::DiGraph(_) | Body::UnGraph(_) => SmallVec::new(),
         };
         // A set, so checking each predecessor stays constant-time even for a
