@@ -186,11 +186,12 @@ pub enum RunPassError {
 
 An analysis is named by a type separate from its result, as in LLVM's new
 pass manager (`DominatorTreeAnalysis::Result = DominatorTree`). Two analyses
-can produce the same result type: two forward analyses over one lattice both
-produce the interpreter's `Analyzed<K, SSAValue, V>`, and both may take
-the same roots as their key. The cache tells them apart by the naming type,
-which is usually an empty struct, e.g. `struct ConstPropFacts;`, and the
-results of one analysis by key.
+can produce the same result type: two constprop analyses that differ only in
+their linker both produce the interpreter's
+`AnalysisResults<K, SSAValue, V, Sem>`, and both may take the same roots as
+their key. The cache tells them apart by the naming type, which is usually an
+empty struct, e.g. `struct ConstPropFacts;`, and the results of one analysis
+by key.
 
 Results are shared as `Arc` (`std::sync::Arc`, a reference-counted pointer:
 several owners share one value without copying it, and it is freed when the
@@ -455,7 +456,7 @@ approach later, if a client needs it.
 ## Roots and reads
 
 The interpreter's results have a query-shaped API
-([`interpreter/index.md`](interpreter/index.md#reading-results--analyzed-and-analysisresults)):
+([`interpreter/index.md`](interpreter/index.md#reading-results--analysisresults)):
 an analysis runs from given roots, and the result answers reads by context,
 value or program point. The interpreter itself memoizes nothing; the
 database caches its results.
@@ -488,8 +489,8 @@ answers claim nothing about callers the analysis did not visit.
 
 **One result covers every root in its key.** Since analyzing from `main`
 already reaches what `main` calls, a callee needs no result of its own. With
-several roots, the result holds one `Analyzed` per root, and a joined read
-joins across them.
+several roots, the result holds one `AnalysisResults` per root, and a joined
+read joins across them.
 
 **What no root reached has no facts.** A rule treats a missing fact as
 unknown, the same as for ids created during a pass.
@@ -511,20 +512,21 @@ input from the caller. A caller who knows the program's real entry points,
 such as only `main`, can list them in a root-based key for more precise
 facts. That is sound only if the list is complete.
 
-Two parts rely on the [interpreter changes](#interpreter-changes-for-review).
-The result is the interpreter's own `Analyzed`, in its owned form, so the
-database can keep it across passes. And a rule reads a joined fact **by
-stage and value**: an SSA value belongs to exactly one callable's body at its
-stage, so the join over a callable's contexts is a join per value, and a rule
-need not first work out which callable its statement sits in. The stage is
-needed because SSA ids are allocated per stage: `%5` at `source` and `%5` at
-`lowered` are different values, and a cross-stage result holds both.
+Two properties of [the interpreter's results](interpreter/index.md#reading-results--analysisresults)
+make this work. They are owned data, so the database can keep them across
+passes. And a rule reads a joined fact **by stage and value**, with
+`joined_fact_at(stage, value)`: an SSA value belongs to exactly one callable's
+body at its stage, so the join over a callable's contexts is a join per
+value, and a rule need not first work out which callable its statement sits
+in. The stage is needed because SSA ids are allocated per stage: `%5` at
+`source` and `%5` at `lowered` are different values, and a cross-stage result
+holds both.
 
 ## First clients: constprop and demand
 
 An analysis's result can be the interpreter's own: `ConstPropFacts::run`
-calls `analyze(stage, callee, args)` for each root and returns the owned
-`Analyzed` values it gets, with no copy into a rewrite-side type.
+calls `analyze(stage, callee, args)` for each root and returns the
+`AnalysisResults` values it gets, with no copy into a rewrite-side type.
 
 Each piece goes in the crate that already holds the matching interpreter
 code:
@@ -532,7 +534,7 @@ code:
 | Piece | Crate |
 |---|---|
 | `AnalysisKind`, `Analysis`, `AnalysisCache`, `Requirement`, `Database` | `kirin-rewrite` |
-| The result type: the owned `Analyzed` | `kirin-interpreter` |
+| The result type, `AnalysisResults` | `kirin-interpreter` |
 | Lattices and engine aliases | `kirin-constprop`, `kirin-demand`, unchanged |
 | The analysis types (`ConstPropFacts`, `DemandFacts`) and their `Analysis<Stage>` impls | the language crate (`toy-lang`; the test languages for the tests) |
 
@@ -540,8 +542,8 @@ The impls go in the language crate because only it knows how to run an
 analysis for its stages: the linker, the error type and its frame composition
 (`ToyAbstractFrame`), as `toy-lang`'s `analyze_constprop` does today. Each
 impl runs the analysis from every root in its key and keeps the resulting
-`Analyzed`s. The analysis crates gain nothing, and `kirin-rewrite` depends on
-none of them.
+`AnalysisResults`. The analysis crates gain nothing, and `kirin-rewrite`
+depends on none of them.
 
 ## Comparison with MLIR
 
@@ -601,52 +603,11 @@ Each step is reviewed before the next starts.
    `RewriteDriver::with_cache`; the driver checks requirements and fails with
    `MissingAnalysis`. Tests in
    `crates/kirin-rewrite/tests/rule_requirements.rs`.
-3. **Constprop client.** Needs the [interpreter
-   changes](#interpreter-changes-for-review). The `ConstPropFacts` analysis
-   type and its `Analysis` impl for a test language; a test-only
-   constant-folding rule.
+3. **Constprop client.** The `ConstPropFacts` analysis type and its
+   `Analysis` impl for a test language, reading the [interpreter's
+   results](interpreter/index.md#reading-results--analysisresults); a
+   test-only constant-folding rule.
 4. **Demand client.** The `DemandFacts` analysis type and its `Analysis`
    impl for a test language; a test-only demand-based dead-code rule.
 5. **Docs.** Update the M3, `AnalysisManager` and `NativeRule` sections of
    `rewrite-engine.md`.
-
-## Interpreter changes (for review)
-
-M3 caches the interpreter's analysis results, which needs one change in
-`kirin-interpreter`.
-
-**What.** `analyze` returns an owned `Analyzed`: plain data holding the fact
-store, the callable and response of each reached context, the root, and the
-callable → contexts index. Today `Analyzed<I>` wraps the converged engine `I`.
-
-- One `AnalysisResults` impl on the owned `Analyzed` replaces the three
-  per-engine impls. Its methods stay the same.
-- Demand's `response`, which reads the parameters from the IR on each call,
-  is computed once when `analyze` finishes. `is_demanded` moves onto the
-  owned `Analyzed`.
-- A per-value joined read is added to `AnalysisResults`, keyed by stage and
-  value, `(CompileStage, SSAValue)`: the join of the value's fact over every
-  context at that stage that has it, so a reader need not know the value's
-  callable. Program points are qualified by stage the same way. The stage is
-  part of the key because SSA ids are allocated per stage, so two stages can
-  hold the same id for different values.
-
-**Why.** The engine borrows the program, so today's `Analyzed` does too.
-While it is alive, nothing can edit the program, so the database cannot
-keep it across passes. An owned result lets the database cache the
-interpreter's own result, giving one result type for every analysis, current
-and downstream, instead of a copy type per analysis on the rewrite side. Every
-client reads it through the same `AnalysisResults` API. LLVM's and MLIR's
-analysis results are owned objects in the same way.
-
-**What does not change.** How analyses compute (engines, worklists, frames,
-dialect rules); the `AnalysisResults` methods; callers that let the type be
-inferred, which is nearly all of them; the analysis crates. `toy-lang` names
-`Analyzed<..>` in three signatures, which change. Roughly 150 lines go and 155
-come in `kirin-interpreter`, as the three impls collapse into one.
-
-**Tests.** The existing tests reading through `AnalysisResults` must pass
-unchanged. One new test analyzes, edits the program, then reads the result,
-which compiles only if the result no longer borrows the program. Another
-analyzes across two stages whose SSA ids overlap and checks that the
-per-value read returns each stage's own facts.
