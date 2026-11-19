@@ -59,20 +59,17 @@ class Python(LoweringABC[ast.AST]):
     ):
         file = inspect.getfile(func)
         source = textwrap.dedent(inspect.getsource(func))
-        if globals:
-            globals.update(func.__globals__)
-        else:
-            globals = func.__globals__
-
         try:
             nonlocals = inspect.getclosurevars(func).nonlocals
         except Exception:
             nonlocals = {}
-        globals.update(nonlocals)
+        # NOTE: func.__globals__ is the module's namespace and must not be mutated.
+        # Copy instead.
+        scope = {**(globals or {}), **func.__globals__, **nonlocals}
         region = self.run(
             ast.parse(source).body[0],
             source=source,
-            globals=globals,
+            globals=scope,
             file=file,
             lineno_offset=lineno_offset,
             col_offset=col_offset,
