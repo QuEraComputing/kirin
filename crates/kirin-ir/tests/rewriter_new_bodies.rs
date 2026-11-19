@@ -400,3 +400,26 @@ fn a_new_digraph_gets_its_yields_from_set_yields() {
     assert_eq!(dg.expect_info(&f.stage).yields(), [SSAValue::from(r)]);
     assert_eq!(verify_derived(&f.stage), Ok(()));
 }
+
+#[test]
+fn erase_body_counts_yields_of_the_erased_graph_as_inside_it() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([TestType::I32], []);
+    let port: SSAValue = dg.expect_info(rewriter.stage()).edge_ports()[0].into();
+    let r = rewriter.new_result(TestType::I32);
+    let node = rewriter
+        .create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Compute(port, r),
+        )
+        .unwrap();
+    // The node's result is used only by the graph's own yield.
+    rewriter.set_yields(dg, [r]).unwrap();
+
+    rewriter.erase_body(dg).unwrap();
+    assert!(dg.get_info(rewriter.stage()).is_none());
+    assert!(node.get_info(rewriter.stage()).is_none());
+    drop(rewriter);
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
