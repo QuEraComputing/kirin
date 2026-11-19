@@ -78,7 +78,7 @@
 //! [`Rewriter::new_block`], or bodies the builder left unowned. A
 //! [`Rewriter::new_block`] block that no statement owns when the `Rewriter`
 //! drops is tombstoned with everything it holds, unless the drop follows a
-//! panic; [`Rewriter::erase_block`] discards one earlier.
+//! panic; [`Rewriter::erase_body`] discards one earlier.
 //!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
@@ -98,8 +98,8 @@ use smallvec::SmallVec;
 
 use super::bodies::bodies_of;
 use crate::{
-    Block, BlockInfo, Body, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementInfo,
-    StatementParent, UnGraph, Use,
+    Block, BlockInfo, Body, CFG, DiGraph, Dialect, Port, SSAValue, StageInfo, Statement,
+    StatementInfo, StatementParent, UnGraph, Use,
 };
 
 /// A structured record of one mutation performed through a [`Rewriter`].
@@ -238,12 +238,15 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A definition passed to an insert or `replace_statement` names a body
-    /// that does not resolve to a live body in this stage.
+    /// A definition passed to an insert or `replace_statement`, or
+    /// `erase_body`, names a body that does not resolve to a live body in
+    /// this stage.
     UnknownBody(Body),
     /// A definition passed to an insert or `replace_statement` names a body
     /// that belongs to another statement or, for a block, to a CFG. A body has
-    /// one owner; detach it from the other one first.
+    /// one owner; detach it from the other one first. Also returned by
+    /// `erase_body` for a body a statement owns: erase or replace the
+    /// statement instead.
     BodyOwnedElsewhere(Body),
     /// A definition passed to an insert or `replace_statement` names the same
     /// body in two fields.
@@ -256,6 +259,12 @@ pub enum RewriteError {
     /// statement's own bodies, which would make the statement its own
     /// ancestor.
     MovedIntoItself { stmt: Statement, anchor: Statement },
+    /// `erase_body` was given a body that nothing owns but this `Rewriter` did
+    /// not create, such as one the builder left unowned.
+    BodyNotDetached(Body),
+    /// Erasing the graph that declares this port would leave dangling uses.
+    /// Replace them first.
+    PortInUse(Port),
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     BlockNotInCfg(Block),
@@ -394,6 +403,15 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::UnknownBody(body) => {
                 write!(f, "body {body:?} is not a live body in this stage")
+            }
+            RewriteError::BodyNotDetached(body) => {
+                write!(f, "body {body:?} was not created by this rewriter")
+            }
+            RewriteError::PortInUse(port) => {
+                write!(
+                    f,
+                    "port {port:?} is still used outside its graph; replace those uses first"
+                )
             }
             RewriteError::BodyOwnedElsewhere(body) => {
                 write!(f, "body {body:?} already belongs to something else")

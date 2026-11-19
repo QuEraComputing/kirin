@@ -1,6 +1,6 @@
 //! `CFG` block-list surgery for the [`Rewriter`](super::Rewriter).
 //!
-//! These methods add, erase, split, and merge blocks of a [`CFG`](crate::CFG),
+//! These methods add, split, and merge blocks of a [`CFG`](crate::CFG),
 //! retarget control-flow edges, and insert or erase block arguments together
 //! with the incoming edges that forward them. Like statement surgery they
 //! maintain every derived mirror on each successful edit —
@@ -25,10 +25,9 @@
 //!
 //! Every block-level method requires its blocks to be members of a `CFG`
 //! block list; statement-owned single-block bodies are rejected with
-//! [`RewriteError::BlockNotInCfg`](super::RewriteError::BlockNotInCfg). The one
-//! exception is [`Rewriter::erase_block`](super::Rewriter::erase_block), which
-//! also erases a [`Rewriter::new_block`](super::Rewriter::new_block) block no
-//! statement owns yet.
+//! [`RewriteError::BlockNotInCfg`](super::RewriteError::BlockNotInCfg).
+//! Blocks are erased with
+//! [`Rewriter::erase_body`](super::Rewriter::erase_body).
 
 mod blocks;
 mod edges;
