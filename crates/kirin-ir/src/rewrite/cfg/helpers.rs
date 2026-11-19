@@ -87,7 +87,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Reject removing `block` if a predecessor outside `allowed` still
     /// branches to it, so a rejected removal leaves the stage untouched and an
     /// accepted one leaves no edge naming a tombstoned block.
-    pub(in crate::rewrite) fn check_no_outside_predecessors(
+    pub(super) fn check_no_outside_predecessors(
         &self,
         block: Block,
         allowed: &[Block],
