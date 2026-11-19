@@ -145,6 +145,54 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(old)
     }
 
+    /// Set the yield list of `graph` to `values`.
+    ///
+    /// A [`Rewriter::new_digraph`] graph starts with no yields; this gives it
+    /// its yields. It can also change how many values a graph yields.
+    /// [`Rewriter::replace_yield`] rewrites one slot of the current list. The
+    /// owning statement's results are not changed: keeping them in step with
+    /// the yields is the caller's responsibility.
+    ///
+    /// Maintains the def-use index: each old yield use is removed and each
+    /// new one added. Yields are not petgraph edges, so the topology is
+    /// unchanged. Setting the list already there is a no-op and records no
+    /// event.
+    ///
+    /// Rejects, leaving the stage untouched, if `graph` or one of `values` is
+    /// unknown. Records [`MutationEvent::ChangedDiGraphYields`].
+    pub fn set_yields(
+        &mut self,
+        graph: DiGraph,
+        values: impl IntoIterator<Item = impl Into<SSAValue>>,
+    ) -> Result<(), RewriteError> {
+        let values: Vec<SSAValue> = values.into_iter().map(Into::into).collect();
+        if let Some(&value) = values
+            .iter()
+            .find(|value| value.get_info(self.stage).is_none())
+        {
+            return Err(RewriteError::UnknownValue(value));
+        }
+        let old = self.live_digraph(graph)?.yields().to_vec();
+        if old == values {
+            return Ok(());
+        }
+
+        for (index, &value) in old.iter().enumerate() {
+            remove_use(self.stage, value, Use::DiGraphYield { graph, index });
+        }
+        for (index, &value) in values.iter().enumerate() {
+            add_use(self.stage, value, Use::DiGraphYield { graph, index });
+        }
+        graph
+            .get_info_mut(self.stage)
+            .expect("graph is live in this stage")
+            .set_yields(values);
+
+        self.events
+            .push(MutationEvent::ChangedDiGraphYields { graph });
+        Ok(())
+    }
+
     /// The live `DiGraph` `graph`, or [`RewriteError::UnknownDiGraph`] for a
     /// deleted or unknown id.
     pub(in crate::rewrite) fn live_digraph(

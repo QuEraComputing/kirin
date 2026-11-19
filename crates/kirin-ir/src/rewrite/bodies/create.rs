@@ -80,13 +80,14 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// Create an empty `DiGraph` owned by nothing, with edge ports of
     /// `edge_port_types` followed by capture ports of `capture_types`.
     ///
-    /// The graph is meant to become a statement's body. Read its ports with
-    /// [`edge_ports`](crate::GraphInfo::edge_ports) and
-    /// [`capture_ports`](crate::GraphInfo::capture_ports), and add nodes with
-    /// [`Rewriter::insert_node`]. Then name the graph
-    /// in the definition of a new statement ([`Rewriter::insert_before`] and
-    /// similar) or of a replacement ([`Rewriter::replace_statement`]); that
-    /// statement becomes its parent. The graph has no name and no yields.
+    /// The graph is meant to become a statement's body. It has no name and no
+    /// yields. Read its ports with [`edge_ports`](crate::GraphInfo::edge_ports)
+    /// and [`capture_ports`](crate::GraphInfo::capture_ports), add nodes with
+    /// [`Rewriter::insert_node`], and give it its yields with
+    /// [`Rewriter::set_yields`]. Then name the graph in the definition of a
+    /// new statement ([`Rewriter::insert_before`] and similar) or of a
+    /// replacement ([`Rewriter::replace_statement`]); that statement becomes
+    /// its parent.
     ///
     /// The rest is as for a [`Rewriter::new_block`] block. Its nodes count as
     /// uses of the values they read as soon as they are added, even while the
