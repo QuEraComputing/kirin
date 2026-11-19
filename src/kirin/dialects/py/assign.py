@@ -14,7 +14,7 @@ import ast
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
-from kirin.dialects.py.indexing import GetItem
+from kirin.dialects.py import indexing
 
 dialect = ir.Dialect("py.assign")
 
@@ -227,7 +227,7 @@ class Lowering(lowering.FromPythonAST):
         items = []
         for idx, item_type in enumerate(value_type.vars):
             stmt = state.current_frame.push(
-                GetItem(obj=value, index=state.get_literal(idx))
+                indexing.GetItem(obj=value, index=state.get_literal(idx))
             )
             stmt.result.type = item_type
             items.append(stmt.result)
