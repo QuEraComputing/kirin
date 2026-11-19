@@ -260,11 +260,25 @@ fn insert_rejects_a_body_holding_the_new_statement() {
 
 #[test]
 fn insert_rejects_a_graph_member_owning_its_graph() {
-    let (mut stage, graph) = unowned_graph();
-    let mut rewriter = Rewriter::new(&mut stage);
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let graph = rewriter.new_digraph([], []);
     assert_eq!(
         rewriter.insert_node(graph, BuilderDialect::OwnDiGraph(graph)),
         Err(RewriteError::BodyEnclosesOwner(Body::DiGraph(graph)))
+    );
+    assert_eq!(rewriter.events(), []);
+}
+
+#[test]
+fn insert_rejects_a_body_the_builder_left_unowned() {
+    let (mut stage, graph) = unowned_graph();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let host = rewriter.new_digraph([], []);
+    assert_eq!(
+        rewriter.insert_node(host, BuilderDialect::OwnDiGraph(graph)),
+        Err(RewriteError::BodyNotDetached(Body::DiGraph(graph))),
+        "only bodies this Rewriter created can be adopted"
     );
     assert_eq!(rewriter.events(), []);
 }

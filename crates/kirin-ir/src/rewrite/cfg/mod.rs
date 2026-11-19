@@ -19,9 +19,9 @@
 //! left to verification.
 //!
 //! Erasure tombstones eagerly: a block's arguments, statements, results, and
-//! nested statement-owned blocks and `CFG`s are marked deleted in one walk.
-//! Liveness therefore stays a single per-item flag; nothing is "dead because
-//! its parent is". (`DiGraph`/`UnGraph` bodies are not tombstoned yet.)
+//! nested statement-owned bodies are marked deleted in one walk. Liveness
+//! therefore stays a single per-item flag; nothing is "dead because its
+//! parent is".
 //!
 //! Every block-level method requires its blocks to be members of a `CFG`
 //! block list; statement-owned single-block bodies are rejected with
