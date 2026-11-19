@@ -374,3 +374,29 @@ fn erase_body_rejects_a_new_graph_whose_values_are_used_outside() {
         "a rejected erase changes nothing"
     );
 }
+
+#[test]
+fn a_new_digraph_gets_its_yields_from_set_yields() {
+    let mut f = fixture();
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    let dg = rewriter.new_digraph([TestType::I32], []);
+    let port: SSAValue = dg.expect_info(rewriter.stage()).edge_ports()[0].into();
+    let r = rewriter.new_result(TestType::I32);
+    rewriter
+        .create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Compute(port, r),
+        )
+        .unwrap();
+    rewriter.set_yields(dg, [r]).unwrap();
+    rewriter
+        .create(
+            InsertionPoint::After(f.anchor),
+            BuilderDialect::OwnDiGraph(dg),
+        )
+        .unwrap();
+    drop(rewriter);
+
+    assert_eq!(dg.expect_info(&f.stage).yields(), [SSAValue::from(r)]);
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}

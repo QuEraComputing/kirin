@@ -235,6 +235,12 @@ impl<L: Dialect> GraphInfo<L, petgraph::Directed, DiGraphExtra> {
         &self.extra.yields
     }
 
+    /// Set the yield list to `yields`. The caller (`Rewriter::set_yields`)
+    /// updates the def-use index.
+    pub(crate) fn set_yields(&mut self, yields: Vec<SSAValue>) {
+        self.extra.yields = yields;
+    }
+
     /// Mutable access to the yield slots, for the rewriter to replace a
     /// yielded value in place while maintaining the def-use index.
     pub(crate) fn yields_mut(&mut self) -> &mut [SSAValue] {
