@@ -3,7 +3,7 @@
 This document designs M3's analysis manager, the `Database` in
 `kirin-rewrite`: how rewrite passes get analysis results, such as constant
 propagation, how those results are cached, and when they are thrown away.
-The database owns the pipeline and the results computed from it, as a salsa
+The database owns the program and the results computed from it, as a salsa
 database owns its inputs and its memoized queries. It computes results, runs
 each pass, and drops results when a pass edits the IR.
 
@@ -22,17 +22,17 @@ cached result.**
   gets its own result.
 - **Result**: the value an analysis produces for one key. The database
   caches results; rules read them.
-- **Pass**: the function `Pipeline::run_pass` runs to edit one stage in place
+- **Pass**: the function `Program::run_pass` runs to edit one stage in place
   through a `Rewriter`. A `RewriteDriver` runs inside a pass. A pass may run a
   driver once, several times, or alongside other edits, and the database only
   sees the pass as a whole.
 - **Revision**: a counter the database bumps once for each pass that edits
-  the pipeline, and on each `pipeline_mut()`. Each result records the
+  the program, and on each `program_mut()`. Each result records the
   revision it was computed at.
 - **Stale**: a result computed at an earlier revision, that is, on IR that
   has since been edited.
-- **`S`**: the pipeline's stage type, as in `Pipeline<S>`: the enum of every
-  stage the pipeline holds (e.g. `Source(StageInfo<SourceLanguage>)`,
+- **`S`**: the program's stage type, as in `Program<S>`: the enum of every
+  stage the program holds (e.g. `Source(StageInfo<SourceLanguage>)`,
   `Lowered(..)`).
 - **`L`**: the language of one stage. A pass and a `RuleSet<L>` work on one
   `StageInfo<L>`.
@@ -56,18 +56,18 @@ cached result.**
   compilation](#toward-query-based-compilation)).
 - Updating a stale result in place rather than recomputing it.
 
-## The core constraint: analyses need the pipeline, passes don't have it
+## The core constraint: analyses need the program, passes don't have it
 
-The existing analyses read the whole pipeline: every interpreter engine is
-built from it, as in `ConstProp::new(&pipeline)`, and so are `toy-lang`'s
-`analyze_constprop(&pipeline, ..)` and `analyze_demand(&pipeline, ..)`. They
+The existing analyses read the whole program: every interpreter engine is
+built from it, as in `ConstProp::new(&program)`, and so are `toy-lang`'s
+`analyze_constprop(&program, ..)` and `analyze_demand(&program, ..)`. They
 need it even when every call stays in one stage: they resolve calls through
-the pipeline's function table, which `StageInfo` does not hold, and they look
+the program's function table, which `StageInfo` does not hold, and they look
 stages up through the stage enum `S`. A pass, however, takes its stage *out
-of* the pipeline (`run_pass`) and sees only a `Rewriter` over that one
-`StageInfo<L>`; it cannot borrow the pipeline either, since `run_pass` holds
+of* the program (`run_pass`) and sees only a `Rewriter` over that one
+`StageInfo<L>`; it cannot borrow the program either, since `run_pass` holds
 it mutably. So an analysis a pass needs must run **before** the pass starts,
-and its result must be **owned** data, not a borrow of the pipeline.
+and its result must be **owned** data, not a borrow of the program.
 
 This decides most of the design: results are computed outside passes, handed
 to the pass read-only, and kept or dropped afterwards.
@@ -89,9 +89,9 @@ pub trait AnalysisKind: 'static {
     type Output: Send + Sync + 'static;
 }
 
-/// How to compute analysis `A` on a `Pipeline<S>`. `run` gets the database
+/// How to compute analysis `A` on a `Program<S>`. `run` gets the database
 /// shared, as a salsa query gets `&db`: it reads the IR through
-/// `db.pipeline()` and gets the analyses it depends on through
+/// `db.program()` and gets the analyses it depends on through
 /// `db.get::<Other>(&key)?`.
 pub trait Analysis<S>: AnalysisKind {
     fn run(db: &Database<S>, key: &Self::Key)
@@ -104,7 +104,7 @@ impl AnalysisCache {
 }
 
 /// "This pass reads analysis `A` for `key`". Unlike `A: Analysis<S>`, it
-/// doesn't mention the pipeline's stage type `S`, so a `RuleSet<L>`, which
+/// doesn't mention the program's stage type `S`, so a `RuleSet<L>`, which
 /// only knows its language `L`, can hold one.
 #[derive(Clone)]
 pub struct Requirement { /* TypeId, name, the key (type-erased) */ }
@@ -113,18 +113,18 @@ impl Requirement {
     pub fn of<A: AnalysisKind>(key: A::Key) -> Self;
 }
 
-/// Owns the pipeline and the results computed from it. Every edit to the
-/// pipeline goes through it, so no cached result outlives an edit.
+/// Owns the program and the results computed from it. Every edit to the
+/// program goes through it, so no cached result outlives an edit.
 pub struct Database<S> {
-    /* pipeline:   Pipeline<S>
+    /* program:    Program<S>
        registered: TypeId -> compute function for S
-       revision:   u64, the pipeline's revision
+       revision:   u64, the program's revision
        cache:      RefCell<AnalysisCache>, mapping (TypeId, key) to
                    (Arc<dyn Any + Send + Sync>, revision computed at) */
 }
 
 impl<S> Database<S> {
-    pub fn new(pipeline: Pipeline<S>) -> Self;
+    pub fn new(program: Program<S>) -> Self;
 
     /// Let passes require `A`. `get` needs no registration.
     pub fn register<A: Analysis<S>>(&mut self) -> &mut Self;
@@ -139,18 +139,18 @@ impl<S> Database<S> {
     pub fn get_cached<A: AnalysisKind>(&self, key: &A::Key)
         -> Option<Arc<A::Output>>;
 
-    pub fn pipeline(&self) -> &Pipeline<S>;
+    pub fn program(&self) -> &Program<S>;
     /// For edits that are not passes, such as parsing more functions in.
     /// Bumps the revision, since the database cannot see what changes.
-    pub fn pipeline_mut(&mut self) -> &mut Pipeline<S>;
-    pub fn into_pipeline(self) -> Pipeline<S>;
+    pub fn program_mut(&mut self) -> &mut Program<S>;
+    pub fn into_program(self) -> Program<S>;
 
-    /// How many passes have edited the pipeline, plus how many times
-    /// `pipeline_mut` was called, since the database was created.
+    /// How many passes have edited the program, plus how many times
+    /// `program_mut` was called, since the database was created.
     pub fn revision(&self) -> u64;
 
     /// Compute every requirement in `requires` that is not cached, then run
-    /// `pass` on `stage` through `Pipeline::run_pass`, handing it the cached
+    /// `pass` on `stage` through `Program::run_pass`, handing it the cached
     /// results; bump the revision if the pass edited the IR.
     pub fn run_pass<L, T, E>(
         &mut self,
@@ -168,7 +168,7 @@ pub enum AnalysisError {
     Cycle { analysis: &'static str },
     /// A pass required `analysis`, but it was never registered.
     Unregistered { analysis: &'static str },
-    /// The key names a stage the pipeline does not hold, or one a failed
+    /// The key names a stage the program does not hold, or one a failed
     /// pass quarantined. `run` returns it.
     UnknownStage,
 }
@@ -177,9 +177,10 @@ pub enum AnalysisError {
 pub enum RunPassError {
     /// A required analysis could not be computed. The pass did not run and
     /// the stage is untouched.
-    Analysis(AnalysisError),
-    /// `Pipeline::run_pass` failed.
-    Pass(StagePassError),
+    RequirementUnsatisfied(AnalysisError),
+    /// `Program::run_pass` returned an error: the stage could not be run,
+    /// or the pass failed.
+    PassFailedOrNotRun(StagePassError),
 }
 ```
 
@@ -203,7 +204,7 @@ Computing takes the database by shared reference, as a salsa query takes
 `&db`, and never mutably. The cache sits behind interior mutability, so
 `get` fills it through `&self`, and an analysis can ask for the analyses it
 depends on in the middle of its own `run`. Only `register`, `run_pass` and
-`pipeline_mut` take `&mut`, so none of them can happen while an analysis
+`program_mut` take `&mut`, so none of them can happen while an analysis
 runs: `run` only has `&Database`. No borrow of the cache leaves the
 database: `get` and `get_cached` return an `Arc`, and `get` releases its
 borrow before calling `A::run`, so an analysis's own `get` calls can fill the
@@ -217,8 +218,8 @@ A failed computation is not cached. `AnalysisError` holds a
 Outside a pass, `Database::get_cached` reads without computing; inside one,
 the pass reads the same results through the `&AnalysisCache` it is given.
 
-One type owns both the pipeline and the results, as a salsa database owns
-its inputs and memoized queries. Owning the pipeline is what guarantees no
+One type owns both the program and the results, as a salsa database owns
+its inputs and memoized queries. Owning the program is what guarantees no
 edit goes unseen: the only ways to edit it are the database's own `&mut`
 methods.
 
@@ -283,7 +284,7 @@ invalidates results, not which keys analyses take or how they ask.
 ### Example
 
 ```rust
-let mut db = Database::new(pipeline);
+let mut db = Database::new(program);
 db.register::<ConstPropFacts>().register::<DemandFacts>();
 
 // The rule set says which analyses its rules read; the database computes the
@@ -297,7 +298,7 @@ db.run_pass(stage, rules.required(), fold)?;
 // The fold edited the IR, so this pass gets a fresh constprop result.
 db.run_pass(stage, rules.required(), fold)?;
 
-let pipeline = db.into_pipeline();
+let program = db.into_program();
 ```
 
 ## Which analyses run before a pass
@@ -309,7 +310,7 @@ because its analyses run lazily inside the pass.
 Rules already say what they read (`.requires::<A>(key)`, see [How rules get
 results](#how-rules-get-results)), so the database takes the list from the
 rule set: `rules.required()`. One type problem stands in the way. A
-`RuleSet<L>` knows the language `L`, not the pipeline's stage type `S`, so it
+`RuleSet<L>` knows the language `L`, not the program's stage type `S`, so it
 can record *which* analysis a rule needs and for which key, as a
 `Requirement`, but it cannot compute one: computing needs `A: Analysis<S>`.
 
@@ -321,7 +322,7 @@ cached. A pass can require several analyses, and one analysis for several
 keys.
 
 - A requirement that was never registered fails with
-  `AnalysisError::Unregistered` **before** the stage leaves the pipeline, so
+  `AnalysisError::Unregistered` **before** the stage leaves the program, so
   the stage is untouched.
 - A hand-written pass without a rule set names its needs directly:
   `[Requirement::of::<ConstPropFacts>(roots)]`, or `[]` for none.
@@ -332,12 +333,11 @@ keys.
 
 ## Invalidation
 
-After a pass, `run_pass` checks whether the pass's `Rewriter` edited the IR.
-It reads the rewriter's `edited` flag, which every mutation sets and nothing
-clears, rather than its event log, which a pass can empty with
-`drain_events`. A `Rewriter` is new for each pass, so the flag says whether
-this pass edited. The flag is a small addition to `kirin-ir`:
-`Rewriter::edited()`.
+After a pass, `run_pass` checks whether the pass's `Rewriter` edited the IR,
+through `Rewriter::edited()`, a small addition to `kirin-ir`: whether its
+event log is non-empty. A pass cannot empty the log, since only
+`into_events`, which consumes the rewriter, takes the events out, and a
+`Rewriter` is new for each pass, so the log says whether this pass edited.
 
 | What happened | Cache afterwards |
 |---|---|
@@ -354,24 +354,24 @@ because a result can depend on any stage through cross-stage calls. Telling
 them apart is a later refinement.
 
 **Revisions.** Dropping is done with a revision counter, as in salsa. The
-database bumps it once for each pass that edits the pipeline, and each cached
+database bumps it once for each pass that edits the program, and each cached
 result records the revision it was computed at. A lookup returns only results
 computed at the current revision. Bumping also frees the stale results, so the
-cache never holds them. With the whole pipeline as one input this behaves
+cache never holds them. With the whole program as one input this behaves
 exactly as clearing the cache. Salsa also keeps one revision, but treats each
 input separately, recording the revision it last changed at; making each
 function body such an input is how this later becomes selective (see [Toward
 query-based compilation](#toward-query-based-compilation)).
 
-**No edit goes unseen.** The database owns the pipeline, so code edits it in
+**No edit goes unseen.** The database owns the program, so code edits it in
 one of three ways, and each keeps the cache honest:
 
 - `run_pass`: dropped as in the table above.
-- `pipeline_mut()`: bumps the revision, dropping everything at once, since
+- `program_mut()`: bumps the revision, dropping everything at once, since
   the database cannot see what the caller changes, e.g. parsing more
   functions in. This is coarse: adding a function drops results nothing
   invalidated.
-- `into_pipeline()`: gives the pipeline back and discards the cached results
+- `into_program()`: gives the program back and discards the cached results
   with the database.
 
 Arena compaction (`Arena::gc`), which `rewrite-engine.md` allows only at pass
@@ -383,7 +383,7 @@ rules and requirements hold, or rebuild them.
 
 A pass reads the results computed before it started, for its whole run, even
 after its first edit. It never gets a recomputed result: recomputing needs the
-pipeline, which the pass does not have. This matches `rewrite-engine.md`:
+program, which the pass does not have. This matches `rewrite-engine.md`:
 no analysis reruns during the mutation phase.
 
 So inside a pass, results are a **snapshot** of the IR before the pass. This
@@ -446,7 +446,7 @@ builds native rules from an empty cache without it. As a safety net, before
 its first sweep the driver checks every requirement against its cache and
 fails with `DriverError::MissingAnalysis` naming the rule and the analysis,
 before editing anything. That catches a driver run through a plain
-`Pipeline::run_pass`, or a pass handing `run_pass` a different list. A rule's
+`Program::run_pass`, or a pass handing `run_pass` a different list. A rule's
 `apply` signature does not change.
 
 In M3 only native rules read results. Pattern rules can use the same recipe
@@ -551,9 +551,9 @@ none of them.
 | Dependencies | constructor takes `AnalysisManager&` | `run` takes `&Database`, as a salsa query takes `&db` |
 | Caches results | `AnalysisManager` | `Database` |
 | Runs passes and triggers invalidation | `PassManager`, a separate type | `Database::run_pass`, the same type |
-| Owns the IR | no | the database owns the pipeline |
+| Owns the IR | no | the database owns the program |
 | Inputs | the op it is constructed from | a key the caller passes with each request: a stage, or roots |
-| When computed | lazily, inside the pass | before the pass (needs the pipeline) |
+| When computed | lazily, inside the pass | before the pass (needs the program) |
 | Knowing what to compute | not needed (lazy) | rules' requirements + a registry, as in LLVM |
 | Reading inside a pass | `getAnalysis`, `getCachedParentAnalysis` | `AnalysisCache::get` only, like a parent analysis |
 | Scope | per op, nested | per key |
@@ -573,8 +573,8 @@ it last changed at, as salsa's inputs do, and each result to record what it
 read: function bodies, and how its calls resolved, such as the function
 table and specializations a linker consulted. IR reads would go through
 tracked accessors, as in salsa, so that nothing goes unrecorded; today
-`db.pipeline()` is untracked. Adding this does not change how analyses are
-asked for; an analysis keeps whole-pipeline invalidation until its reads are
+`db.program()` is untracked. Adding this does not change how analyses are
+asked for; an analysis keeps whole-program invalidation until its reads are
 recorded.
 
 ## Implementation steps
@@ -594,8 +594,7 @@ Each step is reviewed before the next starts.
    before the pass and leaves the stage untouched; `get` computes an
    unregistered analysis; a pass with no edits keeps results and the revision;
    a pass with an edit bumps the revision and drops every result, whatever its
-   key; a pass that edits and then drains its events still bumps the revision;
-   a failed pass drops everything; `pipeline_mut()` drops everything; a pass
+   key; a failed pass drops everything; `program_mut()` drops everything; a pass
    reads the results computed before it.
 2. **Rules read results.** Recipes receive `&AnalysisCache`;
    `AddedRule::requires::<A>(key)`; `RuleSet::required()`;
@@ -632,8 +631,8 @@ callable → contexts index. Today `Analyzed<I>` wraps the converged engine `I`.
   part of the key because SSA ids are allocated per stage, so two stages can
   hold the same id for different values.
 
-**Why.** The engine borrows the pipeline, so today's `Analyzed` does too.
-While it is alive, nothing can edit the pipeline, so the database cannot
+**Why.** The engine borrows the program, so today's `Analyzed` does too.
+While it is alive, nothing can edit the program, so the database cannot
 keep it across passes. An owned result lets the database cache the
 interpreter's own result, giving one result type for every analysis, current
 and downstream, instead of a copy type per analysis on the rewrite side. Every
@@ -647,7 +646,7 @@ inferred, which is nearly all of them; the analysis crates. `toy-lang` names
 come in `kirin-interpreter`, as the three impls collapse into one.
 
 **Tests.** The existing tests reading through `AnalysisResults` must pass
-unchanged. One new test analyzes, edits the pipeline, then reads the result,
-which compiles only if the result no longer borrows the pipeline. Another
+unchanged. One new test analyzes, edits the program, then reads the result,
+which compiles only if the result no longer borrows the program. Another
 analyzes across two stages whose SSA ids overlap and checks that the
 per-value read returns each stage's own facts.
