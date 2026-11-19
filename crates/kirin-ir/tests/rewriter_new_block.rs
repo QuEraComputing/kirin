@@ -254,7 +254,10 @@ fn insert_rejects_a_body_holding_the_new_statement() {
             InsertionPoint::Before(ret),
             BuilderDialect::OwnBlocks(block, other)
         ),
-        Err(RewriteError::BodyEnclosesOwner(Body::Block(block)))
+        Err(RewriteError::CannotInsert {
+            insertion_pt: InsertionPoint::Before(ret),
+            reason: Box::new(RewriteError::BodyEnclosesOwner(Body::Block(block))),
+        })
     );
 
     // Two levels down: `block` holds `holder`, which owns `inner`.
@@ -274,7 +277,10 @@ fn insert_rejects_a_body_holding_the_new_statement() {
             InsertionPoint::Before(inner_ret),
             BuilderDialect::OwnBlocks(block, other)
         ),
-        Err(RewriteError::BodyEnclosesOwner(Body::Block(block)))
+        Err(RewriteError::CannotInsert {
+            insertion_pt: InsertionPoint::Before(inner_ret),
+            reason: Box::new(RewriteError::BodyEnclosesOwner(Body::Block(block))),
+        })
     );
     for unowned in [block, other] {
         assert_eq!(parent(rewriter.stage(), unowned), None);
@@ -290,7 +296,10 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
             InsertionPoint::DiGraph(graph),
             BuilderDialect::OwnDiGraph(graph)
         ),
-        Err(RewriteError::BodyEnclosesOwner(Body::DiGraph(graph)))
+        Err(RewriteError::CannotInsert {
+            insertion_pt: InsertionPoint::DiGraph(graph),
+            reason: Box::new(RewriteError::BodyEnclosesOwner(Body::DiGraph(graph))),
+        })
     );
     assert_eq!(rewriter.events(), []);
 }

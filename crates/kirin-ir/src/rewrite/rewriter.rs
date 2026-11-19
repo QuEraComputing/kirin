@@ -254,19 +254,20 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A definition passed to an insert or `replace_statement` names a body
+    /// A definition passed to `create` or `replace_statement` names a body
     /// that does not resolve to a live body in this stage.
     UnknownBody(Body),
-    /// A definition passed to an insert or `replace_statement` names a body
+    /// A definition passed to `create` or `replace_statement` names a body
     /// that belongs to another statement or, for a block, to a CFG. A body has
     /// one owner; detach it from the other one first.
     BodyOwnedElsewhere(Body),
-    /// A definition passed to an insert or `replace_statement` names the same
+    /// A definition passed to `create` or `replace_statement` names the same
     /// body in two fields.
     BodyListedTwice(Body),
-    /// A definition passed to an insert or `replace_statement` names a body
-    /// that contains the statement (for an insert, the block or graph it is
-    /// inserted into), which would make the statement its own ancestor.
+    /// A definition passed to `create` or `replace_statement` names a body
+    /// that contains the statement (for `create`, the block or graph its
+    /// insertion point is in), which would make the statement its own
+    /// ancestor.
     BodyEnclosesOwner(Body),
     /// `move_before`/`move_after` was given an anchor nested in the moved
     /// statement's own bodies, which would make the statement its own

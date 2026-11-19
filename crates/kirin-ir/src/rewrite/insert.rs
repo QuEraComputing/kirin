@@ -105,7 +105,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
     /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not
     /// contain the block or graph `insertion_pt` is in, which would make the
-    /// statement its own ancestor ([`RewriteError::BodyEnclosesOwner`]).
+    /// statement its own ancestor ([`RewriteError::BodyEnclosesOwner`],
+    /// wrapped in [`RewriteError::CannotInsert`]).
     ///
     /// Rejects, leaving the stage untouched, if a check fails. Records
     /// [`MutationEvent::InsertedStatement`] (covering the adopted bodies),
@@ -118,7 +119,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<Statement, RewriteError> {
         let placement = self.check_insertion_pt(insertion_pt, &definition)?;
-        self.check_new_bodies(&bodies_of(&definition), &[], placement.parent())?;
+        // A body containing `insertion_pt` is a placement error, so it names
+        // the insertion point. The other body errors are about the body alone.
+        self.check_new_bodies(&bodies_of(&definition), &[], placement.parent())
+            .map_err(|reason| match reason {
+                RewriteError::BodyEnclosesOwner(_) => RewriteError::CannotInsert {
+                    insertion_pt,
+                    reason: Box::new(reason),
+                },
+                reason => reason,
+            })?;
         let stmt = self.build_statement(definition)?;
         self.place(stmt, placement);
         Ok(stmt)
