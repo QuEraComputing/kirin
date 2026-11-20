@@ -536,14 +536,16 @@ code:
 | `AnalysisKind`, `Analysis`, `AnalysisCache`, `Requirement`, `Database` | `kirin-rewrite` |
 | The result type, `AnalysisResults` | `kirin-interpreter` |
 | Lattices and engine aliases | `kirin-constprop`, `kirin-demand`, unchanged |
-| The analysis types (`ConstPropFacts`, `DemandFacts`) and their `Analysis<Stage>` impls | the language crate (`toy-lang`; the test languages for the tests) |
+| The analysis types (`ConstPropFacts`, `DemandFacts`) and their `Analysis<Stage>` impls | the language crate (`toy-lang`, which also holds the tests) |
 
 The impls go in the language crate because only it knows how to run an
 analysis for its stages: the linker, the error type and its frame composition
 (`ToyAbstractFrame`), as `toy-lang`'s `analyze_constprop` does today. Each
 impl runs the analysis from every root in its key and keeps the resulting
 `AnalysisResults`. The analysis crates gain nothing, and `kirin-rewrite`
-depends on none of them.
+depends on none of them. The tests live in `toy-lang` too: the test
+languages either lack `constant` and calls, or need a frame composition of
+their own before constprop can run on them.
 
 ## Comparison with MLIR
 
@@ -604,10 +606,11 @@ Each step is reviewed before the next starts.
    `MissingAnalysis`. Tests in
    `crates/kirin-rewrite/tests/rule_requirements.rs`.
 3. **Constprop client.** The `ConstPropFacts` analysis type and its
-   `Analysis` impl for a test language, reading the [interpreter's
+   `Analysis` impl for `toy-lang`, reading the [interpreter's
    results](interpreter/index.md#reading-results--analysisresults); a
-   test-only constant-folding rule.
+   test-only constant-folding rule. Tests in
+   `example/toy-lang/src/analysis_clients.rs`.
 4. **Demand client.** The `DemandFacts` analysis type and its `Analysis`
-   impl for a test language; a test-only demand-based dead-code rule.
+   impl for `toy-lang`; a test-only demand-based dead-code rule.
 5. **Docs.** Update the M3, `AnalysisManager` and `NativeRule` sections of
    `rewrite-engine.md`.
