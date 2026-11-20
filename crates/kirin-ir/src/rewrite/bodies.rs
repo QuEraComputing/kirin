@@ -120,7 +120,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     }
 
     /// Whether `parent` is `body` or nested in it at any depth.
-    fn body_contains(&self, body: Body, parent: StatementParent) -> bool {
+    pub(in crate::rewrite) fn body_contains(&self, body: Body, parent: StatementParent) -> bool {
         let mut current = parent;
         loop {
             let owner = match current {
