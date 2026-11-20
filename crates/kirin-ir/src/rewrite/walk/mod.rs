@@ -72,13 +72,21 @@
 //! - moving it to another block or graph, reported as
 //!   [`WalkError::VisitedMoved`]. This includes merging its block into
 //!   another ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with
-//!   its block as `succ`) and splitting its block at it
+//!   its block as `succ`), splitting its block at it
 //!   ([`Rewriter::split_block`](crate::Rewriter::split_block) with it as
-//!   `at`), which moves it to the new block;
+//!   `at`), which moves it to the new block, and splicing its block's
+//!   statements elsewhere with
+//!   [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before)
+//!   or [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after)
+//!   (a splice leaves the block's terminator behind, so it is allowed while
+//!   visiting the terminator);
 //! - moving it within its block with
 //!   [`Rewriter::move_before`](crate::Rewriter::move_before) or
 //!   [`Rewriter::move_after`](crate::Rewriter::move_after), reported the
 //!   same way;
+//! - splicing the blocks of its CFG into another CFG with
+//!   [`Rewriter::splice_cfg_after`](crate::Rewriter::splice_cfg_after),
+//!   reported the same way;
 //! - moving one of its ancestors, which is not checked;
 //! - reordering the bodies of one of its ancestors
 //!   ([`Rewriter::replace_statement`](crate::Rewriter::replace_statement)),
