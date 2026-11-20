@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 use crate::arena::{GetInfo, GetInfoMut, Id};
 use crate::node::linked_list::{LinkedList, LinkedListNode};
@@ -56,14 +56,19 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if self.live_statement(stmt)?.definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
         }
-        let mut defined: HashSet<SSAValue> = {
-            let definition = &stmt.expect_info(self.stage).definition;
-            definition.results().map(|&result| result.into()).collect()
-        };
-        for body in bodies_of(&stmt.expect_info(self.stage).definition) {
-            self.collect_defined(body, &mut defined);
+        // Reject a value read from outside the copy whose replacement in
+        // `map` is not live. With no value replacements in `map`, every
+        // such value is read as it is, so none can be rejected.
+        if map.has_values() {
+            let mut defined: FxHashSet<SSAValue> = {
+                let definition = &stmt.expect_info(self.stage).definition;
+                definition.results().map(|&result| result.into()).collect()
+            };
+            for body in bodies_of(&stmt.expect_info(self.stage).definition) {
+                self.collect_defined(body, &mut defined);
+            }
+            self.check_replacements_live(stmt, map, &defined)?;
         }
-        self.check_replacements_live(stmt, map, &defined)?;
 
         self.reserve_statement(stmt, map);
         let mut copied = Copied::default();
@@ -91,10 +96,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if source.get_info(self.stage).is_none() {
             return Err(RewriteError::UnknownCfg(source));
         }
-        let mut defined = HashSet::new();
-        self.collect_defined(Body::CFG(source), &mut defined);
-        for stmt in self.body_statements(Body::CFG(source)) {
-            self.check_replacements_live(stmt, map, &defined)?;
+        // Reject a dead replacement for a value read from outside the copy,
+        // as in `clone_statement`.
+        if map.has_values() {
+            let mut defined = FxHashSet::default();
+            self.collect_defined(Body::CFG(source), &mut defined);
+            for stmt in self.body_statements(Body::CFG(source)) {
+                self.check_replacements_live(stmt, map, &defined)?;
+            }
         }
 
         let copy = self.reserve_cfg(source, map);
@@ -107,7 +116,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     /// Add every value defined in `body` or nested in it to `defined`: block
     /// arguments, graph ports and results.
-    fn collect_defined(&self, body: Body, defined: &mut HashSet<SSAValue>) {
+    fn collect_defined(&self, body: Body, defined: &mut FxHashSet<SSAValue>) {
         match body {
             Body::Block(block) => {
                 let arguments = block.expect_info(self.stage).arguments();
@@ -145,7 +154,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         &self,
         stmt: Statement,
         map: &IRMap,
-        defined: &HashSet<SSAValue>,
+        defined: &FxHashSet<SSAValue>,
     ) -> Result<(), RewriteError> {
         let definition = &stmt.expect_info(self.stage).definition;
         for &operand in definition.arguments() {
@@ -431,7 +440,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         };
         let terminator_copy =
             self.fill_statement(terminator, Some(StatementParent::Block(copy)), map, copied);
-        let targets: HashSet<Block> = terminator_copy
+        let targets: FxHashSet<Block> = terminator_copy
             .expect_info(self.stage)
             .definition
             .successors()

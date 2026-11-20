@@ -45,6 +45,11 @@ impl IRMap {
         self.statements.get(&old).copied()
     }
 
+    /// Whether any value has a replacement.
+    pub(super) fn has_values(&self) -> bool {
+        !self.values.is_empty()
+    }
+
     /// `value`'s replacement, or `value` itself if it has none.
     pub fn lookup_or_original(&self, value: SSAValue) -> SSAValue {
         self.value(value).unwrap_or(value)
