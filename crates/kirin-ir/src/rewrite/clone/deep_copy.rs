@@ -1,7 +1,6 @@
-use rustc_hash::FxHashSet;
-
 use crate::arena::GetInfo;
-use crate::{Body, CFG, Dialect, SSAValue, Statement};
+use crate::node::PortParent;
+use crate::{Body, CFG, Dialect, SSAKind, SSAValue, Statement, StatementParent};
 
 use super::IRMap;
 use super::fill::Copied;
@@ -45,14 +44,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // `map` is not live. With no value replacements in `map`, every
         // such value is read as it is, so none can be rejected.
         if map.has_values() {
-            let mut defined: FxHashSet<SSAValue> = {
-                let definition = &stmt.expect_info(self.stage).definition;
-                definition.results().map(|&result| result.into()).collect()
-            };
-            for body in bodies_of(&stmt.expect_info(self.stage).definition) {
-                self.collect_defined(body, &mut defined);
-            }
-            self.check_replacements_live(stmt, map, &defined)?;
+            let copied = bodies_of(&stmt.expect_info(self.stage).definition);
+            self.check_replacements_live(stmt, map, &copied)?;
         }
 
         self.reserve_statement(stmt, map);
@@ -84,10 +77,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // Reject a dead replacement for a value read from outside the copy,
         // as in `clone_statement`.
         if map.has_values() {
-            let mut defined = FxHashSet::default();
-            self.collect_defined(Body::CFG(source), &mut defined);
             for stmt in self.body_statements(Body::CFG(source)) {
-                self.check_replacements_live(stmt, map, &defined)?;
+                self.check_replacements_live(stmt, map, &[Body::CFG(source)])?;
             }
         }
 
@@ -99,74 +90,56 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(copy)
     }
 
-    /// Add every value defined in `body` or nested in it to `defined`: block
-    /// arguments, graph ports and results.
-    fn collect_defined(&self, body: Body, defined: &mut FxHashSet<SSAValue>) {
-        match body {
-            Body::Block(block) => {
-                let arguments = block.expect_info(self.stage).arguments();
-                defined.extend(arguments.iter().map(|&argument| SSAValue::from(argument)));
-            }
-            Body::CFG(cfg) => {
-                for block in cfg.blocks(self.stage) {
-                    let arguments = block.expect_info(self.stage).arguments();
-                    defined.extend(arguments.iter().map(|&argument| SSAValue::from(argument)));
-                }
-            }
-            Body::DiGraph(graph) => {
-                let ports = graph.expect_info(self.stage).ports();
-                defined.extend(ports.iter().map(|&port| SSAValue::from(port)));
-            }
-            Body::UnGraph(graph) => {
-                let ports = graph.expect_info(self.stage).ports();
-                defined.extend(ports.iter().map(|&port| SSAValue::from(port)));
-            }
-        }
-        for stmt in self.body_statements(body) {
-            let definition = &stmt.expect_info(self.stage).definition;
-            defined.extend(definition.results().map(|&result| SSAValue::from(result)));
-            for nested in bodies_of(definition) {
-                self.collect_defined(nested, defined);
-            }
-        }
-    }
-
     /// Reject `stmt` if the copy would read a value from `map` that is not
-    /// live, in `stmt` or anything nested in it. The values in `defined`,
-    /// which the copy defines, are skipped: copying overwrites their entries
-    /// in `map` before anything reads them.
+    /// live, in `stmt` or anything nested in it. A value defined in `copied`,
+    /// the bodies being copied, is skipped: copying overwrites its entry in
+    /// `map` before anything reads it.
     fn check_replacements_live(
         &self,
         stmt: Statement,
         map: &IRMap,
-        defined: &FxHashSet<SSAValue>,
+        copied: &[Body],
     ) -> Result<(), RewriteError> {
         let definition = &stmt.expect_info(self.stage).definition;
-        for &operand in definition.arguments() {
-            if !defined.contains(&operand)
-                && let Some(replacement) = map.value(operand)
+        // A `DiGraph`'s yields are read too.
+        let yields = definition
+            .digraphs()
+            .flat_map(|&graph| graph.expect_info(self.stage).yields().iter());
+        for &read in definition.arguments().chain(yields) {
+            if let Some(replacement) = map.value(read)
                 && replacement.get_info(self.stage).is_none()
+                && !self.defined_in(read, copied)
             {
                 return Err(RewriteError::UnknownValue(replacement));
             }
         }
-        // A `DiGraph`'s yields are read too.
-        for &graph in definition.digraphs() {
-            for &value in graph.expect_info(self.stage).yields() {
-                if !defined.contains(&value)
-                    && let Some(replacement) = map.value(value)
-                    && replacement.get_info(self.stage).is_none()
-                {
-                    return Err(RewriteError::UnknownValue(replacement));
-                }
-            }
-        }
         for body in bodies_of(definition) {
             for nested in self.body_statements(body) {
-                self.check_replacements_live(nested, map, defined)?;
+                self.check_replacements_live(nested, map, copied)?;
             }
         }
         Ok(())
+    }
+
+    /// Whether `value` is defined in one of `bodies`, at any depth: a result
+    /// of a statement in it, or an argument or port of it or of a body nested
+    /// in it.
+    fn defined_in(&self, value: SSAValue, bodies: &[Body]) -> bool {
+        let Some(info) = value.get_info(self.stage) else {
+            return false;
+        };
+        let place = match *info.kind() {
+            SSAKind::Result(stmt, _) => {
+                match stmt.get_info(self.stage).and_then(|item| item.parent) {
+                    Some(parent) => parent,
+                    None => return false,
+                }
+            }
+            SSAKind::BlockArgument(block, _) => StatementParent::Block(block),
+            SSAKind::Port(PortParent::DiGraph(graph), _) => StatementParent::DiGraph(graph),
+            SSAKind::Port(PortParent::UnGraph(graph), _) => StatementParent::UnGraph(graph),
+        };
+        bodies.iter().any(|&body| self.body_contains(body, place))
     }
 
     /// The statements directly in `body`: a block's chain then its
