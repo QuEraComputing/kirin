@@ -4,7 +4,7 @@
 use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_ir::SSAKind;
-use kirin_ir::walk::{PreOrder, WalkResult};
+use kirin_ir::walk::{PreOrder, WalkError, WalkResult};
 use kirin_rewrite::{
     DriverError, PatternRule, RewriteDriver, RewriteSummary, RuleSet, StatementRule,
 };
@@ -107,6 +107,25 @@ impl StatementRule<L> for EraseUsedNeg {
     }
 }
 
+/// Folds the first double negation it visits, erases the visited `neg`, now
+/// unused, and ends the sweep.
+struct FoldEraseAndInterrupt;
+
+impl StatementRule<L> for FoldEraseAndInterrupt {
+    fn apply(
+        &mut self,
+        rewriter: &mut Rewriter<'_, L>,
+        stmt: Statement,
+    ) -> Result<WalkResult, RewriteError> {
+        let Some((r, x)) = double_neg_at(rewriter.stage(), stmt) else {
+            return Ok(WalkResult::Advance);
+        };
+        rewriter.replace_all_uses(r, x)?;
+        rewriter.erase_statement(stmt)?;
+        Ok(WalkResult::Interrupt)
+    }
+}
+
 /// A rule set with no pattern rules yet.
 fn no_patterns() -> RuleSet<L> {
     RuleSet::build(|_| Vec::<PatternRule<L>>::new()).expect("an empty rule set is valid")
@@ -192,4 +211,17 @@ fn a_failing_statement_rule_fails_the_run_with_its_name() {
     };
     assert_eq!(rule, "erase_used_neg");
     assert_eq!(error, RewriteError::StatementResultsInUse(stmt));
+}
+
+/// Erasing the statement being visited breaks the pre-order walk's
+/// contract, which the sweep checks even when the rule then interrupts it.
+#[test]
+fn erasing_the_visited_statement_then_interrupting_fails_the_run() {
+    let mut rules = no_patterns();
+    rules.add_statement_rule("fold_erase_and_interrupt", || FoldEraseAndInterrupt);
+    let error = run(&rules).err();
+    assert!(
+        matches!(error, Some(DriverError::Walk(WalkError::VisitedErased(_)))),
+        "{error:?}"
+    );
 }

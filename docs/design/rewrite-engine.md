@@ -2862,10 +2862,10 @@ rather than native rules; the native items landed after it, in the same
 sweeps. The traversal orders and their edit contract are documented in
 `kirin_ir::walk`, and the rule set and driver in `kirin_rewrite`. In short:
 walks may edit a visited statement's siblings and nested statements, but must
-not erase it or any of its ancestors. Each sweep tries every rule in order at
-each visited statement, then runs a dead-code cleanup, and the fixpoint ends
-at the first sweep recording no `MutationEvent`. Decisions to revisit in
-later milestones:
+not erase it or any of its ancestors, or move it to another block or graph.
+Each sweep tries every rule in order at each visited statement, then runs a
+dead-code cleanup, and the fixpoint ends at the first sweep recording no
+`MutationEvent`. Decisions to revisit in later milestones:
 
 - A rule may erase its root, the statement being visited, only in a walk
   order that allows it (`WalkOrder::ALLOWS_ERASING_VISITED`: the reverse BFS

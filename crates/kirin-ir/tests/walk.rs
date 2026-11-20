@@ -4,8 +4,8 @@ mod common;
 
 use common::{BuilderDialect, new_stage};
 use kirin_ir::walk::{
-    BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkCursor, WalkError, WalkOrder,
-    WalkResult, WalkStatus,
+    BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkError, WalkOrder, WalkResult,
+    WalkStatus,
 };
 use kirin_ir::*;
 
@@ -219,19 +219,20 @@ fn a_nested_root_walks_only_its_subtree() {
     assert_eq!(PostOrder::schedule(&t.stage, t.owner), post);
 }
 
-/// Walk `O` under `t.root`, running `edit` at each statement, and return the
-/// statements visited.
+/// Walk `O` under `root` with `walk_mut`, running `edit` at each statement;
+/// the statements visited, or the walk's error.
 fn walk_editing<O: WalkOrder>(
-    t: &mut Tree,
+    stage: &mut StageInfo<BuilderDialect>,
+    root: Statement,
     mut edit: impl FnMut(&mut Rewriter<BuilderDialect>, Statement),
 ) -> Result<Vec<Statement>, WalkError> {
-    let mut rewriter = Rewriter::new(&mut t.stage);
-    let mut cursor = O::start(rewriter.stage(), t.root);
+    let mut rewriter = Rewriter::new(stage);
     let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(rewriter.stage())? {
+    O::walk_mut(&mut rewriter, root, |rewriter, stmt| {
         visited.push(stmt);
-        edit(&mut rewriter, stmt);
-    }
+        edit(rewriter, stmt);
+        WalkResult::Advance
+    })?;
     Ok(visited)
 }
 
@@ -240,7 +241,7 @@ fn pre_order_walks_children_inserted_while_visiting() {
     let mut t = tree();
     let (owner, then_ret) = (t.owner, t.then_ret);
     let mut inserted = None;
-    let visited = walk_editing::<PreOrder>(&mut t, |rewriter, stmt| {
+    let visited = walk_editing::<PreOrder>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == owner {
             inserted = Some(
                 rewriter
@@ -264,7 +265,7 @@ fn post_order_walks_siblings_inserted_after_the_visited_statement() {
     let mut t = tree();
     let a = t.a;
     let mut inserted = None;
-    let visited = walk_editing::<PostOrder>(&mut t, |rewriter, stmt| {
+    let visited = walk_editing::<PostOrder>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == a {
             inserted = Some(rewriter.insert_after(a, BuilderDialect::Nop).unwrap());
         }
@@ -278,7 +279,7 @@ fn post_order_walks_siblings_inserted_after_the_visited_statement() {
 fn visits_with_insert_after_a<O: WalkOrder>() -> usize {
     let mut t = tree();
     let a = t.a;
-    walk_editing::<O>(&mut t, |rewriter, stmt| {
+    walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == a {
             rewriter.insert_after(a, BuilderDialect::Nop).unwrap();
         }
@@ -324,12 +325,8 @@ fn two_owners() -> (StageInfo<BuilderDialect>, [Statement; 6]) {
 #[test]
 fn bfs_walks_statements_inserted_at_the_current_level_and_below() {
     let (mut stage, [root, a, b, c, x, y]) = two_owners();
-    let mut rewriter = Rewriter::new(&mut stage);
-    let mut cursor = BFS::start(rewriter.stage(), root);
     let (mut n, mut z, mut h) = (None, None, None);
-    let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
-        visited.push(stmt);
+    let visited = walk_editing::<BFS>(&mut stage, root, |rewriter, stmt| {
         if stmt == a {
             // Ahead of the cursor at the current level, and one level down.
             n = Some(rewriter.insert_after(b, BuilderDialect::Nop).unwrap());
@@ -339,7 +336,8 @@ fn bfs_walks_statements_inserted_at_the_current_level_and_below() {
             // At a level that is already finished.
             h = Some(rewriter.insert_after(a, BuilderDialect::Nop).unwrap());
         }
-    }
+    })
+    .unwrap();
     let (n, z, h) = (n.unwrap(), z.unwrap(), h.unwrap());
     assert_eq!(visited, [root, a, b, n, c, x, z, y]);
     assert!(!visited.contains(&h));
@@ -348,17 +346,14 @@ fn bfs_walks_statements_inserted_at_the_current_level_and_below() {
 #[test]
 fn bfs_skips_statements_erased_ahead_of_it() {
     let (mut stage, [root, a, b, c, x, _y]) = two_owners();
-    let mut rewriter = Rewriter::new(&mut stage);
-    let mut cursor = BFS::start(rewriter.stage(), root);
-    let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
-        visited.push(stmt);
+    let visited = walk_editing::<BFS>(&mut stage, root, |rewriter, stmt| {
         if stmt == a {
             // A sibling ahead, and a whole subtree waiting to be walked.
             rewriter.erase_statement(c).unwrap();
             rewriter.erase_statement(b).unwrap();
         }
-    }
+    })
+    .unwrap();
     assert_eq!(visited, [root, a, x]);
 }
 
@@ -366,7 +361,7 @@ fn bfs_skips_statements_erased_ahead_of_it() {
 fn erase_while_visiting<O: WalkOrder>() -> (Statement, Result<Vec<Statement>, WalkError>) {
     let mut t = tree();
     let a = t.a;
-    let result = walk_editing::<O>(&mut t, |rewriter, stmt| {
+    let result = walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == a {
             rewriter.erase_statement(a).unwrap();
         }
@@ -401,7 +396,7 @@ fn reverse_bfs_orders_go_on_after_the_visited_statement_is_erased() {
 fn reverse_bfs_orders_skip_the_rest_of_an_ancestor_erased_while_visiting() {
     let mut t = tree();
     let (owner, then_nop, then_ret) = (t.owner, t.then_nop, t.then_ret);
-    let reverse = walk_editing::<ReverseBFS>(&mut t, |rewriter, stmt| {
+    let reverse = walk_editing::<ReverseBFS>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == then_ret {
             rewriter.erase_statement(owner).unwrap();
         }
@@ -412,7 +407,7 @@ fn reverse_bfs_orders_skip_the_rest_of_an_ancestor_erased_while_visiting() {
     );
 
     let mut t = tree();
-    let keep_order = walk_editing::<KeepOrderReverseBFS>(&mut t, |rewriter, stmt| {
+    let keep_order = walk_editing::<KeepOrderReverseBFS>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == then_nop {
             rewriter.erase_statement(owner).unwrap();
         }
@@ -423,15 +418,12 @@ fn reverse_bfs_orders_skip_the_rest_of_an_ancestor_erased_while_visiting() {
 #[test]
 fn bfs_goes_on_with_the_next_parent_after_the_parent_is_erased() {
     let (mut stage, [root, a, b, c, x, y]) = two_owners();
-    let mut rewriter = Rewriter::new(&mut stage);
-    let mut cursor = BFS::start(rewriter.stage(), root);
-    let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
-        visited.push(stmt);
+    let visited = walk_editing::<BFS>(&mut stage, root, |rewriter, stmt| {
         if stmt == x {
             rewriter.erase_statement(a).unwrap();
         }
-    }
+    })
+    .unwrap();
     assert_eq!(visited, [root, a, b, c, x, y]);
 }
 
@@ -470,33 +462,27 @@ fn bfs_three_levels() -> (StageInfo<BuilderDialect>, [Statement; 7]) {
 #[test]
 fn bfs_goes_on_outside_a_grandparent_erased_while_visiting() {
     let (mut stage, [root, g, h, p, q, a, d]) = bfs_three_levels();
-    let mut rewriter = Rewriter::new(&mut stage);
-    let mut cursor = BFS::start(rewriter.stage(), root);
-    let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
-        visited.push(stmt);
+    let visited = walk_editing::<BFS>(&mut stage, root, |rewriter, stmt| {
         if stmt == a {
             // Erases `p` and `a` with it; `p` is the front parent.
             rewriter.erase_statement(g).unwrap();
         }
-    }
+    })
+    .unwrap();
     assert_eq!(visited, [root, g, h, p, q, a, d]);
 }
 
 #[test]
 fn pre_order_skips_children_and_siblings_erased_while_visiting() {
     let (mut stage, [root, a, b, c, x, y]) = two_owners();
-    let mut rewriter = Rewriter::new(&mut stage);
-    let mut cursor = PreOrder::start(rewriter.stage(), root);
-    let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
-        visited.push(stmt);
+    let visited = walk_editing::<PreOrder>(&mut stage, root, |rewriter, stmt| {
         if stmt == a {
             // Its only child, and a sibling ahead of the cursor.
             rewriter.erase_statement(x).unwrap();
             rewriter.erase_statement(c).unwrap();
         }
-    }
+    })
+    .unwrap();
     assert_eq!(visited, [root, a, b, y]);
 }
 
@@ -654,16 +640,36 @@ fn walk_mut_fails_when_the_visited_statement_is_erased() {
     assert_eq!(result, Err(WalkError::VisitedErased(a)));
 }
 
+/// Erases `a` while visiting it, then interrupts the walk.
+fn erase_a_then_interrupt<O: WalkOrder>() -> (Statement, Result<WalkStatus, WalkError>) {
+    let mut t = tree();
+    let (root, a) = (t.root, t.a);
+    let mut rewriter = Rewriter::new(&mut t.stage);
+    let result = O::walk_mut(&mut rewriter, root, |rewriter, stmt| {
+        if stmt == a {
+            rewriter.erase_statement(a).unwrap();
+            return WalkResult::Interrupt;
+        }
+        WalkResult::Advance
+    });
+    (a, result)
+}
+
 #[test]
-fn skip_before_the_first_step_has_no_effect() {
-    let t = tree();
-    let mut cursor = PreOrder::start(&t.stage, t.root);
-    cursor.skip();
-    let mut visited = Vec::new();
-    while let Some(stmt) = cursor.next(&t.stage).unwrap() {
-        visited.push(stmt);
+fn walk_mut_fails_when_the_visited_statement_is_erased_before_an_interrupt() {
+    for (a, result) in [
+        erase_a_then_interrupt::<PreOrder>(),
+        erase_a_then_interrupt::<PostOrder>(),
+        erase_a_then_interrupt::<BFS>(),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedErased(a)));
     }
-    assert_eq!(visited, PreOrder::schedule(&t.stage, t.root));
+    for (_, result) in [
+        erase_a_then_interrupt::<ReverseBFS>(),
+        erase_a_then_interrupt::<KeepOrderReverseBFS>(),
+    ] {
+        assert_eq!(result, Ok(WalkStatus::Interrupted));
+    }
 }
 
 /// The ids of [`merge_cfg`]'s blocks and statements.
@@ -719,21 +725,11 @@ fn edit_at_z<O: WalkOrder>(
 ) -> (Vec<Statement>, Result<Vec<Statement>, WalkError>) {
     let (mut stage, m) = merge_cfg();
     let schedule = O::schedule(&stage, m.root);
-    let mut rewriter = Rewriter::new(&mut stage);
-    let mut cursor = O::start(rewriter.stage(), m.root);
-    let mut visited = Vec::new();
-    let result = loop {
-        match cursor.next(rewriter.stage()) {
-            Ok(Some(stmt)) => {
-                visited.push(stmt);
-                if stmt == m.z {
-                    edit(&mut rewriter, m);
-                }
-            }
-            Ok(None) => break Ok(visited),
-            Err(error) => break Err(error),
+    let result = walk_editing::<O>(&mut stage, m.root, |rewriter, stmt| {
+        if stmt == m.z {
+            edit(rewriter, m);
         }
-    };
+    });
     (schedule, result)
 }
 
@@ -753,6 +749,29 @@ fn merging_the_visited_statements_block_away_breaks_link_following_walks() {
     }
 }
 
+/// Walks `O` from `z` as the root, merging `z`'s block away while visiting
+/// it.
+fn merge_the_roots_block<O: WalkOrder>() -> (Statement, Result<WalkStatus, WalkError>) {
+    let (mut stage, m) = merge_cfg();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let result = O::walk_mut(&mut rewriter, m.z, |rewriter, _| {
+        merge_b2_into_b1(rewriter, m);
+        WalkResult::Advance
+    });
+    (m.z, result)
+}
+
+#[test]
+fn merging_the_roots_block_away_breaks_link_following_walks() {
+    for (z, result) in [
+        merge_the_roots_block::<PreOrder>(),
+        merge_the_roots_block::<PostOrder>(),
+        merge_the_roots_block::<BFS>(),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(z)));
+    }
+}
+
 #[test]
 fn reverse_bfs_orders_visit_statements_where_they_were_before_a_merge() {
     let (_, m) = merge_cfg();
@@ -766,16 +785,85 @@ fn reverse_bfs_orders_visit_statements_where_they_were_before_a_merge() {
     assert_eq!(result.unwrap(), without_br);
 }
 
+/// Splits the entry block at `at(&t)` while visiting `a`; the walk's
+/// schedule before the split, and the statements it visited.
+fn split_while_visiting_a<O: WalkOrder>(
+    at: impl Fn(&Tree) -> Statement,
+) -> (Vec<Statement>, Result<Vec<Statement>, WalkError>) {
+    let mut t = tree();
+    let (a, at) = (t.a, at(&t));
+    let schedule = O::schedule(&t.stage, t.root);
+    let result = walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
+        if stmt == a {
+            rewriter.split_block(at).unwrap();
+        }
+    });
+    (schedule, result)
+}
+
 #[test]
-fn splitting_the_visited_statements_block_keeps_the_walk() {
-    fn split_at_z(rewriter: &mut Rewriter<BuilderDialect>, m: MergeCfg) {
-        rewriter.split_block(m.z).unwrap();
-    }
+fn splitting_after_the_visited_statement_keeps_the_walk() {
     for (schedule, result) in [
-        edit_at_z::<PreOrder>(split_at_z),
-        edit_at_z::<PostOrder>(split_at_z),
-        edit_at_z::<BFS>(split_at_z),
+        split_while_visiting_a::<PreOrder>(|t| t.owner),
+        split_while_visiting_a::<PostOrder>(|t| t.owner),
+        split_while_visiting_a::<BFS>(|t| t.owner),
     ] {
         assert_eq!(result.unwrap(), schedule);
+    }
+}
+
+#[test]
+fn splitting_at_the_visited_statement_breaks_link_following_walks() {
+    let a = tree().a;
+    for (_, result) in [
+        split_while_visiting_a::<PreOrder>(|t| t.a),
+        split_while_visiting_a::<PostOrder>(|t| t.a),
+        split_while_visiting_a::<BFS>(|t| t.a),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(a)));
+    }
+}
+
+/// Splits `b2` at `z`, then merges the new block, holding `z`, into `b1`:
+/// `z` moves past `b3` to the end of the CFG.
+fn split_at_z_and_merge_the_tail_into_b1(rewriter: &mut Rewriter<BuilderDialect>, m: MergeCfg) {
+    let tail = rewriter.split_block(m.z).unwrap();
+    rewriter.merge_blocks(m.b1, tail, &[]).unwrap();
+}
+
+#[test]
+fn moving_the_visited_statement_into_an_existing_block_breaks_link_following_walks() {
+    let (_, m) = merge_cfg();
+    for (_, result) in [
+        edit_at_z::<PreOrder>(split_at_z_and_merge_the_tail_into_b1),
+        edit_at_z::<PostOrder>(split_at_z_and_merge_the_tail_into_b1),
+        edit_at_z::<BFS>(split_at_z_and_merge_the_tail_into_b1),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(m.z)));
+    }
+}
+
+/// Walks `O` from `z` as the root, splitting `b2` at `z` and then merging
+/// the emptied `b2` into `b1` while visiting it.
+fn split_at_the_root_and_merge_its_old_block<O: WalkOrder>()
+-> (Statement, Result<WalkStatus, WalkError>) {
+    let (mut stage, m) = merge_cfg();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let result = O::walk_mut(&mut rewriter, m.z, |rewriter, _| {
+        rewriter.split_block(m.z).unwrap();
+        merge_b2_into_b1(rewriter, m);
+        WalkResult::Advance
+    });
+    (m.z, result)
+}
+
+#[test]
+fn splitting_at_the_root_breaks_link_following_walks_even_if_its_old_block_is_merged() {
+    for (z, result) in [
+        split_at_the_root_and_merge_its_old_block::<PreOrder>(),
+        split_at_the_root_and_merge_its_old_block::<PostOrder>(),
+        split_at_the_root_and_merge_its_old_block::<BFS>(),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(z)));
     }
 }
