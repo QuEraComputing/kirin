@@ -9,14 +9,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// body.
     ///
     /// The statement keeps its id, results, uses and nested bodies; only its
-    /// place changes. As with [`Rewriter::insert_before`], `anchor` may be a
-    /// block's terminator: `stmt` then goes to the end of that block's
+    /// place changes. As with
+    /// [`InsertionPoint::Before`](crate::InsertionPoint::Before), `anchor` may
+    /// be a block's terminator: `stmt` then goes to the end of that block's
     /// statement chain. Moving a statement to where it already is (before
     /// itself, or before the statement that already follows it) does nothing
     /// and records no event.
     ///
-    /// Not checked, as with [`Rewriter::insert_before`]: that every use of
-    /// `stmt`'s results still comes after it.
+    /// Not checked, as with [`Rewriter::create`]: that every use of `stmt`'s
+    /// results still comes after it.
     ///
     /// Rejects, leaving the stage untouched, if `stmt` or `anchor` is unknown
     /// ([`RewriteError::UnknownStatement`]) or not in a block body
@@ -63,14 +64,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if prev == Some(stmt) || next == Some(stmt) {
             return Ok(());
         }
-        // Walk up the statements whose bodies enclose `anchor`. If `stmt` is
-        // one of them, the move would put `stmt` inside its own body.
-        let mut owner = tree::parent(self.stage, anchor);
-        while let Some(current) = owner {
-            if current == stmt {
-                return Err(RewriteError::MovedIntoItself { stmt, anchor });
-            }
-            owner = tree::parent(self.stage, current);
+        // If `stmt` encloses `anchor`, the move would put `stmt` inside its
+        // own body.
+        if self.encloses(stmt, tree::parent(self.stage, anchor)) {
+            return Err(RewriteError::MovedIntoItself { stmt, anchor });
         }
 
         self.unlink(stmt, block);

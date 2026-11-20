@@ -6,7 +6,9 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use common::{BuilderDialect, EventCursor, TestType, make_compute, make_split, new_stage};
+use common::{
+    BuilderDialect, EventCursor, TestType, cannot_insert, make_compute, make_split, new_stage,
+};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -77,13 +79,20 @@ fn insert_node_adds_operand_edges_and_binds_results() {
     let mut rw = Rewriter::new(&mut stage);
     // A member operand gets an edge from its producer.
     let r1 = rw.new_result(TestType::I32);
-    let n1 = rw.insert_node(dg, BuilderDialect::Compute(rp, r1)).unwrap();
+    let n1 = rw
+        .create(InsertionPoint::DiGraph(dg), BuilderDialect::Compute(rp, r1))
+        .unwrap();
     // An outside operand gets no edge.
     let n2 = rw
-        .insert_node(dg, BuilderDialect::Add(r1.into(), x))
+        .create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Add(r1.into(), x),
+        )
         .unwrap();
     // Two slots reading the same member result get two parallel edges.
-    let n3 = rw.insert_node(dg, BuilderDialect::Add(rp, rp)).unwrap();
+    let n3 = rw
+        .create(InsertionPoint::DiGraph(dg), BuilderDialect::Add(rp, rp))
+        .unwrap();
     let events = rw.events().to_vec();
     drop(rw);
 
@@ -134,28 +143,49 @@ fn insert_node_rejects_without_mutating() {
     let mut rw = Rewriter::new(&mut stage);
     let fresh = rw.new_result(TestType::I32);
     assert_eq!(
-        rw.insert_node(dead_graph, BuilderDialect::Nop),
-        Err(RewriteError::UnknownDiGraph(dead_graph))
+        rw.create(InsertionPoint::DiGraph(dead_graph), BuilderDialect::Nop),
+        Err(cannot_insert(
+            InsertionPoint::DiGraph(dead_graph),
+            RewriteError::UnknownDiGraph(dead_graph)
+        ))
     );
     assert_eq!(
-        rw.insert_node(dg, BuilderDialect::Return),
-        Err(RewriteError::UnexpectedTerminator)
+        rw.create(InsertionPoint::DiGraph(dg), BuilderDialect::Return),
+        Err(cannot_insert(
+            InsertionPoint::DiGraph(dg),
+            RewriteError::UnexpectedTerminator
+        ))
     );
     assert_eq!(
-        rw.insert_node(dg, BuilderDialect::Fork(Successor::from_block(outer))),
-        Err(RewriteError::NonTerminatorWithSuccessors)
+        rw.create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Fork(Successor::from_block(outer))
+        ),
+        Err(cannot_insert(
+            InsertionPoint::DiGraph(dg),
+            RewriteError::NonTerminatorWithSuccessors
+        ))
     );
     assert_eq!(
-        rw.insert_node(dg, BuilderDialect::Compute(x, ResultValue::from(rp))),
+        rw.create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Compute(x, ResultValue::from(rp))
+        ),
         Err(RewriteError::ResultNotFresh(rp))
     );
     assert_eq!(
-        rw.insert_node(dg, BuilderDialect::Use(dead_value())),
+        rw.create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Use(dead_value())
+        ),
         Err(RewriteError::UnknownValue(dead_value()))
     );
     // An unbound result is not live, so it cannot be an operand.
     assert_eq!(
-        rw.insert_node(dg, BuilderDialect::Use(fresh.into())),
+        rw.create(
+            InsertionPoint::DiGraph(dg),
+            BuilderDialect::Use(fresh.into())
+        ),
         Err(RewriteError::UnknownValue(fresh.into()))
     );
     assert!(rw.events().is_empty());
