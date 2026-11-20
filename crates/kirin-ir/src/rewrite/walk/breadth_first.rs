@@ -77,7 +77,7 @@ pub(crate) struct BuiltOrderCursor {
 }
 
 impl WalkOrder for BFS {
-    const ALLOWS_ERASING_VISITED: bool = false;
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = false;
 }
 
 impl CursorOrder for BFS {
@@ -189,7 +189,7 @@ impl BFSCursor {
 }
 
 impl WalkOrder for ReverseBFS {
-    const ALLOWS_ERASING_VISITED: bool = true;
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = true;
 }
 
 impl CursorOrder for ReverseBFS {
@@ -203,7 +203,7 @@ impl CursorOrder for ReverseBFS {
 }
 
 impl WalkOrder for KeepOrderReverseBFS {
-    const ALLOWS_ERASING_VISITED: bool = true;
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = true;
 }
 
 impl CursorOrder for KeepOrderReverseBFS {

@@ -785,6 +785,66 @@ fn reverse_bfs_orders_visit_statements_where_they_were_before_a_merge() {
     assert_eq!(result.unwrap(), without_br);
 }
 
+/// Moves `a` into the `then` arm, before `then_nop`, while visiting it.
+fn move_a_while_visiting<O: WalkOrder>() -> (Statement, Result<Vec<Statement>, WalkError>) {
+    let mut t = tree();
+    let (a, then_nop) = (t.a, t.then_nop);
+    let result = walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
+        if stmt == a {
+            rewriter.move_before(a, then_nop).unwrap();
+        }
+    });
+    (a, result)
+}
+
+#[test]
+fn moving_the_visited_statement_breaks_link_following_walks() {
+    for (a, result) in [
+        move_a_while_visiting::<PreOrder>(),
+        move_a_while_visiting::<PostOrder>(),
+        move_a_while_visiting::<BFS>(),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(a)));
+    }
+}
+
+#[test]
+fn reverse_bfs_orders_go_on_after_the_visited_statement_is_moved() {
+    let t = tree();
+    let (_, reverse) = move_a_while_visiting::<ReverseBFS>();
+    assert_eq!(reverse.unwrap(), ReverseBFS::schedule(&t.stage, t.root));
+    let (_, keep_order) = move_a_while_visiting::<KeepOrderReverseBFS>();
+    assert_eq!(
+        keep_order.unwrap(),
+        KeepOrderReverseBFS::schedule(&t.stage, t.root)
+    );
+}
+
+/// While visiting `a`, moves `else_nop` into the `then` arm, ahead of the
+/// cursor in every link-following order.
+fn move_else_nop_while_visiting_a<O: WalkOrder>() -> (Statement, Result<Vec<Statement>, WalkError>)
+{
+    let mut t = tree();
+    let (a, else_nop, then_nop) = (t.a, t.else_nop, t.then_nop);
+    let result = walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
+        if stmt == a {
+            rewriter.move_after(else_nop, then_nop).unwrap();
+        }
+    });
+    (else_nop, result)
+}
+
+#[test]
+fn moving_another_statement_keeps_the_walk() {
+    for (else_nop, result) in [
+        move_else_nop_while_visiting_a::<PreOrder>(),
+        move_else_nop_while_visiting_a::<PostOrder>(),
+        move_else_nop_while_visiting_a::<BFS>(),
+    ] {
+        assert!(result.unwrap().contains(&else_nop));
+    }
+}
+
 /// Splits the entry block at `at(&t)` while visiting `a`; the walk's
 /// schedule before the split, and the statements it visited.
 fn split_while_visiting_a<O: WalkOrder>(

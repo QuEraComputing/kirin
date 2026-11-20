@@ -24,6 +24,7 @@ mod bodies;
 pub(crate) mod cfg;
 pub(crate) mod digraph;
 mod list;
+mod moves;
 pub(crate) mod pass;
 #[cfg(test)]
 mod pass_tests;

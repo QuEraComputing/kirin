@@ -3,8 +3,8 @@
 
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
-use kirin_ir::walk::{PreOrder, WalkResult};
-use kirin_ir::{BuilderSSAKind, Placeholder};
+use kirin_ir::walk::{PreOrder, WalkError, WalkResult};
+use kirin_ir::{BuilderSSAKind, GetInfo, Placeholder, SSAKind, StatementParent};
 use kirin_rewrite::{
     DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
 };
@@ -64,6 +64,51 @@ fn neg_unchanged_then_interrupt() {
     rewrite!(r, {
         let _ = nothing(r);
         interrupt!()
+    })
+}
+
+/// Moves the statement defining `r` to the front of its block. Returns
+/// whether it moved.
+fn hoist(rewriter: &mut Rewriter<'_, L>, r: SSAValue) -> bool {
+    let stage = rewriter.stage();
+    let SSAKind::Result(stmt, _) = *r.get_info(stage).expect("`r` is live").kind() else {
+        panic!("`r` is a result");
+    };
+    let Some(StatementParent::Block(block)) = *stmt.parent(stage) else {
+        panic!("`r`'s statement is in a block");
+    };
+    let first = block
+        .first_statement(stage)
+        .expect("the block is not empty");
+    rewriter.move_before(stmt, first).unwrap();
+    first != stmt
+}
+
+/// Moves any `neg` to the front of its block.
+#[rewrite_rule(language = L)]
+fn hoist_neg() {
+    let r = op![Arith::neg(x)];
+    rewrite!(r, {
+        let _ = hoist(r);
+    })
+}
+
+/// Ends the sweep if `moved`.
+fn interrupt_if(_rewriter: &mut Rewriter<'_, L>, moved: bool) -> WalkResult {
+    if moved {
+        WalkResult::Interrupt
+    } else {
+        WalkResult::Advance
+    }
+}
+
+/// Moves any `neg` to the front of its block, ending the sweep if it moved.
+#[rewrite_rule(language = L)]
+fn hoist_neg_then_interrupt() {
+    let r = op![Arith::neg(x)];
+    rewrite!(r, {
+        let moved = hoist(r);
+        interrupt_if(moved)
     })
 }
 
@@ -348,4 +393,18 @@ fn skip_does_not_change_the_run_yet() {
     let advancing = run(&rules(double_neg)).unwrap();
     let skipping = run(&rules(double_neg_then_skip)).unwrap();
     assert_eq!(skipping, advancing);
+}
+
+/// Moving the statement being visited breaks the pre-order walk's
+/// contract, which the sweep checks like any walk, even when the rule then
+/// interrupts it.
+#[test]
+fn moving_the_visited_statement_fails_the_run() {
+    for rules in [rules(hoist_neg), rules(hoist_neg_then_interrupt)] {
+        let error = run(&rules).err();
+        assert!(
+            matches!(error, Some(DriverError::Walk(WalkError::VisitedMoved(_)))),
+            "{error:?}"
+        );
+    }
 }
