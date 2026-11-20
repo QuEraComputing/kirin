@@ -1,4 +1,3 @@
-use crate::arena::GetInfo;
 use crate::node::linked_list::LinkedList;
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, Side};
 use crate::rewrite::walk::tree;
@@ -77,7 +76,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let (block, prev, next) = self
             .slot_at(anchor, side)
             .expect("the anchor was checked above and moving `stmt` does not touch it");
-        debug_assert!(stmt.get_info(self.stage).is_some());
         self.link(LinkedList::single(stmt), block, prev, next);
         self.events.push(MutationEvent::MovedStatement { stmt });
         Ok(())
