@@ -1,13 +1,11 @@
 use std::collections::HashSet;
 
-use smallvec::SmallVec;
-
 use crate::arena::{GetInfo, GetInfoMut, Id};
 use crate::node::linked_list::{LinkedList, LinkedListNode};
 use crate::node::{CFGInfo, GraphMember, Port, PortParent};
 use crate::{
-    Block, BlockInfo, BlockParent, Body, CFG, DiGraph, DiGraphInfo, Dialect, SSAInfo, SSAKind,
-    SSAValue, Statement, StatementInfo, StatementParent, Successor, UnGraph, UnGraphInfo, Use,
+    Block, BlockParent, Body, CFG, DiGraph, DiGraphInfo, Dialect, SSAInfo, SSAKind, SSAValue,
+    Statement, StatementInfo, StatementParent, Successor, UnGraph, UnGraphInfo, Use,
 };
 
 use super::IRMap;
@@ -116,7 +114,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 defined.extend(arguments.iter().map(|&argument| SSAValue::from(argument)));
             }
             Body::CFG(cfg) => {
-                for block in self.cfg_blocks(cfg) {
+                for block in cfg.blocks(self.stage) {
                     let arguments = block.expect_info(self.stage).arguments();
                     defined.extend(arguments.iter().map(|&argument| SSAValue::from(argument)));
                 }
@@ -184,8 +182,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let bodies = bodies_of(definition);
         for result in results {
             let ty = result.expect_info(self.stage).ty().clone();
-            let copy = self.stage.ssas.alloc(None);
-            self.unbound_ssa_results.insert(copy, ty);
+            let copy = self.new_result(ty);
             map.map_value(result, copy);
         }
         for body in bodies {
@@ -209,7 +206,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .cfgs
             .alloc_with_id(|id| CFGInfo::builder().id(id).blocks(LinkedList::new()).new());
         map.map_cfg(cfg, copy);
-        for block in self.cfg_blocks(cfg) {
+        let blocks: Vec<Block> = cfg.blocks(self.stage).collect();
+        for block in blocks {
             self.reserve_block(block, Some(BlockParent::CFG(copy)), map);
         }
         copy
@@ -274,29 +272,22 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// First pass for `block`: allocate an empty block under `parent` with
     /// copies of its arguments, then reserve its statements.
     fn reserve_block(&mut self, block: Block, parent: Option<BlockParent>, map: &mut IRMap) {
-        let copy = self.stage.nodes.blocks.alloc_with_id(|id| {
-            BlockInfo::builder()
-                .maybe_parent(parent)
-                .node(LinkedListNode::new(id))
-                .arguments(Vec::new())
-                .predecessors(SmallVec::new())
-                .new()
-        });
-        let arguments: Vec<SSAValue> = block
+        let types: Vec<L::Type> = block
             .expect_info(self.stage)
             .arguments
             .iter()
-            .map(|&arg| arg.into())
+            .map(|&argument| {
+                SSAValue::from(argument)
+                    .expect_info(self.stage)
+                    .ty()
+                    .clone()
+            })
             .collect();
-        let mut copied_arguments = Vec::with_capacity(arguments.len());
-        for (index, argument) in arguments.into_iter().enumerate() {
-            let ty = argument.expect_info(self.stage).ty().clone();
-            let copied = self.alloc_block_argument(copy, index, ty);
+        let copy = self.alloc_block(parent, types);
+        let originals = &block.expect_info(self.stage).arguments;
+        let copies = &copy.expect_info(self.stage).arguments;
+        for (&argument, &copied) in originals.iter().zip(copies) {
             map.map_value(argument, copied);
-            copied_arguments.push(copied);
-        }
-        if let Some(info) = copy.get_info_mut(self.stage) {
-            info.arguments = copied_arguments;
         }
         map.map_block(block, copy);
         for stmt in self.block_statements(block) {
@@ -374,7 +365,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             Body::CFG(cfg) => {
                 let copy = map.cfg(cfg).expect("CFGs are reserved first");
                 let mut tail = None;
-                for block in self.cfg_blocks(cfg) {
+                let blocks: Vec<Block> = cfg.blocks(self.stage).collect();
+                for block in blocks {
                     self.fill_block(block, map, copied);
                     let block_copy = map.block(block).expect("blocks are reserved first");
                     self.link(LinkedList::single(block_copy), copy, tail, None);
@@ -537,9 +529,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     fn body_statements(&self, body: Body) -> Vec<Statement> {
         match body {
             Body::Block(block) => self.block_statements(block),
-            Body::CFG(cfg) => self
-                .cfg_blocks(cfg)
-                .into_iter()
+            Body::CFG(cfg) => cfg
+                .blocks(self.stage)
                 .flat_map(|block| self.block_statements(block))
                 .collect(),
             Body::DiGraph(graph) => graph
@@ -553,16 +544,5 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 .map(|(stmt, _)| stmt)
                 .collect(),
         }
-    }
-
-    /// `cfg`'s blocks, in order.
-    fn cfg_blocks(&self, cfg: CFG) -> Vec<Block> {
-        let mut blocks = Vec::new();
-        let mut current = cfg.get_info(self.stage).and_then(|info| info.blocks.head);
-        while let Some(block) = current {
-            blocks.push(block);
-            current = block.get_info(self.stage).and_then(|info| info.node.next);
-        }
-        blocks
     }
 }
