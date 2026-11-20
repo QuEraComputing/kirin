@@ -48,9 +48,11 @@ fn unowned_graph() -> (StageInfo<BuilderDialect>, DiGraph) {
 /// Fill `block` with `use(x)` then `return`.
 fn fill(rewriter: &mut Rewriter<'_, BuilderDialect>, block: Block, x: SSAValue) -> Statement {
     let ret = rewriter
-        .insert_terminator(block, BuilderDialect::Return)
+        .create(InsertionPoint::Terminator(block), BuilderDialect::Return)
         .unwrap();
-    rewriter.insert_before(ret, BuilderDialect::Use(x)).unwrap()
+    rewriter
+        .create(InsertionPoint::Before(ret), BuilderDialect::Use(x))
+        .unwrap()
 }
 
 #[test]
@@ -156,7 +158,10 @@ fn inserted_statement_adopts_new_blocks() {
         fill(&mut rewriter, else_block, f.x);
         cursor.advance(&rewriter);
         let new_owner = rewriter
-            .insert_after(f.owner, BuilderDialect::OwnBlocks(then_block, else_block))
+            .create(
+                InsertionPoint::After(f.owner),
+                BuilderDialect::OwnBlocks(then_block, else_block),
+            )
             .unwrap();
         (
             then_block,
@@ -189,7 +194,10 @@ fn inserted_graph_member_adopts_new_blocks() {
         let then_block = rewriter.new_block([]);
         let else_block = rewriter.new_block([]);
         let node = rewriter
-            .insert_node(graph, BuilderDialect::OwnBlocks(then_block, else_block))
+            .create(
+                InsertionPoint::DiGraph(graph),
+                BuilderDialect::OwnBlocks(then_block, else_block),
+            )
             .unwrap();
         (then_block, else_block, node)
     };
@@ -205,7 +213,10 @@ fn insert_rejects_a_body_owned_elsewhere() {
     let mut rewriter = Rewriter::new(&mut f.stage);
     let fresh = rewriter.new_block([]);
     assert_eq!(
-        rewriter.insert_after(f.owner, BuilderDialect::OwnBlocks(fresh, f.old_then)),
+        rewriter.create(
+            InsertionPoint::After(f.owner),
+            BuilderDialect::OwnBlocks(fresh, f.old_then)
+        ),
         Err(RewriteError::BodyOwnedElsewhere(Body::Block(f.old_then)))
     );
     assert_eq!(rewriter.events(), [], "nothing was inserted");
@@ -218,7 +229,10 @@ fn insert_rejects_a_body_named_twice() {
     let mut rewriter = Rewriter::new(&mut f.stage);
     let fresh = rewriter.new_block([]);
     assert_eq!(
-        rewriter.insert_after(f.owner, BuilderDialect::OwnBlocks(fresh, fresh)),
+        rewriter.create(
+            InsertionPoint::After(f.owner),
+            BuilderDialect::OwnBlocks(fresh, fresh)
+        ),
         Err(RewriteError::BodyListedTwice(Body::Block(fresh)))
     );
     assert_eq!(rewriter.events(), []);
@@ -233,25 +247,40 @@ fn insert_rejects_a_body_holding_the_new_statement() {
     let block = rewriter.new_block([]);
     let other = rewriter.new_block([]);
     let ret = rewriter
-        .insert_terminator(block, BuilderDialect::Return)
+        .create(InsertionPoint::Terminator(block), BuilderDialect::Return)
         .unwrap();
     assert_eq!(
-        rewriter.insert_before(ret, BuilderDialect::OwnBlocks(block, other)),
-        Err(RewriteError::BodyEnclosesOwner(Body::Block(block)))
+        rewriter.create(
+            InsertionPoint::Before(ret),
+            BuilderDialect::OwnBlocks(block, other)
+        ),
+        Err(RewriteError::CannotInsert {
+            insertion_pt: InsertionPoint::Before(ret),
+            reason: Box::new(RewriteError::BodyEnclosesOwner(Body::Block(block))),
+        })
     );
 
     // Two levels down: `block` holds `holder`, which owns `inner`.
     let inner = rewriter.new_block([]);
     let inner_ret = rewriter
-        .insert_terminator(inner, BuilderDialect::Return)
+        .create(InsertionPoint::Terminator(inner), BuilderDialect::Return)
         .unwrap();
     let spare = rewriter.new_block([]);
     rewriter
-        .insert_before(ret, BuilderDialect::OwnBlocks(inner, spare))
+        .create(
+            InsertionPoint::Before(ret),
+            BuilderDialect::OwnBlocks(inner, spare),
+        )
         .unwrap();
     assert_eq!(
-        rewriter.insert_before(inner_ret, BuilderDialect::OwnBlocks(block, other)),
-        Err(RewriteError::BodyEnclosesOwner(Body::Block(block)))
+        rewriter.create(
+            InsertionPoint::Before(inner_ret),
+            BuilderDialect::OwnBlocks(block, other)
+        ),
+        Err(RewriteError::CannotInsert {
+            insertion_pt: InsertionPoint::Before(inner_ret),
+            reason: Box::new(RewriteError::BodyEnclosesOwner(Body::Block(block))),
+        })
     );
     for unowned in [block, other] {
         assert_eq!(parent(rewriter.stage(), unowned), None);
@@ -263,8 +292,14 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
     let (mut stage, graph) = unowned_graph();
     let mut rewriter = Rewriter::new(&mut stage);
     assert_eq!(
-        rewriter.insert_node(graph, BuilderDialect::OwnDiGraph(graph)),
-        Err(RewriteError::BodyEnclosesOwner(Body::DiGraph(graph)))
+        rewriter.create(
+            InsertionPoint::DiGraph(graph),
+            BuilderDialect::OwnDiGraph(graph)
+        ),
+        Err(RewriteError::CannotInsert {
+            insertion_pt: InsertionPoint::DiGraph(graph),
+            reason: Box::new(RewriteError::BodyEnclosesOwner(Body::DiGraph(graph))),
+        })
     );
     assert_eq!(rewriter.events(), []);
 }
@@ -301,7 +336,7 @@ fn erase_block_rejects_an_unowned_new_block_still_in_use() {
     let block = rewriter.new_block([TestType::I32]);
     let arg: SSAValue = block.expect_info(rewriter.stage()).arguments()[0].into();
     rewriter
-        .insert_after(f.owner, BuilderDialect::Use(arg))
+        .create(InsertionPoint::After(f.owner), BuilderDialect::Use(arg))
         .unwrap();
     assert_eq!(
         rewriter.erase_block(block),
@@ -312,8 +347,8 @@ fn erase_block_rejects_an_unowned_new_block_still_in_use() {
     let target = rewriter.new_block([]);
     let source = rewriter.new_block([]);
     rewriter
-        .insert_terminator(
-            source,
+        .create(
+            InsertionPoint::Terminator(source),
             BuilderDialect::Branch(Successor::from_block(target)),
         )
         .unwrap();

@@ -234,7 +234,7 @@ impl<T, E: Error + Send + Sync + 'static> ActionOutcome for Result<T, E> {
     fn into_action_result(self) -> Result<T, NativeError> {
         self.map_err(
             |error| match (&error as &dyn Any).downcast_ref::<RewriteError>() {
-                Some(rewrite) => NativeError::Rewrite(*rewrite),
+                Some(rewrite) => NativeError::Rewrite(rewrite.clone()),
                 None => NativeError::Failed(NativeFailure::new(error)),
             },
         )

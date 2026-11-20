@@ -49,8 +49,8 @@ impl Placeholder for TestType {
 /// - `Isolated`: no operands, no results (ungraph isolated node)
 /// - `Branch(target)`: one-successor control-flow terminator
 /// - `CondBranch(a, b)`: two-successor control-flow terminator
-/// - `Invoke(r)`: a terminator defining a result, which `insert_terminator`
-///   rejects
+/// - `Invoke(r)`: a terminator defining a result, which an
+///   `InsertionPoint::Terminator` rejects
 /// - `Fork(target)`: a non-terminator carrying a successor, which is invalid
 ///   IR; exists to test that verification reports it
 /// - `Jump(target, args)`: one-successor terminator forwarding `args` to the
@@ -415,5 +415,15 @@ impl EventCursor {
         let events = rw.events()[self.0..].to_vec();
         self.advance(rw);
         events
+    }
+}
+
+/// The error [`Rewriter::create`] and [`Rewriter::insert`] return when a
+/// statement cannot go at `insertion_pt`, for `reason`.
+#[allow(dead_code)]
+pub fn cannot_insert(insertion_pt: InsertionPoint, reason: RewriteError) -> RewriteError {
+    RewriteError::CannotInsert {
+        insertion_pt,
+        reason: Box::new(reason),
     }
 }
