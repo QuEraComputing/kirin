@@ -44,9 +44,9 @@ where
         rewriter.keep_detached_on_drop();
     }
     // Taking the events drops the rewriter, tombstoning the results the pass
-    // never bound and the `new_block` blocks no statement owns, and ending the
-    // borrow of `stage` before it is verified, so the check sees any reference
-    // the pass left to those blocks.
+    // never bound and the bodies it created that no statement owns, and ending
+    // the borrow of `stage` before it is verified, so the check sees any
+    // reference the pass left to those bodies.
     let events = rewriter.into_events();
 
     let pass_result = match panic_or_result {

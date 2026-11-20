@@ -22,7 +22,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::ResultNotFresh`]), and each operand must be live
     /// ([`RewriteError::UnknownValue`]). Each body the definition names must be
     /// live ([`RewriteError::UnknownBody`]), owned by nothing
-    /// ([`RewriteError::BodyOwnedElsewhere`]), named only once
+    /// ([`RewriteError::BodyOwnedElsewhere`]), created by this `Rewriter`
+    /// ([`RewriteError::BodyNotDetached`]), named only once
     /// ([`RewriteError::BodyListedTwice`]), and must not contain `parent`
     /// ([`RewriteError::BodyEnclosesOwner`]).
     pub(super) fn prepare_insert(

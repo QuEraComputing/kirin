@@ -74,11 +74,12 @@
 //! # Bodies of inserted statements
 //!
 //! An inserted statement becomes the parent of the bodies its definition
-//! names, which must be owned by nothing yet: blocks from
-//! [`Rewriter::new_block`], or bodies the builder left unowned. A
-//! [`Rewriter::new_block`] block that no statement owns when the `Rewriter`
-//! drops is tombstoned with everything it holds, unless the drop follows a
-//! panic; [`Rewriter::erase_block`] discards one earlier.
+//! names. Each must be a body this `Rewriter` created that nothing owns yet:
+//! one from [`Rewriter::new_block`], [`Rewriter::new_cfg`],
+//! [`Rewriter::new_digraph`] or [`Rewriter::new_ungraph`]. Such a body that
+//! no statement owns when the `Rewriter` drops is tombstoned with everything
+//! it holds, unless the drop follows a panic; [`Rewriter::erase_body`]
+//! discards one earlier.
 //!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
@@ -98,8 +99,8 @@ use smallvec::SmallVec;
 
 use super::bodies::bodies_of;
 use crate::{
-    Block, BlockInfo, Body, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementInfo,
-    StatementParent, UnGraph, Use,
+    Block, BlockInfo, Body, CFG, DiGraph, Dialect, Port, SSAValue, StageInfo, Statement,
+    StatementInfo, StatementParent, UnGraph, Use,
 };
 
 /// A structured record of one mutation performed through a [`Rewriter`].
@@ -110,8 +111,9 @@ use crate::{
 ///
 /// Edits to detached code, such as a [`Rewriter::new_block`] block no
 /// statement owns yet, record events like any other edit. Creating detached
-/// code records nothing, and neither does tombstoning it when the `Rewriter`
-/// drops; the statement that attaches it records its usual event. An id an
+/// code records nothing, and neither does erasing it with
+/// [`Rewriter::erase_body`] or tombstoning it when the `Rewriter` drops; the
+/// statement that attaches it records its usual event. An id an
 /// event names may therefore be dead by the time the log is read.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum MutationEvent {
@@ -238,12 +240,14 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A definition passed to an insert or `replace_statement` names a body
-    /// that does not resolve to a live body in this stage.
+    /// A definition passed to an insert or `replace_statement`, or
+    /// `erase_body`, names a body that does not resolve to a live body in
+    /// this stage.
     UnknownBody(Body),
     /// A definition passed to an insert or `replace_statement` names a body
-    /// that belongs to another statement or, for a block, to a CFG. A body has
-    /// one owner; detach it from the other one first.
+    /// that belongs to another statement or, for a block, to a CFG; a body has
+    /// one owner. Also returned by `erase_body` for a body a statement owns:
+    /// erase or replace the statement instead.
     BodyOwnedElsewhere(Body),
     /// A definition passed to an insert or `replace_statement` names the same
     /// body in two fields.
@@ -256,9 +260,18 @@ pub enum RewriteError {
     /// statement's own bodies, which would make the statement its own
     /// ancestor.
     MovedIntoItself { stmt: Statement, anchor: Statement },
+    /// A definition passed to an insert or `replace_statement` names, or
+    /// `erase_body` is given, a body that nothing owns but this `Rewriter` did
+    /// not create, such as one the builder left unowned. Only bodies from
+    /// `new_block`, `new_cfg`, `new_digraph` and `new_ungraph` can be adopted
+    /// or erased on their own.
+    BodyNotDetached(Body),
+    /// Erasing the graph that declares this port would leave dangling uses.
+    /// Replace them first.
+    PortInUse(Port),
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
-    NotInCfgBody(Block),
+    BlockNotInCfg(Block),
     /// The block belongs to a different CFG than the operation's CFG.
     CfgMismatch { block: Block, expected: CFG },
     /// `merge_blocks` was asked to merge a block into itself.
@@ -395,6 +408,15 @@ impl fmt::Display for RewriteError {
             RewriteError::UnknownBody(body) => {
                 write!(f, "body {body:?} is not a live body in this stage")
             }
+            RewriteError::BodyNotDetached(body) => {
+                write!(f, "body {body:?} was not created by this rewriter")
+            }
+            RewriteError::PortInUse(port) => {
+                write!(
+                    f,
+                    "port {port:?} is still used outside its graph; replace those uses first"
+                )
+            }
             RewriteError::BodyOwnedElsewhere(body) => {
                 write!(f, "body {body:?} already belongs to something else")
             }
@@ -416,7 +438,7 @@ impl fmt::Display for RewriteError {
             RewriteError::YieldIndexOutOfRange { graph, index } => {
                 write!(f, "yield index {index} is out of range for DiGraph {graph}")
             }
-            RewriteError::NotInCfgBody(block) => {
+            RewriteError::BlockNotInCfg(block) => {
                 write!(f, "block {block:?} is not part of a CFG block list")
             }
             RewriteError::CfgMismatch { block, expected } => {
@@ -498,8 +520,9 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
     /// their types. Their arena slots stay empty until bound.
     pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
-    /// Blocks from [`Rewriter::new_block`] that no statement owns yet.
-    pub(super) unowned_blocks: FxHashSet<Block>,
+    /// Bodies this `Rewriter` created, such as [`Rewriter::new_block`]
+    /// blocks, that no statement owns yet.
+    pub(super) unowned_bodies: FxHashSet<Body>,
     /// Leave detached code in place on drop, set after a caught panic.
     pub(super) keep_detached_on_drop: bool,
 }
@@ -510,7 +533,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             stage,
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
-            unowned_blocks: FxHashSet::default(),
+            unowned_bodies: FxHashSet::default(),
             keep_detached_on_drop: false,
         }
     }
@@ -1156,7 +1179,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// such as blocks from [`Rewriter::new_block`]. Each must be live
     /// ([`RewriteError::UnknownBody`]), owned by nothing
     /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
-    /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not
+    /// owned), created by this `Rewriter` ([`RewriteError::BodyNotDetached`]),
+    /// named once ([`RewriteError::BodyListedTwice`]), and must not
     /// contain the block or graph the statement is inserted into, which would
     /// make the statement its own ancestor ([`RewriteError::BodyEnclosesOwner`]).
     pub fn insert_after(
@@ -1314,8 +1338,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// reordering them (swapping an `if`'s arms) just works. A body only the
     /// old definition named is tombstoned with everything nested in it, as
     /// erasing the statement would do. A body only the new one names gets
-    /// `stmt` as its parent; it must be live, owned by nothing else, and not
-    /// enclose `stmt`. For a `DiGraph` member, the
+    /// `stmt` as its parent; it must be live, owned by nothing, created by this
+    /// `Rewriter`, and not enclose `stmt`. For a `DiGraph` member, the
     /// edges into it follow the operand values it gains or loses; for an
     /// `UnGraph` node, the wires it leaves and joins are resynced. An `UnGraph`
     /// edge statement keeps its result ids, so its wires and their edges are
@@ -1328,7 +1352,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// edge statement ([`RewriteError::EdgeRoleMismatch`]) or gives an edge
     /// statement operands, or names a body that is not live
     /// ([`RewriteError::UnknownBody`]), belongs to something else
-    /// ([`RewriteError::BodyOwnedElsewhere`]), is named twice
+    /// ([`RewriteError::BodyOwnedElsewhere`]), was not created by this
+    /// `Rewriter` ([`RewriteError::BodyNotDetached`]), is named twice
     /// ([`RewriteError::BodyListedTwice`]), or encloses `stmt`
     /// ([`RewriteError::BodyEnclosesOwner`]).
     ///
