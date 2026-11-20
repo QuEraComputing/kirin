@@ -1054,6 +1054,7 @@ dependencies = [
  "kirin-lexer",
  "kirin-prettyless",
  "kirin-test-types",
+ "kirin-types",
  "serde",
  "serde_json",
 ]
@@ -1067,6 +1068,16 @@ dependencies = [
  "kirin-test-types",
  "serde",
  "smallvec",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "kirin-types"
+version = "0.1.0"
+dependencies = [
+ "kirin-ir",
+ "kirin-test-utils",
+ "serde",
  "thiserror 2.0.18",
 ]
 
