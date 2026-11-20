@@ -493,7 +493,12 @@ several roots, the result holds one `AnalysisResults` per root, and a joined
 read joins across them.
 
 **What no root reached has no facts.** A rule treats a missing fact as
-unknown, the same as for ids created during a pass.
+unknown, the same as for ids created during a pass. A lattice may leave its
+bottom unstored, though, as demand does with `Dead`: a value the analysis
+reached but nothing demands has no fact either. For such a lattice a missing
+fact means bottom for an id that existed when the analysis ran, under a key
+that reaches all of the stage, such as a stage-wide one; a rule that reads it
+so must act only on such ids.
 
 **The roots must cover every entry point.** A rewrite edits a callable's one
 body, so a fact justifies it only if the fact holds for every way the
