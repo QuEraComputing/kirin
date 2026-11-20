@@ -785,28 +785,85 @@ fn reverse_bfs_orders_visit_statements_where_they_were_before_a_merge() {
     assert_eq!(result.unwrap(), without_br);
 }
 
-/// Splits the entry block at `a` while visiting `a`; the walk's schedule
-/// before the split, and the statements it visited.
-fn split_at_a_while_visiting<O: WalkOrder>() -> (Vec<Statement>, Result<Vec<Statement>, WalkError>)
-{
+/// Splits the entry block at `at(&t)` while visiting `a`; the walk's
+/// schedule before the split, and the statements it visited.
+fn split_while_visiting_a<O: WalkOrder>(
+    at: impl Fn(&Tree) -> Statement,
+) -> (Vec<Statement>, Result<Vec<Statement>, WalkError>) {
     let mut t = tree();
-    let a = t.a;
+    let (a, at) = (t.a, at(&t));
     let schedule = O::schedule(&t.stage, t.root);
     let result = walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == a {
-            rewriter.split_block(a).unwrap();
+            rewriter.split_block(at).unwrap();
         }
     });
     (schedule, result)
 }
 
 #[test]
-fn splitting_the_visited_statements_block_keeps_the_walk() {
+fn splitting_after_the_visited_statement_keeps_the_walk() {
     for (schedule, result) in [
-        split_at_a_while_visiting::<PreOrder>(),
-        split_at_a_while_visiting::<PostOrder>(),
-        split_at_a_while_visiting::<BFS>(),
+        split_while_visiting_a::<PreOrder>(|t| t.owner),
+        split_while_visiting_a::<PostOrder>(|t| t.owner),
+        split_while_visiting_a::<BFS>(|t| t.owner),
     ] {
         assert_eq!(result.unwrap(), schedule);
+    }
+}
+
+#[test]
+fn splitting_at_the_visited_statement_breaks_link_following_walks() {
+    let a = tree().a;
+    for (_, result) in [
+        split_while_visiting_a::<PreOrder>(|t| t.a),
+        split_while_visiting_a::<PostOrder>(|t| t.a),
+        split_while_visiting_a::<BFS>(|t| t.a),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(a)));
+    }
+}
+
+/// Splits `b2` at `z`, then merges the new block, holding `z`, into `b1`:
+/// `z` moves past `b3` to the end of the CFG.
+fn split_at_z_and_merge_the_tail_into_b1(rewriter: &mut Rewriter<BuilderDialect>, m: MergeCfg) {
+    let tail = rewriter.split_block(m.z).unwrap();
+    rewriter.merge_blocks(m.b1, tail, &[]).unwrap();
+}
+
+#[test]
+fn moving_the_visited_statement_into_an_existing_block_breaks_link_following_walks() {
+    let (_, m) = merge_cfg();
+    for (_, result) in [
+        edit_at_z::<PreOrder>(split_at_z_and_merge_the_tail_into_b1),
+        edit_at_z::<PostOrder>(split_at_z_and_merge_the_tail_into_b1),
+        edit_at_z::<BFS>(split_at_z_and_merge_the_tail_into_b1),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(m.z)));
+    }
+}
+
+/// Walks `O` from `z` as the root, splitting `b2` at `z` and then merging
+/// the emptied `b2` into `b1` while visiting it.
+fn split_at_the_root_and_merge_its_old_block<O: WalkOrder>()
+-> (Statement, Result<WalkStatus, WalkError>) {
+    let (mut stage, m) = merge_cfg();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let result = O::walk_mut(&mut rewriter, m.z, |rewriter, _| {
+        rewriter.split_block(m.z).unwrap();
+        merge_b2_into_b1(rewriter, m);
+        WalkResult::Advance
+    });
+    (m.z, result)
+}
+
+#[test]
+fn splitting_at_the_root_breaks_link_following_walks_even_if_its_old_block_is_merged() {
+    for (z, result) in [
+        split_at_the_root_and_merge_its_old_block::<PreOrder>(),
+        split_at_the_root_and_merge_its_old_block::<PostOrder>(),
+        split_at_the_root_and_merge_its_old_block::<BFS>(),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(z)));
     }
 }

@@ -66,19 +66,24 @@
 //! its new one. Moving the visited statement itself is dangerous in
 //! [`PreOrder`], [`PostOrder`] and [`BFS`]: they find the next statement
 //! from the visited one, so the walk would carry on from its new place,
-//! skipping or repeating part of the walk. These orders do not allow:
+//! skipping or repeating part of the walk. In these orders the visited
+//! statement must end its visit in the block or graph it started in. They
+//! do not allow:
 //!
-//! - merging its block into another block
-//!   ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with its
-//!   block as `succ`), reported as [`WalkError::VisitedMoved`];
+//! - moving it to another block or graph, reported as
+//!   [`WalkError::VisitedMoved`]. This includes merging its block into
+//!   another ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with
+//!   its block as `succ`) and splitting its block at it
+//!   ([`Rewriter::split_block`](crate::Rewriter::split_block) with it as
+//!   `at`), which moves it to the new block;
 //! - reordering the bodies of one of its ancestors
 //!   ([`Rewriter::replace_statement`](crate::Rewriter::replace_statement)),
 //!   which is not checked.
 //!
-//! Splitting its block with
-//! [`Rewriter::split_block`](crate::Rewriter::split_block) keeps the order
-//! and is allowed. [`ReverseBFS`] and [`KeepOrderReverseBFS`] allow every
-//! move: they visit each statement once, where it was at the start.
+//! Splitting its block after it, at the next statement or at the
+//! terminator, keeps it in place and is allowed. [`ReverseBFS`] and
+//! [`KeepOrderReverseBFS`] allow every move: they visit each statement
+//! once, where it was at the start.
 //!
 //! An allowed edit does not guarantee that newly nested statements will be
 //! visited in this walk. Discovery follows each order's rules above; nesting
