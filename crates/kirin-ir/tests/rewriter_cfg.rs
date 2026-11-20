@@ -70,7 +70,8 @@ fn append_and_insert_blocks_link_into_cfg() {
         "one ChangedBlockList per created block"
     );
 
-    // The block list reads the same forwards and backwards.
+    // Following the `next` links from the head and the `prev` links from the
+    // tail visits the same blocks, in opposite orders.
     let order: Vec<Block> = cfg.blocks(&stage).collect();
     assert_eq!(order, vec![before, entry, after, exit, tail]);
     let reversed: Vec<Block> = cfg.blocks(&stage).rev().collect();
@@ -1249,5 +1250,201 @@ fn block_arg_edits_reject_edges_without_successor_operands() {
 
     assert!(rw.events().is_empty());
     assert_eq!(target.expect_info(rw.stage()).arguments(), args_before);
+    verify_derived(rw.stage()).unwrap();
+}
+
+/// ```text
+/// caller { ^b { ret }  ^c { ret } }
+/// callee { ^e(%a) { u = use %a; br ^f }  ^f { inner_owner = own_cfg inner { ^i { ret } }; ret } }
+/// ^lone { }   // in no CFG
+/// ```
+struct CfgSplice {
+    stage: StageInfo<BuilderDialect>,
+    caller: CFG,
+    callee: CFG,
+    b: Block,
+    c: Block,
+    e: Block,
+    f: Block,
+    i: Block,
+    lone: Block,
+    a: SSAValue,
+    u: Statement,
+}
+
+fn cfg_splice() -> CfgSplice {
+    let mut stage = new_stage();
+    let b_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let b = stage.block().terminator(b_ret).new();
+    let c_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let c = stage.block().terminator(c_ret).new();
+    let caller = stage.cfg().add_block(b).add_block(c).new();
+
+    let i_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let i = stage.block().terminator(i_ret).new();
+    let inner = stage.cfg().add_block(i).new();
+    let inner_owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(inner))
+        .new();
+    let f_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let f = stage.block().stmt(inner_owner).terminator(f_ret).new();
+    let a = stage.block_argument().index(0);
+    let u = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let e_br = stage.statement().definition(br(f)).new();
+    let e = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(u)
+        .terminator(e_br)
+        .new();
+    let callee = stage.cfg().add_block(e).add_block(f).new();
+    let lone = stage.block().new();
+
+    let stage = stage.finalize().unwrap();
+    let a = arg(&stage, e, 0);
+    CfgSplice {
+        stage,
+        caller,
+        callee,
+        b,
+        c,
+        e,
+        f,
+        i,
+        lone,
+        a,
+        u,
+    }
+}
+
+/// `cfg`'s blocks in order, checking that following the `prev` links from
+/// the tail visits the same blocks as following the `next` links from the head.
+fn block_order(stage: &StageInfo<BuilderDialect>, cfg: CFG) -> Vec<Block> {
+    let forward: Vec<Block> = cfg.blocks(stage).collect();
+    let mut backward: Vec<Block> = cfg.blocks(stage).rev().collect();
+    backward.reverse();
+    assert_eq!(forward, backward, "prev and next links agree");
+    forward
+}
+
+#[test]
+fn splice_cfg_after_moves_every_block_and_keeps_their_edges() {
+    let CfgSplice {
+        mut stage,
+        caller,
+        callee,
+        b,
+        c,
+        e,
+        f,
+        a,
+        u,
+        ..
+    } = cfg_splice();
+    let mut rw = Rewriter::new(&mut stage);
+    rw.splice_cfg_after(callee, b).unwrap();
+
+    assert_eq!(block_order(rw.stage(), caller), [b, e, f, c]);
+    assert_eq!(block_order(rw.stage(), callee), []);
+    for block in [e, f] {
+        assert_eq!(
+            block.expect_info(rw.stage()).parent(),
+            Some(BlockParent::CFG(caller))
+        );
+    }
+    // Arguments, uses and edges move with the blocks.
+    assert_eq!(arg(rw.stage(), e, 0), a);
+    assert_eq!(uses_set(rw.stage(), a), HashSet::from([so(u, 0)]));
+    assert_eq!(preds(rw.stage(), f), HashSet::from([e]));
+    assert_eq!(
+        rw.events().to_vec(),
+        vec![
+            MutationEvent::ChangedBlockList { cfg: callee },
+            MutationEvent::ChangedBlockList { cfg: caller },
+            MutationEvent::SplicedCfg {
+                source: callee,
+                dest: caller,
+            },
+        ]
+    );
+    verify_derived(rw.stage()).unwrap();
+}
+
+#[test]
+fn splice_cfg_after_the_last_block_and_from_an_empty_cfg() {
+    let CfgSplice {
+        mut stage,
+        caller,
+        callee,
+        b,
+        c,
+        e,
+        f,
+        ..
+    } = cfg_splice();
+    let mut rw = Rewriter::new(&mut stage);
+    // After the last block: the moved blocks end the list.
+    rw.splice_cfg_after(callee, c).unwrap();
+    assert_eq!(block_order(rw.stage(), caller), [b, c, e, f]);
+
+    // `callee` is now empty: splicing it again moves nothing.
+    let mut log = EventCursor::default();
+    log.advance(&rw);
+    rw.splice_cfg_after(callee, b).unwrap();
+    assert_eq!(block_order(rw.stage(), caller), [b, c, e, f]);
+    assert_eq!(log.read_and_advance(&rw).len(), 3);
+    verify_derived(rw.stage()).unwrap();
+}
+
+#[test]
+fn splice_cfg_rejects_illegal_splices_leaving_the_stage_untouched() {
+    let CfgSplice {
+        mut stage,
+        caller,
+        callee,
+        b,
+        c,
+        e,
+        f,
+        i,
+        lone,
+        ..
+    } = cfg_splice();
+    let dead_cfg = CFG::from(Id::from(TestSSAValue(9_999)));
+    let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
+    let mut rw = Rewriter::new(&mut stage);
+
+    assert_eq!(
+        rw.splice_cfg_after(dead_cfg, b),
+        Err(RewriteError::UnknownCfg(dead_cfg))
+    );
+    assert_eq!(
+        rw.splice_cfg_after(callee, dead_block),
+        Err(RewriteError::UnknownBlock(dead_block))
+    );
+    assert_eq!(
+        rw.splice_cfg_after(callee, lone),
+        Err(RewriteError::NotInCfgBody(lone))
+    );
+    // The anchor is in the source.
+    assert_eq!(
+        rw.splice_cfg_after(callee, e),
+        Err(RewriteError::CfgSplicedIntoItself {
+            source: callee,
+            anchor: e
+        })
+    );
+    // The anchor is nested in one of the source's blocks (`^f` owns `inner`).
+    assert_eq!(
+        rw.splice_cfg_after(callee, i),
+        Err(RewriteError::CfgSplicedIntoItself {
+            source: callee,
+            anchor: i
+        })
+    );
+    assert!(rw.events().is_empty());
+    assert_eq!(block_order(rw.stage(), caller), [b, c]);
+    assert_eq!(block_order(rw.stage(), callee), [e, f]);
     verify_derived(rw.stage()).unwrap();
 }

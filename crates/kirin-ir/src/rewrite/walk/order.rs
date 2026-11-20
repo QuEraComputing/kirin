@@ -1,7 +1,9 @@
 use std::fmt;
 
 use crate::arena::GetInfo;
-use crate::{Dialect, MutationEvent, Rewriter, StageInfo, Statement, StatementParent};
+use crate::{
+    BlockParent, CFG, Dialect, MutationEvent, Rewriter, StageInfo, Statement, StatementParent,
+};
 
 /// A traversal order over the statements nested under a root statement.
 ///
@@ -63,13 +65,13 @@ pub trait WalkOrder: CursorOrder {
         let mut cursor = Self::start(rewriter.stage(), root);
         while let Some(stmt) = cursor.next(rewriter.stage()) {
             let seen = rewriter.events().len();
-            let parent = stmt.get_info(rewriter.stage()).and_then(|info| info.parent);
+            let place = VisitedPlace::of(rewriter.stage(), stmt);
             let result = visit(rewriter, stmt);
             // Check the contract before stepping on, so the cursor never steps
             // from a statement erased or moved where the order forbids it.
             cursor.check_erasure(rewriter.stage())?;
             if !Self::ALLOWS_ERASING_OR_MOVING_VISITED {
-                check_not_moved_since(rewriter, stmt, parent, seen)?;
+                check_not_moved_since(rewriter, stmt, place, seen)?;
             }
             // `None` on `Advance` and `Skip`, the final status on `Interrupt`.
             if let Some(status) = result.steer(&mut cursor) {
@@ -81,22 +83,25 @@ pub trait WalkOrder: CursorOrder {
 }
 
 /// Fail with [`WalkError::VisitedMoved`] if `visited` is live but the edits
-/// since the first `seen` events of `rewriter` moved it: out of `parent`,
-/// the block or graph it was in when its visit started (a merge of its block
-/// into another, a split of its block at it, or a move), or within it (a
-/// move). An erased `visited` passes: erasure is
+/// since the first `seen` events of `rewriter` moved it from `place`: to
+/// another block or graph (a merge of its block into another, a split of its
+/// block at it, a move, or a splice of its block that took it along), into
+/// another CFG with its block (a splice of its CFG), or within its block (a
+/// move). A splice that left it behind, such as the terminator of a spliced
+/// block, is not a move. An erased `visited` passes: erasure is
 /// [`WalkCursor::check_erasure`]'s to judge. Panics if `rewriter` has
 /// recorded fewer than `seen` events.
 fn check_not_moved_since<L: Dialect>(
     rewriter: &Rewriter<'_, L>,
     visited: Statement,
-    parent: Option<StatementParent>,
+    place: VisitedPlace,
     seen: usize,
 ) -> Result<(), WalkError> {
-    let Some(info) = visited.get_info(rewriter.stage()) else {
+    let stage = rewriter.stage();
+    if visited.get_info(stage).is_none() {
         return Ok(());
-    };
-    let moved = info.parent != parent
+    }
+    let moved = VisitedPlace::of(stage, visited) != place
         || rewriter.events()[seen..].iter().any(
             |event| matches!(*event, MutationEvent::MovedStatement { stmt } if stmt == visited),
         );
@@ -104,6 +109,33 @@ fn check_not_moved_since<L: Dialect>(
         Err(WalkError::VisitedMoved(visited))
     } else {
         Ok(())
+    }
+}
+
+/// Where a visited statement was when its visit started: its parent block or
+/// graph, and, if that is a block, the block's CFG. A move to another block
+/// or graph changes the parent; a splice of its CFG keeps the parent but
+/// changes the CFG.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct VisitedPlace {
+    parent: Option<StatementParent>,
+    cfg: Option<CFG>,
+}
+
+impl VisitedPlace {
+    /// Where `stmt` is now in `stage`.
+    fn of<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Self {
+        let parent = stmt.get_info(stage).and_then(|info| info.parent);
+        let cfg = match parent {
+            Some(StatementParent::Block(block)) => {
+                match block.get_info(stage).and_then(|info| info.parent()) {
+                    Some(BlockParent::CFG(cfg)) => Some(cfg),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        Self { parent, cfg }
     }
 }
 
