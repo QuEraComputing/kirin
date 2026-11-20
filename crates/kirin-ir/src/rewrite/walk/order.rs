@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::arena::GetInfo;
-use crate::{Dialect, Rewriter, StageInfo, Statement, StatementParent};
+use crate::{Dialect, MutationEvent, Rewriter, StageInfo, Statement, StatementParent};
 
 /// A traversal order over the statements nested under a root statement.
 ///
@@ -16,12 +16,11 @@ use crate::{Dialect, Rewriter, StageInfo, Statement, StatementParent};
               that would skip `walk_mut`'s checks of the walk contract"
 )]
 pub trait WalkOrder: CursorOrder {
-    /// Whether an edit may erase the statement being visited, or move it to
-    /// another block or graph (see the [contract](super#contract)).
-    /// Only the reverse BFS orders allow it: they build their order at the
-    /// start, while the others find the next statement through the visited
-    /// one.
-    const ALLOWS_ERASING_VISITED: bool;
+    /// Whether an edit may erase or move the statement being visited (see
+    /// the [contract](super#contract)). Only the reverse BFS orders allow it:
+    /// they build their order at the start, while the others find the next
+    /// statement through the visited one.
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool;
 
     /// Every statement of the walk under `root`, in order, for a walk that
     /// edits nothing. Empty if `root` is not live.
@@ -53,9 +52,9 @@ pub trait WalkOrder: CursorOrder {
 
     /// [`walk`](Self::walk) with a `visit` that may edit through `rewriter`,
     /// within the walk's contract (see the [module docs](super)). Fails if
-    /// `visit` erases the statement it is visiting where the order does not
-    /// allow it, or moves it to another block or graph, whatever `visit`
-    /// returns: an interrupted walk is checked too.
+    /// `visit` erases or moves the statement it is visiting where the order
+    /// does not allow it, whatever `visit` returns: an interrupted walk is
+    /// checked too.
     fn walk_mut<'r, L: Dialect>(
         rewriter: &mut Rewriter<'r, L>,
         root: Statement,
@@ -63,13 +62,14 @@ pub trait WalkOrder: CursorOrder {
     ) -> Result<WalkStatus, WalkError> {
         let mut cursor = Self::start(rewriter.stage(), root);
         while let Some(stmt) = cursor.next(rewriter.stage()) {
+            let seen = rewriter.events().len();
             let parent = stmt.get_info(rewriter.stage()).and_then(|info| info.parent);
             let result = visit(rewriter, stmt);
             // Check the contract before stepping on, so the cursor never steps
             // from a statement erased or moved where the order forbids it.
             cursor.check_erasure(rewriter.stage())?;
-            if !Self::ALLOWS_ERASING_VISITED {
-                check_not_moved(rewriter.stage(), stmt, parent)?;
+            if !Self::ALLOWS_ERASING_OR_MOVING_VISITED {
+                check_not_moved_since(rewriter, stmt, parent, seen)?;
             }
             // `None` on `Advance` and `Skip`, the final status on `Interrupt`.
             if let Some(status) = result.steer(&mut cursor) {
@@ -80,18 +80,30 @@ pub trait WalkOrder: CursorOrder {
     }
 }
 
-/// Fail with [`WalkError::VisitedMoved`] if `visited` is live but no longer
-/// in `parent`, the block or graph it was in when its visit started. An
-/// erased `visited` passes: erasure is [`WalkCursor::check_erasure`]'s to
-/// judge.
-fn check_not_moved<L: Dialect>(
-    stage: &StageInfo<L>,
+/// Fail with [`WalkError::VisitedMoved`] if `visited` is live but the edits
+/// since the first `seen` events of `rewriter` moved it: out of `parent`,
+/// the block or graph it was in when its visit started (a merge of its block
+/// into another, a split of its block at it, or a move), or within it (a
+/// move). An erased `visited` passes: erasure is
+/// [`WalkCursor::check_erasure`]'s to judge. Panics if `rewriter` has
+/// recorded fewer than `seen` events.
+fn check_not_moved_since<L: Dialect>(
+    rewriter: &Rewriter<'_, L>,
     visited: Statement,
     parent: Option<StatementParent>,
+    seen: usize,
 ) -> Result<(), WalkError> {
-    match visited.get_info(stage) {
-        Some(info) if info.parent != parent => Err(WalkError::VisitedMoved(visited)),
-        _ => Ok(()),
+    let Some(info) = visited.get_info(rewriter.stage()) else {
+        return Ok(());
+    };
+    let moved = info.parent != parent
+        || rewriter.events()[seen..].iter().any(
+            |event| matches!(*event, MutationEvent::MovedStatement { stmt } if stmt == visited),
+        );
+    if moved {
+        Err(WalkError::VisitedMoved(visited))
+    } else {
+        Ok(())
     }
 }
 
@@ -180,8 +192,8 @@ pub enum WalkError {
     /// The statement being visited was erased before the walk proceeded, in a
     /// way its order does not allow (see the [module docs](super)).
     VisitedErased(Statement),
-    /// The statement being visited was moved to another block or graph before
-    /// the walk proceeded (see the [module docs](super)).
+    /// The statement being visited was moved before the walk proceeded, in an
+    /// order a move breaks (see the [module docs](super)).
     VisitedMoved(Statement),
 }
 
@@ -197,7 +209,7 @@ impl fmt::Display for WalkError {
             WalkError::VisitedMoved(stmt) => {
                 write!(
                     f,
-                    "statement {stmt:?} was moved to another block or graph while the walk was visiting it"
+                    "statement {stmt:?} was moved while the walk was visiting it"
                 )
             }
         }

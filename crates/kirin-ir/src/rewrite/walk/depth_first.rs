@@ -28,7 +28,7 @@ pub(crate) struct PostOrderCursor {
 }
 
 impl WalkOrder for PreOrder {
-    const ALLOWS_ERASING_VISITED: bool = false;
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = false;
 }
 
 impl CursorOrder for PreOrder {
@@ -43,7 +43,7 @@ impl CursorOrder for PreOrder {
 }
 
 impl WalkOrder for PostOrder {
-    const ALLOWS_ERASING_VISITED: bool = false;
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = false;
 }
 
 impl CursorOrder for PostOrder {
