@@ -377,7 +377,7 @@ where
             + self.text(";")
     }
 
-    /// Render `name(T0, T1) -> Ret` — shared by all header variants.
+    /// Render `name(T0, T1) -> Rets` — shared by all header variants.
     fn print_fn_signature(
         &'a self,
         name: Option<GlobalSymbol>,

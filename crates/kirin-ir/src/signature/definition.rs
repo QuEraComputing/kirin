@@ -17,7 +17,7 @@ impl<T, C> Signature<T, C> {
         Self::with_rets(params, vec![ret], constraints)
     }
 
-    /// Creates a new signature with several return types.
+    /// Creates a new signature with the given return types (empty means no returns).
     pub fn with_rets(params: Vec<T>, rets: Vec<T>, constraints: C) -> Self {
         Signature {
             params,
@@ -41,7 +41,8 @@ impl<T, C> Signature<T, C> {
         &self.constraints
     }
 
-    /// Formats the return types as `T`, `(T, U)`, or `None`; a lone `(`-type is wrapped.
+    /// Formats the return types as `T`, `(T, U)`, or `None`.
+    /// A lone type printing as `(...)` or `None` is wrapped so it parses back as one return.
     pub fn rets_to_string(&self) -> String
     where
         T: std::fmt::Display,
@@ -49,7 +50,7 @@ impl<T, C> Signature<T, C> {
         match self.rets.as_slice() {
             [] => "None".to_string(),
             [ret] => match ret.to_string() {
-                ret if ret.starts_with('(') => format!("({ret})"),
+                ret if ret.starts_with('(') || ret == "None" => format!("({ret})"),
                 ret => ret,
             },
             rets => {

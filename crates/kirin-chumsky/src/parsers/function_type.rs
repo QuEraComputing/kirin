@@ -25,7 +25,8 @@ where
 
 /// Parses a function type signature.
 ///
-/// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32` or `-> None`
+/// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32` or `-> None`.
+/// `-> ()` is a single unit-typed output, not "no outputs".
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `FunctionType<<T as HasParser>::Output>`.

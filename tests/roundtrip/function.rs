@@ -256,3 +256,24 @@ specialize @A fn @compute(i32, i64, f32) -> f64 cfg {
 "#;
     roundtrip::assert_program_roundtrip::<SplitSigLanguage>(input);
 }
+
+#[test]
+fn test_split_sig_program_multiple_and_no_returns() {
+    let input = r#"
+stage @A fn @pair(i32, f64) -> (i32, f64);
+stage @A fn @sink(i32) -> None;
+
+specialize @A fn @pair(i32, f64) -> (i32, f64) cfg {
+  ^bb0(%x: i32, %y: f64) {
+    ret %x, %y;
+  }
+}
+
+specialize @A fn @sink(i32) -> None cfg {
+  ^bb0(%x: i32) {
+    ret;
+  }
+}
+"#;
+    roundtrip::assert_program_roundtrip::<SplitSigLanguage>(input);
+}

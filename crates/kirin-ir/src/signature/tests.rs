@@ -72,3 +72,9 @@ fn test_exact_applicable_requires_matching_rets() {
     assert!(ExactSemantics::applicable(&call, &cand).is_none());
     assert!(ExactSemantics::applicable(&call, &call).is_some());
 }
+
+#[test]
+fn test_rets_to_string_wraps_none_typed_single_return() {
+    let sig = Signature::new(vec![], "None", ());
+    assert_eq!(sig.rets_to_string(), "(None)");
+}

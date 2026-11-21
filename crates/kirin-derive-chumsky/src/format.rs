@@ -173,7 +173,7 @@ pub enum BodyProjection {
 pub enum SignatureProjection {
     /// `{sig:inputs}` — comma-separated input type list (`Type, Type`).
     Inputs,
-    /// `{sig:return}` — single return type (`Type`).
+    /// `{sig:return}` — return types (`Type`, `(Type, Type)`, or `None`).
     Return,
 }
 

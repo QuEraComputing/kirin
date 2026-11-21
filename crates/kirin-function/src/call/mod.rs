@@ -204,7 +204,7 @@ where
         self
     }
 
-    /// Results typed as `types`, e.g. the callee's `Signature::rets()`.
+    /// Results typed as `types`; pass the callee's `Signature::rets()` (not checked here).
     pub fn returns(mut self, types: impl IntoIterator<Item = Lang::Type>) -> Self {
         self.result_types = types.into_iter().collect();
         self
