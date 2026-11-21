@@ -606,16 +606,34 @@ fn test_parse_does_not_duplicate_a_poisoned_stage() {
 }
 
 #[test]
-fn test_unit_typed_return_stays_single_return() {
-    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
-    let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");
-    program.parse(&input).unwrap();
-    let stage = program.stages().next().unwrap();
-    let signature = stage
-        .staged_function_arena()
-        .iter()
-        .next()
-        .unwrap()
-        .signature();
-    assert_eq!(signature, &unit_sig());
+fn test_unit_typed_signatures_roundtrip() {
+    let parse = |text: &str| {
+        let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+        program.parse(text).unwrap();
+        let stage = program.stages().next().unwrap();
+        let staged = stage.staged_function_arena().iter().next().unwrap();
+        staged.signature().clone()
+    };
+    for sig in [
+        unit_sig(),
+        Signature::with_rets(vec![UnitType], vec![], ()),
+        Signature::with_rets(vec![UnitType], vec![UnitType, UnitType], ()),
+    ] {
+        assert_eq!(parse(&format!("stage @A fn @foo{sig};")), sig);
+    }
+    assert_eq!(parse("stage @A fn @foo(()) -> ();"), unit_sig());
+}
+
+#[test]
+fn test_function_type_unit_and_none_outputs() {
+    let outputs = |text| {
+        let parser = crate::function_type::<_, UnitType>();
+        kirin_test_utils::parse_tokens!(text, parser)
+            .unwrap()
+            .value
+            .output_types
+            .len()
+    };
+    assert_eq!(outputs("(()) -> ()"), 1);
+    assert_eq!(outputs("(()) -> None"), 0);
 }

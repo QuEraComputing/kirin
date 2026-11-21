@@ -1,27 +1,31 @@
 use crate::ast::*;
+use crate::parsers::identifier;
 use crate::traits::*;
 use chumsky::prelude::*;
 use kirin_lexer::Token;
 
-/// Parses `T`, `(T, U)`, or `()`; a single type is tried first.
-pub fn return_type_list<'t, I, T>()
--> impl Parser<'t, I, Vec<<T as HasParser<'t>>::Output>, ParserError<'t>>
+/// Parses return types with `ty`: `None` (no returns), `(T, U)`, or a single `T`.
+pub fn return_type_list<'t, I, O>(
+    ty: impl Parser<'t, I, O, ParserError<'t>> + Clone,
+) -> impl Parser<'t, I, Vec<O>, ParserError<'t>>
 where
     I: TokenInput<'t>,
-    T: HasParser<'t>,
 {
-    T::parser()
-        .map(|ty| vec![ty])
-        .or(T::parser()
+    identifier("None")
+        .map(|_| Vec::new())
+        .or(ty
+            .clone()
             .separated_by(just(Token::Comma))
+            .at_least(1)
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen)))
+        .or(ty.map(|ty| vec![ty]))
         .labelled("return types")
 }
 
 /// Parses a function type signature.
 ///
-/// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32`
+/// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32` or `-> None`
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `FunctionType<<T as HasParser>::Output>`.
@@ -45,21 +49,11 @@ where
 
     let output_types = just(Token::Arrow)
         .ignore_then(
-            T::parser()
-                .map_with(|ty, e| Spanned {
-                    value: ty,
-                    span: e.span(),
-                })
-                .separated_by(just(Token::Comma))
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen))
-                .or(T::parser().map_with(|ty, e| {
-                    vec![Spanned {
-                        value: ty,
-                        span: e.span(),
-                    }]
-                }))
-                .or(empty().to(Vec::new())),
+            return_type_list(T::parser().map_with(|ty, e| Spanned {
+                value: ty,
+                span: e.span(),
+            }))
+            .or(empty().to(Vec::new())),
         )
         .or(empty().to(Vec::new()))
         .labelled("function output types");

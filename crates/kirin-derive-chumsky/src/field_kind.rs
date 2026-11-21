@@ -209,7 +209,7 @@ pub fn parser_expr<L: Layout>(
                             #crate_path::chumsky::prelude::just(#crate_path::Token::RParen),
                         )
                         .then_ignore(#crate_path::chumsky::prelude::just(#crate_path::Token::Arrow))
-                        .then(#crate_path::return_type_list::<_, #ir_type>())
+                        .then(#crate_path::return_type_list(<#ir_type as #crate_path::HasParser<'t>>::parser()))
                         .map(|(params, rets)| #crate_path::ir::Signature::with_rets(params, rets, ()))
                 }
             }
@@ -223,7 +223,7 @@ pub fn parser_expr<L: Layout>(
             }
             FormatOption::Signature(crate::format::SignatureProjection::Return) => {
                 // Return types
-                quote! { #crate_path::return_type_list::<_, #ir_type>() }
+                quote! { #crate_path::return_type_list(<#ir_type as #crate_path::HasParser<'t>>::parser()) }
             }
             _ => unreachable!("validation prevents other options on Signature fields"),
         },

@@ -160,7 +160,7 @@ fn test_signature_returns_roundtrip() {
     for (text, rets) in [
         ("(1) -> 2", vec![2]),
         ("(1) -> (2, 3)", vec![2, 3]),
-        ("(1) -> ()", vec![]),
+        ("(1) -> None", vec![]),
     ] {
         let sig = parse_with::<Signature<i32>>(text).unwrap();
         assert_eq!(sig, Signature::with_rets(vec![1], rets, ()));

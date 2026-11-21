@@ -41,13 +41,17 @@ impl<T, C> Signature<T, C> {
         &self.constraints
     }
 
-    /// Formats the return types as `T`, `(T, U)`, or `()`.
+    /// Formats the return types as `T`, `(T, U)`, or `None`; a lone `(`-type is wrapped.
     pub fn rets_to_string(&self) -> String
     where
         T: std::fmt::Display,
     {
         match self.rets.as_slice() {
-            [ret] => ret.to_string(),
+            [] => "None".to_string(),
+            [ret] => match ret.to_string() {
+                ret if ret.starts_with('(') => format!("({ret})"),
+                ret => ret,
+            },
             rets => {
                 let rets: Vec<String> = rets.iter().map(ToString::to_string).collect();
                 format!("({})", rets.join(", "))
