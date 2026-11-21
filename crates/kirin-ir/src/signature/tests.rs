@@ -60,3 +60,15 @@ fn test_exact_cmp_incomparable() {
         SignatureCmp::Incomparable
     );
 }
+
+#[test]
+fn test_exact_applicable_requires_matching_rets() {
+    let call = Signature::with_rets(
+        vec![SimpleType::Int],
+        vec![SimpleType::Bool, SimpleType::Int],
+        (),
+    );
+    let cand = Signature::new(vec![SimpleType::Int], SimpleType::Bool, ());
+    assert!(ExactSemantics::applicable(&call, &cand).is_none());
+    assert!(ExactSemantics::applicable(&call, &call).is_some());
+}

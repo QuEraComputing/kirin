@@ -3,6 +3,22 @@ use crate::traits::*;
 use chumsky::prelude::*;
 use kirin_lexer::Token;
 
+/// Parses `T`, `(T, U)`, or `()`; a single type is tried first.
+pub fn return_type_list<'t, I, T>()
+-> impl Parser<'t, I, Vec<<T as HasParser<'t>>::Output>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+{
+    T::parser()
+        .map(|ty| vec![ty])
+        .or(T::parser()
+            .separated_by(just(Token::Comma))
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LParen), just(Token::RParen)))
+        .labelled("return types")
+}
+
 /// Parses a function type signature.
 ///
 /// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32`

@@ -604,3 +604,18 @@ fn test_parse_does_not_duplicate_a_poisoned_stage() {
         "@A must resolve to the existing position, not create a second one"
     );
 }
+
+#[test]
+fn test_unit_typed_return_stays_single_return() {
+    let mut program: Program<StageInfo<FunctionDefinition>> = Program::new();
+    let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");
+    program.parse(&input).unwrap();
+    let stage = program.stages().next().unwrap();
+    let signature = stage
+        .staged_function_arena()
+        .iter()
+        .next()
+        .unwrap()
+        .signature();
+    assert_eq!(signature, &unit_sig());
+}

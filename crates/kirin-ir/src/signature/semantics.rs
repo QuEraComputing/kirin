@@ -41,7 +41,7 @@ pub trait SignatureSemantics<T, C = ()> {
     ) -> SignatureCmp;
 }
 
-/// Exact-match semantics: applicable only when params and ret are exactly equal.
+/// Exact-match semantics: applicable only when params and rets are exactly equal.
 ///
 /// No lattice structure required. Suitable for simple nominal type systems.
 pub struct ExactSemantics;
@@ -59,7 +59,7 @@ impl<T: PartialEq, C: PartialEq> SignatureSemantics<T, C> for ExactSemantics {
             .zip(cand.params().iter())
             .all(|(a, b)| a == b);
         #[allow(clippy::unit_cmp)]
-        if params_match && call.ret() == cand.ret() && call.constraints() == cand.constraints() {
+        if params_match && call.rets() == cand.rets() && call.constraints() == cand.constraints() {
             Some(())
         } else {
             None
@@ -98,8 +98,8 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
         if call.constraints() != cand.constraints() {
             return None;
         }
-        // Call return type must match candidate return type if specified
-        if call.ret() != cand.ret() {
+        // Call return types must match candidate return types
+        if call.rets() != cand.rets() {
             return None;
         }
         // Call params must be subtypes (more specific or equal) of candidate params

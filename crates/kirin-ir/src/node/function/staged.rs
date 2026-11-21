@@ -91,8 +91,8 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         &self.signature
     }
 
-    pub fn return_type(&self) -> &L::Type {
-        self.signature.ret()
+    pub fn return_types(&self) -> &[L::Type] {
+        self.signature.rets()
     }
 
     pub fn backedges(&self) -> &[StagedFunction] {

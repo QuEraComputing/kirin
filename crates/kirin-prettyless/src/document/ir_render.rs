@@ -85,12 +85,12 @@ where
         self.text(parts.join(", "))
     }
 
-    /// Print a signature's return type.
+    /// Print a signature's return types.
     pub fn print_signature_return<T: std::fmt::Display>(
         &'a self,
         sig: &Signature<T>,
     ) -> ArenaDoc<'a> {
-        self.text(format!("{}", sig.ret()))
+        self.text(sig.rets_to_string())
     }
 
     /// Pretty print a statement by printing its definition.
@@ -387,7 +387,7 @@ where
         self.text(self.function_symbol_text(name))
             + params.enclose("(", ")")
             + self.text(" -> ")
-            + self.text(format!("{}", sig.ret()))
+            + self.text(sig.rets_to_string())
     }
 
     fn function_symbol_text(&self, name: Option<GlobalSymbol>) -> String {

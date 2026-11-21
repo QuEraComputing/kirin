@@ -168,7 +168,7 @@ where
             compile_stage: self.compile_stage,
             target,
             args: Vec::new(),
-            result_count: 0,
+            result_types: Vec::new(),
             marker: std::marker::PhantomData,
         }
     }
@@ -183,7 +183,7 @@ where
     compile_stage: Option<CompileStage>,
     target: CallTarget,
     args: Vec<SSAValue>,
-    result_count: usize,
+    result_types: Vec<Lang::Type>,
     marker: std::marker::PhantomData<T>,
 }
 
@@ -198,18 +198,28 @@ where
         self
     }
 
+    /// Placeholder-typed results.
     pub fn results(mut self, count: usize) -> Self {
-        self.result_count = count;
+        self.result_types = (0..count).map(|_| T::placeholder().into()).collect();
+        self
+    }
+
+    /// Results typed as `types`, e.g. the callee's `Signature::rets()`.
+    pub fn returns(mut self, types: impl IntoIterator<Item = Lang::Type>) -> Self {
+        self.result_types = types.into_iter().collect();
         self
     }
 
     pub fn insert(self) -> call_build_result::Call {
         let statement = self.stage.statement_arena().next_id();
-        let results: Vec<ResultValue> = (0..self.result_count)
-            .map(|index| {
+        let results: Vec<ResultValue> = self
+            .result_types
+            .into_iter()
+            .enumerate()
+            .map(|(index, ty)| {
                 self.stage
                     .ssa()
-                    .ty(T::placeholder().into())
+                    .ty(ty)
                     .kind(BuilderSSAKind::Result(statement, index))
                     .new()
                     .into()

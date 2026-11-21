@@ -4,7 +4,7 @@ use kirin_ir::{Dialect, Signature};
 use kirin_lexer::{Logos, Token};
 
 use crate::ast::SymbolName;
-use crate::parsers::{identifier, symbol};
+use crate::parsers::{identifier, return_type_list, symbol};
 use crate::traits::{HasParser, ParserError, TokenInput};
 
 pub(super) type RichError<'src> = Rich<'src, Token<'src>, SimpleSpan>;
@@ -61,10 +61,10 @@ where
         .ignore_then(symbol())
         .then(type_list_parser::<I, L>())
         .then_ignore(just(Token::Arrow))
-        .then(L::Type::parser())
-        .map(|((function, params), ret)| ParsedFnSignature {
+        .then(return_type_list::<I, L::Type>())
+        .map(|((function, params), rets)| ParsedFnSignature {
             function,
-            signature: Signature::new(params, ret, ()),
+            signature: Signature::with_rets(params, rets, ()),
         })
         .labelled("function signature")
 }
