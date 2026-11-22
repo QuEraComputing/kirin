@@ -4,7 +4,7 @@ use kirin_ir::{Dialect, Signature};
 use kirin_lexer::{Logos, Token};
 
 use crate::ast::SymbolName;
-use crate::parsers::{identifier, return_type_list, symbol};
+use crate::parsers::{identifier, return_clause, symbol};
 use crate::traits::{HasParser, ParserError, TokenInput};
 
 pub(super) type RichError<'src> = Rich<'src, Token<'src>, SimpleSpan>;
@@ -60,8 +60,7 @@ where
     identifier("fn")
         .ignore_then(symbol())
         .then(type_list_parser::<I, L>())
-        .then_ignore(just(Token::Arrow))
-        .then(return_type_list(L::Type::parser()))
+        .then(return_clause(L::Type::parser()))
         .map(|((function, params), rets)| ParsedFnSignature {
             function,
             signature: Signature::with_rets(params, rets, ()),

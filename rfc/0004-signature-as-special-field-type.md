@@ -99,11 +99,11 @@ Add recognition in `parse_field`: detect `Signature<T>` type path, extract `T`, 
 
 ```
 (Type, Type, ...) -> Type
-(Type, ...) -> (Type, Type, ...)
-(Type, ...) -> None
+(Type, ...) -> Type, Type, ...
+(Type, ...)
 ```
 
-Params in parentheses, comma-separated, arrow, then the return types: one type, a non-empty parenthesized list, or `None` for no returns. A single return type that itself starts with `(` (e.g. unit `()`) prints wrapped, `(())`, so it parses back as one return.
+Params in parentheses, comma-separated, then an optional return clause: an arrow followed by a bare comma-separated list of one or more return types. A function with no returns has no arrow. The return list is never parenthesized, so a type that itself prints with parentheses (unit `()`, a tuple `(T, U)`) is always a single return: `-> (T, U)` returns one tuple, `-> T, U` returns two values, and neither converts into the other.
 
 ```rust
 impl<'t, T> HasParser<'t> for Signature<T>
@@ -117,8 +117,7 @@ where
             .separated_by(just(Token::Comma))
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
-            .then_ignore(just(Token::Arrow))
-            .then(return_type_list(T::parser()))
+            .then(return_clause(T::parser()))
             .map(|(params, rets)| Signature::with_rets(params, rets, ()))
     }
 }
@@ -128,7 +127,7 @@ where
 
 Note: This is the same logic currently in `fn_params_and_return` in `kirin-chumsky/src/function_text/syntax.rs`, but moved to a `HasParser` impl on the type itself.
 
-`PrettyPrint` (or `Display`) for `Signature<T>` outputs the same format: `(T, T) -> T`, `(T) -> (T, T)`, or `(T) -> None`.
+`PrettyPrint` (or `Display`) for `Signature<T>` outputs the same format: `(T, T) -> T`, `(T) -> T, T`, or `(T)`.
 
 ### Signature field projections
 
@@ -138,7 +137,7 @@ Like graph fields (`{body:ports}`, `{body:body}`), the Signature field supports 
 |------------|--------|--------|------|
 | `{sig}` | `(T, T) -> T` (whole) | `(T, T) -> T` | `Signature<T>` |
 | `{sig:inputs}` | `T, T` (comma-separated type list) | `T, T` | `Vec<T>` → `sig.params()` |
-| `{sig:return}` | `T`, `(T, T)`, or `None` | same | `Vec<T>` → `sig.rets()` |
+| `{sig:return}` | `T`, `T, T`, or nothing (bare list; the arrow belongs to the format string) | same | `Product<T>` → `sig.rets()` |
 
 **Constraint:** Either use `{sig}` as a whole, or use `{sig:inputs}` + `{sig:return}` together. The derive errors if only one projection appears without the other. This ensures the Signature field is always fully determined by the format string.
 

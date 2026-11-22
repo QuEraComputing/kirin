@@ -377,17 +377,20 @@ where
             + self.text(";")
     }
 
-    /// Render `name(T0, T1) -> Rets` — shared by all header variants.
+    /// Render `name(T0, T1) -> R0, R1` — shared by all header variants. A
+    /// signature with no returns renders `name(T0, T1)`.
     fn print_fn_signature(
         &'a self,
         name: Option<GlobalSymbol>,
         sig: &Signature<L::Type>,
     ) -> ArenaDoc<'a> {
         let params = self.list(sig.params().iter(), ", ", |p| self.text(format!("{}", p)));
-        self.text(self.function_symbol_text(name))
-            + params.enclose("(", ")")
-            + self.text(" -> ")
-            + self.text(sig.rets_to_string())
+        let header = self.text(self.function_symbol_text(name)) + params.enclose("(", ")");
+        if sig.rets().is_empty() {
+            header
+        } else {
+            header + self.text(" -> ") + self.text(sig.rets_to_string())
+        }
     }
 
     fn function_symbol_text(&self, name: Option<GlobalSymbol>) -> String {

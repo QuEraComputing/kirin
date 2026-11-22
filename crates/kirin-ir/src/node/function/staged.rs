@@ -1,3 +1,4 @@
+use crate::Product;
 use crate::arena::{GetInfo, GetInfoMut, Id, Item};
 use crate::identifier;
 use crate::language::Dialect;
@@ -91,7 +92,7 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         &self.signature
     }
 
-    pub fn return_types(&self) -> &[L::Type] {
+    pub fn return_types(&self) -> &Product<L::Type> {
         self.signature.rets()
     }
 

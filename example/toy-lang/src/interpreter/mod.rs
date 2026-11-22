@@ -9,6 +9,8 @@ mod error;
 mod frame;
 
 #[cfg(test)]
+mod multi_return_tests;
+#[cfg(test)]
 mod tests;
 
 pub use error::ToyError;

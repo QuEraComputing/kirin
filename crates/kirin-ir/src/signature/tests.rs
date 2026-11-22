@@ -74,7 +74,20 @@ fn test_exact_applicable_requires_matching_rets() {
 }
 
 #[test]
-fn test_rets_to_string_wraps_none_typed_single_return() {
-    let sig = Signature::new(vec![], "None", ());
-    assert_eq!(sig.rets_to_string(), "(None)");
+fn test_display_keeps_parenthesized_types_as_one_return() {
+    // A type that prints with parentheses is still a single return: the
+    // return list itself is never parenthesized.
+    assert_eq!(Signature::new(vec![], "()", ()).to_string(), "() -> ()");
+    assert_eq!(
+        Signature::new(vec![], "(A, B)", ()).to_string(),
+        "() -> (A, B)"
+    );
+    assert_eq!(
+        Signature::with_rets(vec![], ["A", "B"], ()).to_string(),
+        "() -> A, B"
+    );
+    assert_eq!(
+        Signature::with_rets(vec!["A"], Vec::<&str>::new(), ()).to_string(),
+        "(A)"
+    );
 }

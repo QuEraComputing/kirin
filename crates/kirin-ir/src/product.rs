@@ -108,15 +108,14 @@ macro_rules! product {
     };
 }
 
-/// Dialect types that support product types implement this.
+/// A language's own tuple type implements this to wrap a [`Product`].
 ///
-/// The framework uses this to:
-/// - Parse `(T1, T2)` syntax as product types
-/// - Print product types
-/// - Auto-destructure multi-result statements during interpretation
-///
-/// Similar to `Placeholder` -- an opt-in trait that derive macros detect
-/// and add bounds for automatically.
+/// A `Product` is the framework container for the values at a boundary and
+/// is never itself a type. A language that has tuples defines a tuple type
+/// in its type lattice and implements `HasProduct` to build it from, and
+/// view it as, a `Product` of its component types. Languages without tuples
+/// do not implement it. The value-level counterpart is the interpreter's
+/// `HasProductValue`; `kirin-tuple` provides the standard tuple statements.
 pub trait HasProduct: Sized {
     /// Wrap a product into this type.
     fn from_product(product: Product<Self>) -> Self;

@@ -260,16 +260,16 @@ specialize @A fn @compute(i32, i64, f32) -> f64 cfg {
 #[test]
 fn test_split_sig_program_multiple_and_no_returns() {
     let input = r#"
-stage @A fn @pair(i32, f64) -> (i32, f64);
-stage @A fn @sink(i32) -> None;
+stage @A fn @pair(i32, f64) -> i32, f64;
+stage @A fn @sink(i32);
 
-specialize @A fn @pair(i32, f64) -> (i32, f64) cfg {
+specialize @A fn @pair(i32, f64) -> i32, f64 cfg {
   ^bb0(%x: i32, %y: f64) {
     ret %x, %y;
   }
 }
 
-specialize @A fn @sink(i32) -> None cfg {
+specialize @A fn @sink(i32) -> cfg {
   ^bb0(%x: i32) {
     ret;
   }

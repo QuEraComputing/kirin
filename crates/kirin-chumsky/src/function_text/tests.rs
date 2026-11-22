@@ -621,19 +621,10 @@ fn test_unit_typed_signatures_roundtrip() {
     ] {
         assert_eq!(parse(&format!("stage @A fn @foo{sig};")), sig);
     }
+    // A unit type is one return; no returns is the absence of the arrow.
     assert_eq!(parse("stage @A fn @foo(()) -> ();"), unit_sig());
-}
-
-#[test]
-fn test_function_type_unit_and_none_outputs() {
-    let outputs = |text| {
-        let parser = crate::function_type::<_, UnitType>();
-        kirin_test_utils::parse_tokens!(text, parser)
-            .unwrap()
-            .value
-            .output_types
-            .len()
-    };
-    assert_eq!(outputs("(()) -> ()"), 1);
-    assert_eq!(outputs("(()) -> None"), 0);
+    assert_eq!(
+        parse("stage @A fn @foo(());"),
+        Signature::with_rets(vec![UnitType], vec![], ())
+    );
 }
