@@ -167,6 +167,21 @@ pub(super) fn tokenize<'src>(src: &'src str) -> Vec<(Token<'src>, SimpleSpan)> {
         .collect()
 }
 
+/// Span from the first token through the `}` that closes the first `{`.
+/// Program text uses it to find where a `stage @A mod ...` declaration ends.
+pub(super) fn braced_span<'src>(
+    tokens: &[(Token<'src>, SimpleSpan)],
+) -> Result<SimpleSpan, Vec<RichError<'src>>> {
+    let end = tokens.last().map(|(_, span)| span.end).unwrap_or_default();
+    let eoi = SimpleSpan::from(end..end);
+    let stream = Stream::from_iter(tokens.to_vec()).map(eoi, |(token, span)| (token, span));
+
+    definition_span()
+        .then_ignore(any().repeated())
+        .parse(stream)
+        .into_result()
+}
+
 pub(super) fn parse_one_declaration<'src, L>(
     tokens: &[(Token<'src>, SimpleSpan)],
 ) -> Result<(Declaration<'src, L::Type>, SimpleSpan), Vec<RichError<'src>>>

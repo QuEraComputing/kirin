@@ -11,9 +11,9 @@
 //! For multi-dialect stage enums, use `#[derive(ParseDispatch)]` from
 //! `kirin-derive-ir`.
 
-use kirin_ir::{CompileStage, Dialect, StageInfo, StageMeta};
+use kirin_ir::{CompileStage, DeclaredName, Dialect, Module, StageInfo, StageMeta};
 
-use crate::{HasParser, ParseEmit};
+use crate::{ChumskyError, HasParser, ParseEmit, ParseModuleText};
 
 use super::error::FunctionParseError;
 use super::parse_text::{FirstPassCtx, FirstPassDispatchResult, SecondPassCtx};
@@ -39,6 +39,11 @@ pub trait ParseDispatch: StageMeta {
         stage_id: CompileStage,
         ctx: &mut SecondPassCtx<'_>,
     ) -> Result<Option<usize>, FunctionParseError>;
+
+    /// Parse `mod @name { ... }` into this stage with
+    /// [`ParseModuleText`]. Returns the module text API's error; the program
+    /// parser reports it at the declaration's position.
+    fn dispatch_module(&mut self, input: &str) -> Result<Option<Module>, ChumskyError>;
 }
 
 /// Blanket impl for single-dialect programs (`Program<StageInfo<L>>`).
@@ -47,7 +52,7 @@ pub trait ParseDispatch: StageMeta {
 /// not a type parameter being resolved recursively through the trait solver.
 impl<L> ParseDispatch for StageInfo<L>
 where
-    L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L>,
+    L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L> + DeclaredName,
     L::Type: kirin_ir::Placeholder, // Still needed for staged_function() on StageInfo
     for<'t> L: HasParser<'t>,
     for<'t> L::Type: HasParser<'t, Output = L::Type>,
@@ -66,5 +71,9 @@ where
         ctx: &mut SecondPassCtx<'_>,
     ) -> Result<Option<usize>, FunctionParseError> {
         second_pass_concrete::<L>(self, stage_id, ctx).map(Some)
+    }
+
+    fn dispatch_module(&mut self, input: &str) -> Result<Option<Module>, ChumskyError> {
+        <Self as ParseModuleText<L>>::parse_module(self, (), input).map(Some)
     }
 }

@@ -36,6 +36,7 @@
 //! `mod @name { statement; ... }` into a stage, located the same way as
 //! for [`ParseStatementText`].
 //! Each member has its own SSA scope and uses the dialect statement parser.
+//! In whole-program text the module is written `stage @A mod @name { ... }`.
 //!
 //! # Defining Dialects
 //!

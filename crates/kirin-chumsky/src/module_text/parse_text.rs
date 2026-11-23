@@ -15,6 +15,9 @@ use super::syntax::ModuleText;
 /// for definitions with projected names (`{:name}`): standalone module
 /// parsing does not register them or preserve names supplied by the function
 /// registry. On error the stage is unchanged.
+///
+/// In whole-program text the same module is written `stage @A mod @name
+/// { ... }` and parsed by `ParseProgramText`.
 pub trait ParseModuleText<L: Dialect, Ctx = ()> {
     fn parse_module(&mut self, ctx: Ctx, input: &str) -> Result<Module, ChumskyError>;
 }

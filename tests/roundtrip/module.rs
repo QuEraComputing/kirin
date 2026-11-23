@@ -23,6 +23,64 @@ impl From<GraphFunctionLanguage> for TestLanguage {
     }
 }
 
+#[derive(Debug, StageMeta, ParseDispatch, RenderDispatch)]
+enum TestStage {
+    #[stage(name = "decls")]
+    Decls(StageInfo<TestLanguage>),
+    #[stage(name = "code")]
+    Code(StageInfo<GraphFunctionLanguage>),
+}
+
+/// Both stages declare a module `@a`; each keeps its own members.
+const TWO_STAGE_PROGRAM: &str = r#"
+stage @decls mod @a { decl @value; }
+stage @code mod @a { %k = constant 1 -> i64; }
+stage @code fn @f(i64) -> i64;
+specialize @code fn @f(i64) -> i64 cfg { ^e(%x: i64) { ret %x; } }
+"#;
+
+#[test]
+fn program_text_keeps_modules_in_their_stages() {
+    let mut program: Program<TestStage> = Program::new();
+    program.parse(TWO_STAGE_PROGRAM).unwrap();
+    let printed = program.sprint();
+
+    let mut reparsed: Program<TestStage> = Program::new();
+    reparsed.parse(&printed).unwrap();
+    assert_eq!(reparsed.sprint(), printed);
+
+    let decls_id = reparsed.stage_by_name("decls").unwrap();
+    let module = reparsed
+        .resolve_module::<TestLanguage>("a", decls_id)
+        .unwrap();
+    let Some(TestStage::Decls(decls)) = reparsed.stage(decls_id) else {
+        panic!("@decls holds TestLanguage");
+    };
+    let value = decls.symbol_table().lookup("value").unwrap();
+    let member = module.member_by_name(decls, value).unwrap();
+    assert!(matches!(member.definition(decls), TestLanguage::Decl { name } if *name == value));
+
+    let code_id = reparsed.stage_by_name("code").unwrap();
+    let module = reparsed
+        .resolve_module::<GraphFunctionLanguage>("a", code_id)
+        .unwrap();
+    let Some(TestStage::Code(code)) = reparsed.stage(code_id) else {
+        panic!("@code holds GraphFunctionLanguage");
+    };
+    assert_eq!(module.members(code).count(), 1);
+    assert!(reparsed.lookup_function_by_name("f").is_some());
+}
+
+#[test]
+fn program_text_rejects_duplicate_module_in_a_stage() {
+    let src = "stage @decls mod @a {}\nstage @decls mod @a {}";
+    let mut program: Program<TestStage> = Program::new();
+    let error = program.parse(src).unwrap_err();
+    assert!(error.to_string().contains("duplicate module @a"), "{error}");
+    let span = error.span.unwrap();
+    assert_eq!(span.start, src.rfind("@a").unwrap());
+}
+
 #[test]
 fn declaration_lookup_after_roundtrip() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();

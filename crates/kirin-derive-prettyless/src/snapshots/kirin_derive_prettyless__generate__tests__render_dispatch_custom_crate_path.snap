@@ -18,4 +18,15 @@ impl kirin_prettyless::RenderDispatch for Stage {
             ),
         }
     }
+    fn render_modules(
+        &self,
+        config: &kirin_prettyless::Config,
+        global_symbols: &kirin_ir::InternTable<String, kirin_ir::GlobalSymbol>,
+    ) -> Result<Vec<String>, std::fmt::Error> {
+        match self {
+            Stage::Source(s) => {
+                kirin_prettyless::RenderDispatch::render_modules(s, config, global_symbols)
+            }
+        }
+    }
 }

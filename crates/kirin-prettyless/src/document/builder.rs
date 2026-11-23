@@ -158,10 +158,14 @@ impl<'a, L: Dialect> Document<'a, L> {
         L: PrettyPrint,
         L::Type: std::fmt::Display,
     {
-        let max_width = self.config.max_width;
         let arena_doc = node.pretty_print(self);
+        self.render_doc(arena_doc)
+    }
+
+    /// Render an already-built document to a string.
+    pub(crate) fn render_doc(&self, doc: ArenaDoc<'a>) -> Result<String, std::fmt::Error> {
         let mut buf = String::new();
-        arena_doc.render_fmt(max_width, &mut buf)?;
+        doc.render_fmt(self.config.max_width, &mut buf)?;
         Ok(strip_trailing_whitespace(&buf))
     }
 }

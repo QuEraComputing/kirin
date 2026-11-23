@@ -1,7 +1,9 @@
 //! Stage-dispatched program parser for textual function declarations.
 //!
 //! This module parses a sequence of `stage` and `specialize` declarations into
-//! a [`Program`](kirin_ir::Program). Each declaration starts with a symbolic
+//! a [`Program`](kirin_ir::Program). A `stage @A mod @name { ... }`
+//! declaration places a module in stage `A`; it is parsed immediately in
+//! pass 1, using the stage's [`ParseModuleText`](crate::ParseModuleText) grammar. Each declaration starts with a symbolic
 //! stage (for example `@A`), and the concrete dialect parser is chosen at
 //! runtime by dispatching on that stage's actual `StageInfo<L>` variant.
 //!
@@ -93,7 +95,7 @@ use crate::{EmitContext, HasParser, ParseEmit};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
-use super::syntax::{Declaration, Header, RichError, parse_one_declaration, tokenize};
+use super::syntax::{Declaration, Header, RichError, braced_span, parse_one_declaration, tokenize};
 use crate::ast::SymbolName;
 
 /// Parse function text into a program using stage-driven dialect dispatch.
@@ -341,6 +343,10 @@ where
 
         let mut index = 0;
         while index < tokens.len() {
+            if let Some(next) = parse_module_declaration(self, &tokens, src, index)? {
+                index = next;
+                continue;
+            }
             let head = parse_declaration_head(&tokens, index)?;
             let stage_id = resolve_or_create_stage_symbol(self, &head.stage)?;
             let (function, function_symbol) = if matches!(head.keyword, DeclKeyword::Stage) {
@@ -461,6 +467,63 @@ where
 // ---------------------------------------------------------------------------
 // Internal helpers (unchanged from original)
 // ---------------------------------------------------------------------------
+
+/// Parse `stage @A mod [@name] { ... }` at `start_index` into stage `A`
+/// and return the token index after the closing brace, or `None` if the
+/// tokens there start some other declaration.
+fn parse_module_declaration<S>(
+    program: &mut Program<S>,
+    tokens: &[(Token<'_>, SimpleSpan)],
+    src: &str,
+    start_index: usize,
+) -> Result<Option<usize>, FunctionParseError>
+where
+    S: StageMeta + ParseDispatch,
+{
+    let [
+        (Token::Identifier("stage"), _),
+        (Token::Symbol(stage_name), stage_span),
+        (Token::Identifier("mod"), _),
+        ..,
+    ] = &tokens[start_index..]
+    else {
+        return Ok(None);
+    };
+    // Only the extent is found here; the module parser checks the body.
+    let span = braced_span(&tokens[start_index + 2..]).map_err(parse_error_from_chumsky)?;
+
+    let stage_symbol = SymbolName {
+        name: stage_name,
+        span: *stage_span,
+    };
+    let stage_id = resolve_or_create_stage_symbol(program, &stage_symbol)?;
+    let status = program.stage_status(stage_id);
+    let stage = program
+        .stage_mut(stage_id)
+        .ok_or_else(|| stage_missing_error(stage_name, status, Some(*stage_span)))?;
+    let shift =
+        |inner: SimpleSpan| SimpleSpan::from(inner.start + span.start..inner.end + span.start);
+    stage
+        .dispatch_module(&src[span.start..span.end])
+        .map_err(|error| match error {
+            crate::ChumskyError::Parse(errors) => FunctionParseError::new(
+                FunctionParseErrorKind::DefinitionParseFailed,
+                errors.first().map(|error| shift(error.span)),
+                errors
+                    .iter()
+                    .map(|error| error.message.clone())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ),
+            crate::ChumskyError::Emit(error) => FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                Some(span),
+                error.to_string(),
+            ),
+        })?
+        .ok_or_else(|| stage_dialect_mismatch_error(stage_name, Some(*stage_span)))?;
+    Ok(Some(advance_to_next_declaration(tokens, start_index, span)))
+}
 
 fn parse_declaration_head<'src>(
     tokens: &[(Token<'src>, SimpleSpan)],

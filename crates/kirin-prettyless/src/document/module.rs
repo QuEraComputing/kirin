@@ -8,6 +8,7 @@ where
     L::Type: std::fmt::Display,
 {
     /// Print `mod @name { statement; ... }`, without a stage prefix.
+    /// Program text uses [`Document::print_stage_module`].
     pub fn print_module(&'a self, module: &Module) -> ArenaDoc<'a> {
         let info = module.expect_info(self.stage);
         let mut header = self.text("mod");

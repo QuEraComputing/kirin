@@ -42,7 +42,8 @@ fn parse_chumsky_crate_path(attrs: &[syn::Attribute]) -> Result<String, syn::Err
 /// Generate a `ParseDispatch` implementation for a stage enum.
 ///
 /// For each unique dialect type `L` among the variants, generates a match arm
-/// that calls `first_pass_concrete::<L>` / `second_pass_concrete::<L>`.
+/// that calls `first_pass_concrete::<L>` / `second_pass_concrete::<L>`, and
+/// `ParseModuleText` on the variant's `StageInfo<L>`.
 pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let variants = stage::parse_stage_variants(input)?;
 
@@ -71,6 +72,13 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         &ir_crate,
         &chumsky_crate,
         DispatchPass::Second,
+    );
+    let module_arms = build_dispatch_arms(
+        &variants,
+        enum_ident,
+        &ir_crate,
+        &chumsky_crate,
+        DispatchPass::Module,
     );
 
     Ok(quote! {
@@ -101,6 +109,18 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
                     #second_pass_arms
                 }
             }
+
+            fn dispatch_module(
+                &mut self,
+                input: &str,
+            ) -> ::core::result::Result<
+                ::core::option::Option<#ir_crate::Module>,
+                #chumsky_crate::ChumskyError,
+            > {
+                match self {
+                    #module_arms
+                }
+            }
         }
     })
 }
@@ -108,12 +128,13 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 enum DispatchPass {
     First,
     Second,
+    Module,
 }
 
 fn build_dispatch_arms(
     variants: &[StageVariantInfo],
     enum_ident: &syn::Ident,
-    _ir_crate: &syn::Path,
+    ir_crate: &syn::Path,
     chumsky_crate: &syn::Path,
     pass: DispatchPass,
 ) -> TokenStream {
@@ -130,6 +151,10 @@ fn build_dispatch_arms(
             },
             DispatchPass::Second => quote! {
                 #chumsky_crate::second_pass_concrete::<#dialect_ty>(stage_info, stage_id, ctx)
+                    .map(::core::option::Option::Some)
+            },
+            DispatchPass::Module => quote! {
+                <#ir_crate::StageInfo<#dialect_ty> as #chumsky_crate::ParseModuleText<#dialect_ty>>::parse_module(stage_info, (), input)
                     .map(::core::option::Option::Some)
             },
         };

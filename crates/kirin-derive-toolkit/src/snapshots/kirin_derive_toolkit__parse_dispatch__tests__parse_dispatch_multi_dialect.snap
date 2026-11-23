@@ -40,4 +40,24 @@ impl kirin_chumsky::ParseDispatch for MixedStage {
             }
         }
     }
+    fn dispatch_module(
+        &mut self,
+        input: &str,
+    ) -> ::core::result::Result<::core::option::Option<kirin_ir::Module>, kirin_chumsky::ChumskyError>
+    {
+        match self {
+            MixedStage::StageA(stage_info) => {
+                <kirin_ir::StageInfo<FunctionDefinition> as kirin_chumsky::ParseModuleText<
+                    FunctionDefinition,
+                >>::parse_module(stage_info, (), input)
+                .map(::core::option::Option::Some)
+            }
+            MixedStage::StageB(stage_info) => {
+                <kirin_ir::StageInfo<LowerDefinition> as kirin_chumsky::ParseModuleText<
+                    LowerDefinition,
+                >>::parse_module(stage_info, (), input)
+                .map(::core::option::Option::Some)
+            }
+        }
+    }
 }

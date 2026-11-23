@@ -32,6 +32,17 @@ pub(crate) fn generate(input: &DeriveInput) -> Result<TokenStream2, syn::Error> 
                         #pretty_crate::RenderDispatch::render_staged_function(s, sf, config, global_symbols), )*
                 }
             }
+
+            fn render_modules(
+                &self,
+                config: &#pretty_crate::Config,
+                global_symbols: &#ir_crate::InternTable<String, #ir_crate::GlobalSymbol>,
+            ) -> Result<Vec<String>, std::fmt::Error> {
+                match self {
+                    #( #enum_ident::#all_idents(s) =>
+                        #pretty_crate::RenderDispatch::render_modules(s, config, global_symbols), )*
+                }
+            }
         }
     })
 }

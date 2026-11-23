@@ -33,6 +33,7 @@ use crate::{Config, Document, PrettyPrint, RenderError};
 ///             Stage::B(ctx) => ctx.render_staged_function(sf, config, gs),
 ///         }
 ///     }
+///     // `render_modules` delegates the same way.
 /// }
 /// ```
 pub trait RenderDispatch {
@@ -49,6 +50,13 @@ pub trait RenderDispatch {
         config: &Config,
         global_symbols: &InternTable<String, GlobalSymbol>,
     ) -> Result<Option<String>, std::fmt::Error>;
+
+    /// Render each of this stage's modules as `stage @A mod @name { ... }`.
+    fn render_modules(
+        &self,
+        config: &Config,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) -> Result<Vec<String>, std::fmt::Error>;
 }
 
 /// Generic blanket implementation: any `StageInfo<L>` where `L` supports pretty
@@ -73,6 +81,20 @@ where
         let mut doc = Document::with_global_symbols(config.clone(), self, global_symbols);
         let rendered = doc.render(&sf)?;
         Ok(Some(rendered))
+    }
+
+    fn render_modules(
+        &self,
+        config: &Config,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) -> Result<Vec<String>, std::fmt::Error> {
+        self.module_arena()
+            .iter()
+            .map(|info| {
+                let doc = Document::with_global_symbols(config.clone(), self, global_symbols);
+                doc.render_doc(doc.print_stage_module(&info.id()))
+            })
+            .collect()
     }
 }
 
@@ -174,7 +196,7 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
     }
 }
 
-/// Builder for rendering all functions in a [`Program`].
+/// Builder for rendering all modules and functions in a [`Program`].
 #[must_use = "call .into_string(), .print(), or .bat() to produce output"]
 pub struct ProgramRenderBuilder<'a, S> {
     program: &'a Program<S>,
@@ -190,8 +212,12 @@ impl<'a, S: RenderDispatch> ProgramRenderBuilder<'a, S> {
 
     /// Render to a string, consuming the builder.
     pub fn into_string(self) -> Result<String, RenderError> {
-        let doc = ProgramDocument::new(self.config, self.program);
+        let gs = self.program.global_symbols();
         let mut parts = Vec::new();
+        for stage in self.program.stages() {
+            parts.extend(stage.render_modules(&self.config, gs)?);
+        }
+        let doc = ProgramDocument::new(self.config, self.program);
         for func_info in self.program.function_arena().iter() {
             let rendered = doc.render_function(func_info.id())?;
             if !rendered.is_empty() {
@@ -252,11 +278,11 @@ impl PrintExt for Function {
     }
 }
 
-/// Extension trait for printing all functions in a [`Program`].
+/// Extension trait for printing all modules and functions in a [`Program`].
 pub trait ProgramPrintExt {
     type Stage: RenderDispatch;
 
-    /// Create a builder for rendering every function in the program.
+    /// Create a builder for rendering every module and function in the program.
     fn render(&self) -> ProgramRenderBuilder<'_, Self::Stage>;
 
     /// Convenience shorthand: render to string with default config.
