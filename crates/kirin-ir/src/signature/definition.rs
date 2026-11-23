@@ -127,23 +127,3 @@ impl<T: std::fmt::Display, C> std::fmt::Display for Signature<T, C> {
         Ok(())
     }
 }
-
-impl<T: crate::Placeholder> Signature<T> {
-    /// Creates a signature with no parameters and one placeholder return type.
-    ///
-    /// Use this when constructing IR before type inference has resolved types.
-    ///
-    /// This is a default dispatch key for a function declared without a
-    /// signature, not a claim about its arity: the parameter list is empty in
-    /// the same way the return list has one entry. Whether a definition
-    /// declares a signature at all is answered by
-    /// [`HasSignature::signature`](crate::HasSignature::signature) returning
-    /// `None`, so a checker must not compare a body against this value.
-    pub fn placeholder() -> Self {
-        Signature {
-            params: Product::new(),
-            rets: crate::product![T::placeholder()],
-            constraints: (),
-        }
-    }
-}

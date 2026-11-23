@@ -534,13 +534,14 @@ impl<L: Dialect> ::kirin::ir::IsEdge for PatternOps<L> {
 #[automatically_derived]
 impl<L: Dialect> ::kirin::ir::Dialect for PatternOps<L> {
     type Type = L::Type;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl<L: Dialect> ::kirin::ir::HasSignature<Self> for PatternOps<L>
 where
     L: ::kirin::ir::HasSignature<L>,
 {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         match self {
             Self::Op(field_0) => <L as ::kirin::ir::HasSignature<L>>::signature(field_0),
             Self::Hole(field_0) => {

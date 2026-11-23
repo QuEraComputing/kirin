@@ -316,7 +316,7 @@ fn test_print_block_empty_body() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function().name(test_sym).new().unwrap();
+    let _ = stage.staged_function().name(test_sym).signature(default_sig()).new().unwrap();
 
     let block = stage.block().new();
     let stage = stage.finalize().unwrap();
@@ -332,7 +332,7 @@ fn test_print_block_only_terminator() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function().name(test_sym).new().unwrap();
+    let _ = stage.staged_function().name(test_sym).signature(default_sig()).new().unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
@@ -351,7 +351,7 @@ fn test_print_block_with_named_args() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function().name(test_sym).new().unwrap();
+    let _ = stage.staged_function().name(test_sym).signature(default_sig()).new().unwrap();
 
     let ret_val = stage.block_argument().index(0);
     let ret = SimpleLanguage::op_return(&mut stage, ret_val);
@@ -379,7 +379,7 @@ fn test_print_cfg_empty() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function().name(test_sym).new().unwrap();
+    let _ = stage.staged_function().name(test_sym).signature(default_sig()).new().unwrap();
 
     let cfg = stage.cfg().new();
     let stage = stage.finalize().unwrap();
@@ -428,7 +428,7 @@ fn test_render_builder_config() {
         .terminator(ret)
         .new();
     let body = stage.cfg().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(&mut stage, body, kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64));
     let f = stage
         .specialize()
         .staged_func(sf)

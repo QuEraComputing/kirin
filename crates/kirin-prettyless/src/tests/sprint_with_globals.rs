@@ -15,7 +15,7 @@ fn test_sprint_with_globals() {
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
     let body = stage.cfg().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(&mut stage, body, kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64));
     let _ = stage
         .specialize()
         .staged_func(staged_function)

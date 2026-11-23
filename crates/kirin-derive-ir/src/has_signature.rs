@@ -39,7 +39,7 @@ fn signature_body_struct(
         Some(field) => {
             // For structs, use `self.field` since the method receives &self.
             let field_ident = field.ident.as_ref().expect("Signature field must be named");
-            Ok(quote! { Some(self.#field_ident.clone()) })
+            Ok(quote! { Some(&self.#field_ident) })
         }
         None => Ok(quote! { None }),
     }
@@ -74,7 +74,7 @@ fn signature_body_variant(
         Some(field) => {
             // For enum variants, use the pattern binding variable from destructuring.
             let binding = &stmt_ctx.pattern.names[field.index];
-            Ok(quote! { Some(#binding.clone()) })
+            Ok(quote! { Some(#binding) })
         }
         None => Ok(quote! { None }),
     }
@@ -129,7 +129,7 @@ pub(crate) fn has_signature_template(crate_path: &syn::Path) -> TraitImplTemplat
             self_arg: quote! { &self },
             params: vec![],
             return_type: Some({
-                quote! { Option<#cp_for_return::Signature<<Self as #cp_for_return::Dialect>::Type>> }
+                quote! { Option<&#cp_for_return::Signature<<Self as #cp_for_return::Dialect>::Type>> }
             }),
             pattern: Box::new(pattern),
             generics: None,

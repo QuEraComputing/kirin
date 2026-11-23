@@ -157,7 +157,7 @@ fn test_roundtrip_return() {
 fn test_roundtrip_function() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
-    let input = r#"%f = function cfg {
+    let input = r#"%f = function (f64) -> f64 cfg {
     ^entry(%x: f64) {
         %y = add %x, %x -> f64;
         %z = constant 42 -> f64;
@@ -172,7 +172,7 @@ fn test_roundtrip_function() {
     let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
-    // The function format "$function {0}" doesn't include a type
+    // The function format "$function {2} {0}" doesn't include a type
     // annotation, so the emit path leaves the function result SSA untyped.
     // Set missing types before finalize.
     for ssa in stage.ssa_arena_mut().iter_mut() {
@@ -204,7 +204,7 @@ fn test_roundtrip_function() {
 fn test_roundtrip_function_multiple_blocks() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
-    let input = r#"%f = function cfg {
+    let input = r#"%f = function (f64) -> f64 cfg {
     ^entry(%x: f64) {
         %y = add %x, %x -> f64;
         return %y;

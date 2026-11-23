@@ -213,6 +213,7 @@ empty_impls!(TestLang);
 
 impl Dialect for TestLang {
     type Type = TestType;
+    type Signatures = crate::ShapeSemantics;
 }
 
 /// An empty builder stage over [`TestLang`].

@@ -273,19 +273,27 @@ impl TraitImplTemplate<StandardLayout> {
         })
     }
 
-    /// Create a marker trait impl with a `Type` associated type.
-    pub fn marker(trait_path: &syn::Path, ir_type: &syn::Path) -> MarkerTemplate {
+    /// Create a marker trait impl with the `Type` and `Signatures`
+    /// associated types.
+    pub fn marker(
+        trait_path: &syn::Path,
+        ir_type: &syn::Path,
+        signatures: &syn::Path,
+    ) -> MarkerTemplate {
         MarkerTemplate {
             trait_path: trait_path.clone(),
             ir_type: ir_type.clone(),
+            signatures: signatures.clone(),
         }
     }
 }
 
-/// Template for a marker trait impl (`impl Dialect for Type { type Type = IrType; }`).
+/// Template for a marker trait impl
+/// (`impl Dialect for Type { type Type = IrType; type Signatures = S; }`).
 pub struct MarkerTemplate {
     trait_path: syn::Path,
     ir_type: syn::Path,
+    signatures: syn::Path,
 }
 
 impl Template<StandardLayout> for MarkerTemplate {
@@ -295,6 +303,10 @@ impl Template<StandardLayout> for MarkerTemplate {
             .assoc_type(
                 syn::Ident::new("Type", proc_macro2::Span::call_site()),
                 ir_type,
+            )
+            .assoc_type(
+                syn::Ident::new("Signatures", proc_macro2::Span::call_site()),
+                &self.signatures,
             )
             .to_token_stream();
         Ok(vec![result])

@@ -54,7 +54,7 @@ specialize @test fn @undirected(i64) -> i64 ungraph ^graph(%x: i64) {
 const AMBIGUOUS_PROGRAM: &str = r#"
 stage @test fn @ambiguous(i64, i64) -> i64;
 
-specialize @test fn @ambiguous(i64) -> i64 block ^first(%x: i64) {
+specialize @test fn @ambiguous(i64, f64) -> i64 block ^first(%x: i64, %y: f64) {
   ret %x;
 }
 
@@ -77,25 +77,19 @@ fn function_callee(program: &Program<TestStage>, name: &str) -> (CompileStage, C
     (stage, Callee::Function(function))
 }
 
-/// Replace `specialization` with one whose definition is `definition`, via the
-/// builder; it does not check the statement, so it may be non-callable or
-/// unallocated.
-fn redefine(
+/// Try to add `definition` as another specialization of `specialization`'s
+/// staged function.
+fn specialize_with(
     program: &mut Program<TestStage>,
     stage: CompileStage,
     specialization: SpecializedFunction,
     definition: Statement,
-) -> SpecializedFunction {
+) -> Result<SpecializedFunction, SpecializeError> {
     program.stage_mut(stage).unwrap().with_builder(|b| {
-        let Err(SpecializeError::Duplicate(conflict)) = b
-            .specialize()
+        b.specialize()
             .staged_func(specialization.id().0)
             .definition(definition)
             .new()
-        else {
-            panic!("the existing specialization holds this signature");
-        };
-        b.redefine_specialization(conflict)
     })
 }
 
@@ -240,7 +234,7 @@ impl Linker<TestStage> for FixedTargetLinker {
 }
 
 #[test]
-fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
+fn a_non_callable_statement_cannot_define_a_specialization() {
     let mut program = parse(BLOCK_PROGRAM);
     let (stage, callee) = function_callee(&program, "linear");
     let target = SameStageLinker
@@ -256,20 +250,21 @@ fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
         .statements(info)
         .next()
         .expect("body contains an arithmetic statement");
-    // The specialization record is the sole source of its definition.
-    redefine(&mut program, stage, target.specialization, non_callable);
 
-    let demand_error = DemandAnalysis::<TestStage>::new(&program)
+    // The definition statement owns the signature, so a statement that
+    // declares none never becomes a specialization: the engines cannot be
+    // handed one.
+    assert!(matches!(
+        specialize_with(&mut program, stage, target.specialization, non_callable),
+        Err(SpecializeError::MissingSignature(stmt)) if stmt == non_callable
+    ));
+
+    DemandAnalysis::<TestStage>::new(&program)
         .analyze(stage, callee, [Demand::Live])
-        .err()
-        .expect("non-callable definition must fail");
-    assert_eq!(demand_error, InterpreterError::NotCallable(non_callable));
-
-    let dense_error = DenseLiveness::<TestStage>::new(&program)
+        .expect("the original specialization is untouched");
+    DenseLiveness::<TestStage>::new(&program)
         .analyze(stage, callee)
-        .err()
-        .expect("non-callable definition must fail");
-    assert_eq!(dense_error, InterpreterError::NotCallable(non_callable));
+        .expect("the original specialization is untouched");
 }
 
 #[test]
@@ -341,33 +336,13 @@ fn malformed_custom_targets_return_errors_without_panicking() {
         );
     }
 
+    // A statement the stage does not hold cannot be registered as a
+    // definition, so no specialization record can point at one.
     let missing_definition = program.stage(lowered).unwrap().statement_arena().next_id();
-    let target = LinkTarget {
-        specialization: redefine(
-            &mut program,
-            lowered,
-            target.specialization,
-            missing_definition,
-        ),
-        ..target
-    };
-    let expected = InterpreterError::MissingStatement(missing_definition);
-    assert_eq!(
-        DemandAnalysis::<TestStage>::new(&program)
-            .with_linker(FixedTargetLinker(target))
-            .analyze(source, callee, [Demand::Live])
-            .err()
-            .unwrap(),
-        expected
-    );
-    assert_eq!(
-        DenseLiveness::<TestStage>::new(&program)
-            .with_linker(FixedTargetLinker(target))
-            .analyze(source, callee)
-            .err()
-            .unwrap(),
-        expected
-    );
+    assert!(matches!(
+        specialize_with(&mut program, lowered, target.specialization, missing_definition),
+        Err(SpecializeError::UnknownDefinition(stmt)) if stmt == missing_definition
+    ));
 }
 
 #[test]

@@ -18,7 +18,7 @@
 //! let ir = Input::<StandardLayout>::from_derive_input(&ast)?;
 //! ir.compose()
 //!     .add(TraitImplTemplate::bool_property(IS_PURE_CONFIG, "::kirin::ir"))
-//!     .add(TraitImplTemplate::marker(&trait_path, &ir_type))
+//!     .add(TraitImplTemplate::marker(&trait_path, &ir_type, &signatures))
 //!     .build()
 //! ```
 

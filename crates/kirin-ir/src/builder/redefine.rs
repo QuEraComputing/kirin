@@ -20,7 +20,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// to determine what needs recompilation.
     pub fn redefine_specialization(
         &mut self,
-        error: DuplicateSpecialization<L>,
+        error: DuplicateSpecialization,
     ) -> SpecializedFunction {
         let staged_function_info = &mut self.staged_functions[error.staged_function];
 
@@ -37,7 +37,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
         );
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)
-            .signature(error.signature)
             .definition(error.definition)
             .maybe_backedges(error.backedges)
             .new();
@@ -68,7 +67,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             id,
             name: error.name,
             signature: error.signature,
-            specializations: error.specializations,
+            specializations: Vec::new(),
             backedges: error.backedges,
             invalidated: false,
         };

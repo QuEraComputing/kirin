@@ -25,8 +25,8 @@ pub use rewrite::walk;
 pub use arena::{Arena, GetInfo, Id, Identifier, Item};
 pub use body::{Body, HasCallableBody};
 pub use builder::error::{
-    DuplicateSpecialization, ProgramError, ProgramStagedError, SpecializeError,
-    StagedFunctionConflictKind, StagedFunctionError,
+    DuplicateSpecialization, InterfaceMismatch, ProgramError, ProgramStagedError, SpecializeError,
+    StagedFunctionConflictKind, StagedFunctionError, UnknownSpecialization,
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, TypeResolution, Typeof};
@@ -56,7 +56,8 @@ pub use program::Program;
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
 pub use rewrite::{MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter};
 pub use signature::{
-    ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
+    ExactSemantics, HasSignature, LatticeSemantics, ShapeSemantics, Signature, SignatureCmp,
+    SignatureSemantics,
 };
 pub use stage::{
     HasStageInfo, StageAction, StageActionMut, StageArenas, StageDispatch, StageDispatchMiss,

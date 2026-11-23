@@ -387,10 +387,11 @@ impl ::kirin::ir::IsEdge for Constant {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for Constant {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for Constant {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         None
     }
 }

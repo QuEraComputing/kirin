@@ -546,12 +546,13 @@ pub mod constant_build_result {
 #[automatically_derived]
 impl<T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::Dialect for Constant<T, Ty> {
     type Type = Ty;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl<T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::HasSignature<Self>
     for Constant<T, Ty>
 {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         None
     }
 }

@@ -27,6 +27,7 @@ pub mod digraph;
 pub mod error;
 mod graph_common;
 mod redefine;
+mod specialization;
 mod stage_info;
 mod staged;
 pub mod ungraph;

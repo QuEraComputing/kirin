@@ -2,7 +2,7 @@ use crate::Product;
 use crate::arena::{GetInfo, GetInfoMut, Id, Item};
 use crate::identifier;
 use crate::language::Dialect;
-use crate::signature::{Signature, SignatureCmp, SignatureSemantics};
+use crate::signature::{HasSignature, Signature, SignatureCmp, SignatureSemantics};
 
 use super::specialized::{SpecializedFunction, SpecializedFunctionInfo};
 use crate::node::symbol::GlobalSymbol;
@@ -46,6 +46,11 @@ impl std::fmt::Display for UniqueLiveSpecializationError {
 
 impl std::error::Error for UniqueLiveSpecializationError {}
 
+/// What the dialect's [`Signatures`](Dialect::Signatures) produces for an
+/// applicable candidate.
+type SignatureEnv<L> =
+    <<L as Dialect>::Signatures as SignatureSemantics<<L as Dialect>::Type>>::Env;
+
 /// A function compiled to a specific stage, carrying the generic signature
 /// and all specializations for that stage.
 ///
@@ -66,7 +71,7 @@ pub struct StagedFunctionInfo<L: Dialect> {
     pub(crate) id: StagedFunction,
     pub(crate) name: Option<GlobalSymbol>,
     pub(crate) signature: Signature<L::Type>,
-    pub(crate) specializations: Vec<SpecializedFunctionInfo<L>>,
+    pub(crate) specializations: Vec<SpecializedFunctionInfo>,
     /// Functions that call this staged function (used for inter-procedural analyses).
     /// note that the call statement must refer to the `StagedFunction` ID,
     /// if it refers to a `SpecializedFunction`, it should be recorded in the
@@ -115,17 +120,13 @@ impl<L: Dialect> StagedFunctionInfo<L> {
     }
 
     /// Get the specializations of this staged function.
-    /// The specialized function signature are strictly subset of the staged function signature
-    pub fn specializations(&self) -> &[SpecializedFunctionInfo<L>] {
+    ///
+    /// Each specialization's signature has the same shape as this staged
+    /// function's interface signature (checked when it is created) and is
+    /// expected to refine it type by type (see
+    /// [`SignatureSemantics::refines`]).
+    pub fn specializations(&self) -> &[SpecializedFunctionInfo] {
         &self.specializations
-    }
-
-    pub fn specializations_mut(&mut self) -> &mut Vec<SpecializedFunctionInfo<L>> {
-        &mut self.specializations
-    }
-
-    pub fn add_specialization(&mut self, spec: SpecializedFunctionInfo<L>) {
-        self.specializations.push(spec);
     }
 
     pub fn unique_live_specialization(
@@ -151,19 +152,27 @@ impl<L: Dialect> StagedFunctionInfo<L> {
     }
 
     /// Find all specializations applicable to the given call signature,
-    /// reduced to the most specific candidates using the provided semantics.
+    /// reduced to the most specific candidates under the dialect's
+    /// [`Signatures`](Dialect::Signatures).
     ///
     /// Invalidated specializations are excluded from matching.
-    pub fn all_matching<S: SignatureSemantics<L::Type>>(
+    pub fn all_matching(
         &self,
+        stage: &crate::StageInfo<L>,
         call: &Signature<L::Type>,
-    ) -> Vec<(&SpecializedFunctionInfo<L>, S::Env)> {
+    ) -> Vec<(&SpecializedFunctionInfo, SignatureEnv<L>)>
+    where
+        L: HasSignature<L>,
+    {
         // Collect all applicable, non-invalidated specializations with their environments
         let applicable: Vec<_> = self
             .specializations
             .iter()
             .filter(|spec| !spec.is_invalidated())
-            .filter_map(|spec| S::applicable(call, spec.signature()).map(|env| (spec, env)))
+            .filter_map(|spec| {
+                let signature = spec.signature(stage)?;
+                L::Signatures::applicable(call, signature).map(|env| (spec, signature, env))
+            })
             .collect();
 
         // Reduce to the most specific candidates: keep only those where
@@ -171,13 +180,13 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         let dominated: Vec<bool> = applicable
             .iter()
             .enumerate()
-            .map(|(i, (spec, env))| {
+            .map(|(i, (_, signature, env))| {
                 applicable
                     .iter()
                     .enumerate()
-                    .any(|(j, (other, other_env))| {
+                    .any(|(j, (_, other, other_env))| {
                         i != j
-                            && S::cmp_candidate(other.signature(), other_env, spec.signature(), env)
+                            && L::Signatures::cmp_candidate(other, other_env, signature, env)
                                 == SignatureCmp::More
                     })
             })
@@ -187,7 +196,7 @@ impl<L: Dialect> StagedFunctionInfo<L> {
             .into_iter()
             .zip(dominated)
             .filter(|(_, d)| !*d)
-            .map(|(item, _)| item)
+            .map(|((spec, _, env), _)| (spec, env))
             .collect()
     }
 }

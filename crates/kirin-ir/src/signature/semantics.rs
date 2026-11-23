@@ -39,6 +39,19 @@ pub trait SignatureSemantics<T, C = ()> {
         b: &Signature<T, C>,
         b_env: &Self::Env,
     ) -> SignatureCmp;
+
+    /// Does a specialization's signature fit the interface its staged
+    /// function declares?
+    ///
+    /// This is a different relation from [`applicable`](Self::applicable),
+    /// which matches a call site against a candidate. A specialization may be
+    /// narrower than its interface in every position, returns included.
+    ///
+    /// The default requires the specialization to be applicable where the
+    /// interface is, which keeps return types equal.
+    fn refines(spec: &Signature<T, C>, interface: &Signature<T, C>) -> bool {
+        Self::applicable(spec, interface).is_some()
+    }
 }
 
 /// Exact-match semantics: applicable only when params and rets are exactly equal.
@@ -80,6 +93,36 @@ impl<T: PartialEq, C: PartialEq> SignatureSemantics<T, C> for ExactSemantics {
     }
 }
 
+/// Shape-only semantics, for a dialect that declares no order on its types.
+///
+/// A specialization fits its interface when the parameter and return counts
+/// agree; the types are not compared. Dispatch is exact, as in
+/// [`ExactSemantics`]. This is what `#[derive(Dialect)]` selects unless the
+/// dialect names another semantics with `#[kirin(signatures = ...)]`.
+pub struct ShapeSemantics;
+
+impl<T: PartialEq, C: PartialEq> SignatureSemantics<T, C> for ShapeSemantics {
+    type Env = ();
+
+    fn applicable(call: &Signature<T, C>, cand: &Signature<T, C>) -> Option<Self::Env> {
+        ExactSemantics::applicable(call, cand)
+    }
+
+    fn cmp_candidate(
+        a: &Signature<T, C>,
+        a_env: &Self::Env,
+        b: &Signature<T, C>,
+        b_env: &Self::Env,
+    ) -> SignatureCmp {
+        ExactSemantics::cmp_candidate(a, a_env, b, b_env)
+    }
+
+    fn refines(spec: &Signature<T, C>, interface: &Signature<T, C>) -> bool {
+        spec.params().len() == interface.params().len()
+            && spec.rets().len() == interface.rets().len()
+    }
+}
+
 /// Lattice-based semantics: applicable when all call params are subtypes
 /// (`is_subseteq`) of the candidate params.
 ///
@@ -109,6 +152,20 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
             .zip(cand.params().iter())
             .all(|(call_param, cand_param)| call_param.is_subseteq(cand_param));
         if all_applicable { Some(()) } else { None }
+    }
+
+    /// Same shape, and every parameter and return type is a subset of or
+    /// equal to the interface's.
+    fn refines(spec: &Signature<T>, interface: &Signature<T>) -> bool {
+        #[allow(clippy::unit_cmp)]
+        let same_constraints = spec.constraints() == interface.constraints();
+        let pointwise = |spec: &crate::Product<T>, interface: &crate::Product<T>| {
+            spec.len() == interface.len()
+                && spec.iter().zip(interface).all(|(s, i)| s.is_subseteq(i))
+        };
+        same_constraints
+            && pointwise(spec.params(), interface.params())
+            && pointwise(spec.rets(), interface.rets())
     }
 
     fn cmp_candidate(
@@ -235,6 +292,42 @@ mod tests {
         let cand = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
 
         assert!(LatticeSemantics::<SimpleType>::applicable(&call, &cand).is_none());
+    }
+
+    #[test]
+    fn lattice_semantics_refines_allows_narrower_params_and_returns() {
+        let interface = make_sig(vec![SimpleType::Top], SimpleType::Top);
+        let narrower = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+        assert!(LatticeSemantics::<SimpleType>::refines(
+            &narrower, &interface
+        ));
+        assert!(LatticeSemantics::<SimpleType>::refines(
+            &interface, &interface
+        ));
+        // A narrower return is not a matching call: dispatch keeps returns equal.
+        assert!(LatticeSemantics::<SimpleType>::applicable(&narrower, &interface).is_none());
+    }
+
+    #[test]
+    fn lattice_semantics_refines_rejects_wider_types_and_other_shapes() {
+        let interface = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+        let wider_param = make_sig(vec![SimpleType::Top], SimpleType::Mid);
+        let wider_ret = make_sig(vec![SimpleType::Mid], SimpleType::Top);
+        let extra_param = make_sig(vec![SimpleType::Mid, SimpleType::Mid], SimpleType::Mid);
+        let extra_ret = Signature::new()
+            .takes([SimpleType::Mid])
+            .returns_each([SimpleType::Mid, SimpleType::Mid]);
+        for spec in [wider_param, wider_ret, extra_param, extra_ret] {
+            assert!(!LatticeSemantics::<SimpleType>::refines(&spec, &interface));
+        }
+    }
+
+    #[test]
+    fn exact_semantics_refines_only_an_equal_signature() {
+        let interface = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+        let narrower = make_sig(vec![SimpleType::Bot], SimpleType::Mid);
+        assert!(ExactSemantics::refines(&interface, &interface));
+        assert!(!ExactSemantics::refines(&narrower, &interface));
     }
 
     #[test]

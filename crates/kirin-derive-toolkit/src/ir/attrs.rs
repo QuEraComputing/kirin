@@ -8,6 +8,7 @@ pub struct KirinStructOptions {
     pub crate_path: Option<syn::Path>,
     #[darling(rename = "type")]
     pub ir_type: syn::Path,
+    pub signatures: Option<syn::Path>,
     pub format: Option<String>,
     #[darling(rename = "builders")]
     pub builder: Option<BuilderOptions>,
@@ -33,6 +34,7 @@ pub struct KirinEnumOptions {
     pub crate_path: Option<syn::Path>,
     #[darling(rename = "type")]
     pub ir_type: syn::Path,
+    pub signatures: Option<syn::Path>,
     #[darling(rename = "builders")]
     pub builder: Option<BuilderOptions>,
     #[darling(default)]
@@ -156,6 +158,9 @@ pub struct GlobalOptions {
     pub crate_path: Option<syn::Path>,
     /// The `#[kirin(type = ...)]` IR enum type this statement belongs to.
     pub ir_type: syn::Path,
+    /// The `#[kirin(signatures = ...)]` signature semantics of the dialect;
+    /// `None` selects the IR crate's `ShapeSemantics`.
+    pub signatures: Option<syn::Path>,
     /// Builder function configuration from `#[kirin(builders)]` or `#[kirin(builders = name)]`.
     pub builder: Option<BuilderOptions>,
     /// Whether the operation is marked `#[kirin(constant)]`.
@@ -203,6 +208,7 @@ impl From<KirinStructOptions> for GlobalOptions {
         GlobalOptions {
             crate_path: opts.crate_path,
             ir_type: opts.ir_type,
+            signatures: opts.signatures,
             builder: opts.builder,
             constant: opts.constant,
             pure: opts.pure,
@@ -233,6 +239,7 @@ impl From<KirinEnumOptions> for GlobalOptions {
         GlobalOptions {
             crate_path: value.crate_path,
             ir_type: value.ir_type,
+            signatures: value.signatures,
             builder: value.builder,
             constant: value.constant,
             pure: value.pure,

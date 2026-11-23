@@ -196,6 +196,7 @@ pub(crate) struct LangA;
 impl_empty_dialect_traits!(LangA);
 impl Dialect for LangA {
     type Type = TestType;
+    type Signatures = crate::ShapeSemantics;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -203,6 +204,7 @@ struct LangB;
 impl_empty_dialect_traits!(LangB);
 impl Dialect for LangB {
     type Type = TestType;
+    type Signatures = crate::ShapeSemantics;
 }
 
 #[derive(Debug)]

@@ -310,7 +310,7 @@ fn test_staged_function_unnamed() {
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(ctx, body);
+        let fdef = SimpleLanguage::op_function(ctx, body, kirin_ir::Signature::new().returns(SimpleType::I64));
         ctx.specialize()
             .staged_func(sf)
             .definition(fdef)
@@ -341,7 +341,7 @@ fn test_staged_function_no_params() {
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
     let body = stage.cfg().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(&mut stage, body, kirin_ir::Signature::new().returns(SimpleType::I64));
     let _ = stage
         .specialize()
         .staged_func(staged_function)
@@ -395,7 +395,7 @@ fn test_program_render_builder_write_to() {
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(ctx, body);
+        let fdef = SimpleLanguage::op_function(ctx, body, kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64));
         ctx.specialize()
             .staged_func(sf)
             .definition(fdef)
@@ -435,7 +435,7 @@ fn test_function_render_builder_write_to() {
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(ctx, body);
+        let fdef = SimpleLanguage::op_function(ctx, body, kirin_ir::Signature::new().returns(SimpleType::I64));
         ctx.specialize()
             .staged_func(sf)
             .definition(fdef)
@@ -470,7 +470,7 @@ fn test_render_very_narrow_width() {
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
     let body = stage.cfg().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(&mut stage, body, kirin_ir::Signature::new().takes([SimpleType::I64, SimpleType::F64, SimpleType::I64]).returns(SimpleType::F64));
     let _ = stage
         .specialize()
         .staged_func(sf)

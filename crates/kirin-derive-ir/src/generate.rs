@@ -210,6 +210,12 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
     let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
     let trait_path: syn::Path = syn::parse_quote!(#crate_path::Dialect);
 
+    let signatures: syn::Path = ir
+        .attrs
+        .signatures
+        .clone()
+        .unwrap_or_else(|| syn::parse_quote!(#crate_path::ShapeSemantics));
+
     let mut builder = ir.compose();
 
     for config in FIELD_ITER_CONFIGS {
@@ -226,7 +232,11 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
 
     builder = builder
         .add(BuilderTemplate::new())
-        .add(TraitImplTemplate::marker(&trait_path, &ir.attrs.ir_type))
+        .add(TraitImplTemplate::marker(
+            &trait_path,
+            &ir.attrs.ir_type,
+            &signatures,
+        ))
         .add(crate::has_signature::has_signature_template(crate_path))
         .add(crate::has_callable_body::has_callable_body_template(
             crate_path,

@@ -1,10 +1,15 @@
 use crate::{SimpleType, Value};
-use kirin_ir::{CFG, Dialect, ResultValue, SSAValue};
+use kirin_ir::{CFG, Dialect, ResultValue, SSAValue, Signature};
 
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
 #[cfg_attr(feature = "pretty", derive(kirin_derive_chumsky::PrettyPrint))]
-#[kirin(builders, type = SimpleType, crate = kirin_ir)]
+#[kirin(
+    builders,
+    type = SimpleType,
+    signatures = kirin_ir::LatticeSemantics::<SimpleType>,
+    crate = kirin_ir
+)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -34,7 +39,11 @@ pub enum SimpleLanguage {
     Return(SSAValue),
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
-        chumsky(format = "$function {0}")
+        chumsky(format = "$function {2} {0}")
     )]
-    Function(CFG, #[kirin(type = SimpleType::F64)] ResultValue),
+    Function(
+        CFG,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+        Signature<SimpleType>,
+    ),
 }
