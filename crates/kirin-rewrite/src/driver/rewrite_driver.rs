@@ -39,7 +39,8 @@ impl std::ops::AddAssign for RewriteSummary {
 /// After each statement, the edits its rules recorded as
 /// [`MutationEvent`](kirin_ir::MutationEvent)s add to the worklist the
 /// statements they may have given a new match: for each statement changed,
-/// replaced or inserted, the statement itself and the users of its results.
+/// replaced, created or newly placed under the root, the statement itself and
+/// the users of its results.
 /// If the rule set has a [`StatementRule`] or [`BlockRule`], which may read
 /// anything around a statement, also its owner, unless that is the root, and
 /// the producers of its operands; a pattern rule cannot gain a match there.
@@ -53,8 +54,9 @@ impl std::ops::AddAssign for RewriteSummary {
 ///
 /// When the worklist is empty, the sweep erases the dead code under the
 /// root. The run ends after the first sweep that records no
-/// [`MutationEvent`](kirin_ir::MutationEvent); a rule that matches but edits
-/// nothing does not count as a change.
+/// [`MutationEvent`](kirin_ir::MutationEvent); a rule that matches but records
+/// no event does not count as a change. Creating code counts even if nothing
+/// places it, such as a clone the rule abandons.
 ///
 /// Symbol attributes, the ones [`HasSymbols`](kirin_ir::HasSymbols) lists,
 /// match by name through the pattern and program symbol tables, never by

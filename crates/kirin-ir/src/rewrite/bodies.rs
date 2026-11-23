@@ -25,10 +25,11 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// uses too. To abandon the block early, call [`Rewriter::erase_block`].
     ///
     /// A block no statement owns by the time [`Rewriter::into_events`] is
-    /// called, or the `Rewriter` is dropped, is tombstoned together with
-    /// everything it holds, recording
+    /// called is tombstoned together with everything it holds, recording
     /// [`MutationEvent::ErasedStatement`](crate::MutationEvent::ErasedStatement)
-    /// for each statement. After a panic it is left for inspection instead.
+    /// for each statement. A `Rewriter` dropped without `into_events`
+    /// tombstones it too, but records nothing anyone can read. After a panic
+    /// it is left for inspection instead.
     /// Unlike [`Rewriter::erase_block`], this cleanup does not check that
     /// nothing outside still refers to the block: a branch to it, or a use of
     /// a value it defines, is left dangling. When a pass run by

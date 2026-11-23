@@ -111,13 +111,17 @@ use crate::{
 /// analyses can subscribe to the event kinds that invalidate them, and
 /// worklist drivers can re-enqueue the statements named in the events.
 ///
-/// Every statement records one [`MutationEvent::CreatedStatement`] when it is
-/// made and one [`MutationEvent::ErasedStatement`] when it dies. Edits to
-/// detached code, such as a [`Rewriter::new_block`] block no statement owns
-/// yet, record events like any other edit, and detached code nothing placed
-/// records the erasure of its statements when [`Rewriter::into_events`] is
-/// called or the `Rewriter` is dropped. An id an event names may therefore be
-/// dead by the time the log is read.
+/// Every statement this `Rewriter` makes records one
+/// [`MutationEvent::CreatedStatement`]; every statement that dies records one
+/// [`MutationEvent::ErasedStatement`], so in the log
+/// [`Rewriter::into_events`] returns, each created statement is either still
+/// alive or erased. Edits to detached code, such as a [`Rewriter::new_block`]
+/// block no statement owns yet, record events like any other edit. Detached
+/// code nothing placed is erased by `into_events`, which records the erasure
+/// of its statements; a `Rewriter` dropped without `into_events` tombstones
+/// that code too, but the log is dropped with it, so those erasures are never
+/// seen. An id an event names may therefore be dead by the time the log is
+/// read.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum MutationEvent {
     /// One or more operand slots of `stmt` were rewritten in place.

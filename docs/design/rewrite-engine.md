@@ -2077,14 +2077,17 @@ own. Edits to detached code, such as a `new_block` block no statement owns yet
 or a detached statement, record events like any other edit, and the statement
 that attaches it records its usual event. Creating a `new_block` block records
 nothing. `clone_statement` and `clone_cfg` record `CreatedStatement` for each
-statement they copy, outer statements first, so every statement records one
-`CreatedStatement` when it is made and one `ErasedStatement` when it dies.
-Placing an existing statement somewhere new, by a move or by inserting a
-detached statement, records `PlacedStatement`. Detached code nothing placed is
-tombstoned when `into_events` is called or the `Rewriter` is dropped, recording
+statement they copy, outer statements first, so every statement the
+`Rewriter` makes records one `CreatedStatement` when it is made and one
+`ErasedStatement` when it dies. Cloning is therefore an edit even if the copy
+is abandoned. Placing an existing statement somewhere new, by a move or by
+inserting a detached statement, records `PlacedStatement`. Detached code
+nothing placed is tombstoned when `into_events` is called, recording
 `ErasedStatement` for each of its statements; after a panic it is left for
-inspection instead. An id an event names may therefore be dead by the time the
-log is read. The remaining documented event kind (result-type events) grows in
+inspection instead. A `Rewriter` dropped without `into_events` tombstones that
+code too, but its log is dropped with it, so the pairing of `CreatedStatement`
+and `ErasedStatement` holds only in the log `into_events` returns. An id an
+event names may therefore be dead by the time the log is read. The remaining documented event kind (result-type events) grows in
 as the corresponding mutation capability lands (see
 [Gap 3](#gap-3--mutationevent-vocabulary-vs-implementation)).
 
