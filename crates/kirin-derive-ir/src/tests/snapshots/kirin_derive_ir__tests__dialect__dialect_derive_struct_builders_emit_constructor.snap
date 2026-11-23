@@ -562,6 +562,12 @@ impl<T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::HasCallableBody for
     }
 }
 #[automatically_derived]
+impl<T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::DeclaredName for Constant<T, Ty> {
+    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
+        ::core::option::Option::None
+    }
+}
+#[automatically_derived]
 impl<T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::BranchOp for Constant<T, Ty> {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         {

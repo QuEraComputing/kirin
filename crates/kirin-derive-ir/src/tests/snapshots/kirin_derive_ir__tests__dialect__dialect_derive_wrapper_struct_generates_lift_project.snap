@@ -411,6 +411,16 @@ where
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::DeclaredName for WrapperOp
+where
+    InnerOp: ::kirin::ir::DeclaredName,
+{
+    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::DeclaredName>::declared_name(field_0)
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::BranchOp for WrapperOp {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         let Self(field_0) = self;

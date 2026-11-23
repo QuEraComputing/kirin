@@ -769,6 +769,20 @@ impl<T: CompileTimeValue> ::kirin::ir::HasCallableBody for Arith<T> {
     }
 }
 #[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::DeclaredName for Arith<T> {
+    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ::core::option::Option::None,
+            Self::CondBr { condition, target } => ::core::option::Option::None,
+        }
+    }
+}
+#[automatically_derived]
 impl<T: CompileTimeValue> ::kirin::ir::BranchOp for Arith<T> {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

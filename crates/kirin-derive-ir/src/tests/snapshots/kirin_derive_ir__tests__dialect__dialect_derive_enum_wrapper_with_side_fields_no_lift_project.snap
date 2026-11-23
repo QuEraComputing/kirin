@@ -588,6 +588,23 @@ where
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::DeclaredName for MixedWraps
+where
+    SimpleOp: ::kirin::ir::DeclaredName,
+    InnerOp: ::kirin::ir::DeclaredName,
+{
+    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::DeclaredName>::declared_name(field_0)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::DeclaredName>::declared_name(inner)
+            }
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::BranchOp for MixedWraps {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

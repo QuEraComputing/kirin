@@ -7,7 +7,11 @@ use super::stmt::Statement;
 use super::symbol::GlobalSymbol;
 
 /// The local name introduced by this statement, if any. Referenced symbols
-/// are deliberately excluded. Implement this on languages used in modules.
+/// are deliberately excluded.
+///
+/// `#[derive(Dialect)]` implements it: an unmarked statement returns `None`,
+/// `#[kirin(declared_name)]` on a `Symbol` field returns that field, and
+/// `#[wraps]` delegates.
 pub trait DeclaredName {
     fn declared_name(&self) -> Option<Symbol>;
 }

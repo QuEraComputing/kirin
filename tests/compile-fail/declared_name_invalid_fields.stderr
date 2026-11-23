@@ -1,0 +1,17 @@
+error: #[kirin(declared_name)] requires a single Symbol field; Option and Vec are unsupported
+ --> tests/compile-fail/declared_name_invalid_fields.rs:6:5
+  |
+6 |     #[kirin(declared_name)]
+  |     ^
+
+error: #[kirin(declared_name)] requires a single Symbol field; Option and Vec are unsupported
+  --> tests/compile-fail/declared_name_invalid_fields.rs:13:5
+   |
+13 |     #[kirin(declared_name)]
+   |     ^
+
+error: #[kirin(declared_name)] requires a single Symbol field; Option and Vec are unsupported
+  --> tests/compile-fail/declared_name_invalid_fields.rs:20:5
+   |
+20 |     #[kirin(declared_name)]
+   |     ^

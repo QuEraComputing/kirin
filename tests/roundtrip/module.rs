@@ -9,7 +9,10 @@ use kirin_test_languages::GraphFunctionLanguage;
 #[kirin(type = kirin_arith::ArithType)]
 enum TestLanguage {
     #[chumsky(format = "item {name}")]
-    NamedItem { name: Symbol },
+    NamedItem {
+        #[kirin(declared_name)]
+        name: Symbol,
+    },
     #[wraps]
     Other(GraphFunctionLanguage),
 }
@@ -17,15 +20,6 @@ enum TestLanguage {
 impl From<GraphFunctionLanguage> for TestLanguage {
     fn from(value: GraphFunctionLanguage) -> Self {
         Self::Other(value)
-    }
-}
-
-impl DeclaredName for TestLanguage {
-    fn declared_name(&self) -> Option<Symbol> {
-        match self {
-            Self::NamedItem { name } => Some(*name),
-            Self::Other(_) => None,
-        }
     }
 }
 

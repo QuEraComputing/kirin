@@ -74,6 +74,9 @@ pub struct StatementOptions {
 pub struct KirinFieldOptions {
     #[darling(default)]
     pub callable_body: bool,
+    /// Marks the `Symbol` field holding the name this statement declares.
+    #[darling(default)]
+    pub declared_name: bool,
     #[darling(default)]
     pub into: bool,
     pub default: Option<DefaultValue>,

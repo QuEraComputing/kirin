@@ -1,0 +1,5 @@
+error: at most one #[kirin(declared_name)] field is allowed per statement
+ --> tests/compile-fail/declared_name_duplicate.rs:8:5
+  |
+8 |     #[kirin(declared_name)]
+  |     ^

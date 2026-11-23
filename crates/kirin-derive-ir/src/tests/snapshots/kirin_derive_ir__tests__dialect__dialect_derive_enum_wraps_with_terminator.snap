@@ -570,6 +570,23 @@ where
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::DeclaredName for CfOps
+where
+    BranchOp: ::kirin::ir::DeclaredName,
+    ReturnOp: ::kirin::ir::DeclaredName,
+{
+    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
+        match self {
+            Self::Branch(field_0) => {
+                <BranchOp as ::kirin::ir::DeclaredName>::declared_name(field_0)
+            }
+            Self::Return(field_0) => {
+                <ReturnOp as ::kirin::ir::DeclaredName>::declared_name(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::BranchOp for CfOps {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

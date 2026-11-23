@@ -34,6 +34,8 @@ pub struct Statement<L: Layout> {
     pub fields: Vec<FieldInfo<L>>,
     /// The explicitly designated callable body, if this is a direct definition.
     pub callable_body: Option<FieldIndex>,
+    /// The `Symbol` field naming what this statement declares, if any.
+    pub declared_name: Option<FieldIndex>,
     /// Delegation target if this variant uses `#[wraps]`.
     pub wraps: Option<Wrapper>,
     /// Layout-specific extra data computed per statement.
@@ -58,6 +60,7 @@ impl<L: Layout> Statement<L> {
             attrs,
             fields: Vec::new(),
             callable_body: None,
+            declared_name: None,
             wraps: None,
             extra,
             extra_attrs,
@@ -132,7 +135,32 @@ impl<L: Layout> Statement<L> {
 
         let is_wrapper = wraps.is_some() || field_wraps.iter().any(Option::is_some);
         for (index, field) in fields.iter().enumerate() {
-            if !KirinFieldOptions::from_field(field)?.callable_body {
+            let options = KirinFieldOptions::from_field(field)?;
+            if options.declared_name {
+                if is_wrapper {
+                    return Err(darling::Error::custom(
+                        "#[wraps] delegates the declared name; mark the name on the wrapped statement",
+                    )
+                    .with_span(field));
+                }
+                if self.declared_name.is_some() {
+                    return Err(darling::Error::custom(
+                        "at most one #[kirin(declared_name)] field is allowed per statement",
+                    )
+                    .with_span(field));
+                }
+                if !matches!(
+                    Collection::from_type(&field.ty, "Symbol"),
+                    Some(Collection::Single)
+                ) {
+                    return Err(darling::Error::custom(
+                        "#[kirin(declared_name)] requires a single Symbol field; Option and Vec are unsupported",
+                    )
+                    .with_span(field));
+                }
+                self.declared_name = Some(FieldIndex::new(field.ident.clone(), index));
+            }
+            if !options.callable_body {
                 continue;
             }
             if is_wrapper {
