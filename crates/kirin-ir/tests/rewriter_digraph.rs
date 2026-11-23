@@ -100,11 +100,11 @@ fn insert_node_adds_operand_edges_and_binds_results() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: n1 },
+            MutationEvent::CreatedStatement { stmt: n1 },
             topology,
-            MutationEvent::InsertedStatement { stmt: n2 },
+            MutationEvent::CreatedStatement { stmt: n2 },
             topology,
-            MutationEvent::InsertedStatement { stmt: n3 },
+            MutationEvent::CreatedStatement { stmt: n3 },
             topology,
         ]
     );

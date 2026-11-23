@@ -173,8 +173,8 @@ fn inserted_statement_adopts_new_blocks() {
 
     assert_eq!(
         events,
-        [MutationEvent::InsertedStatement { stmt: new_owner }],
-        "the insertion covers the bodies the statement gains"
+        [MutationEvent::CreatedStatement { stmt: new_owner }],
+        "the creation covers the bodies the statement gains"
     );
     for block in [then_block, else_block] {
         assert_eq!(
@@ -219,7 +219,7 @@ fn insert_rejects_a_body_owned_elsewhere() {
         ),
         Err(RewriteError::BodyOwnedElsewhere(Body::Block(f.old_then)))
     );
-    assert_eq!(rewriter.events(), [], "nothing was inserted");
+    assert_eq!(rewriter.events(), [], "nothing was created");
     assert_eq!(parent(rewriter.stage(), fresh), None, "nothing was adopted");
 }
 

@@ -128,12 +128,16 @@ impl Worklist {
     }
 
     /// Add the statements `events` may have given a new match: for each
-    /// statement an event names as changed, replaced or inserted, the
-    /// statement itself and the users of its results, and with native rules
-    /// also its owner and the producers of its operands, those of them under
-    /// the root. A move or splice adds nothing, but is recorded (see
-    /// [`move_occurred`](Self::move_occurred)). Other events add nothing;
-    /// the next sweep visits what they changed.
+    /// statement an event names as changed, replaced, created or newly
+    /// placed, the statement itself and the users of its results, and with
+    /// native rules also its owner and the producers of its operands, those
+    /// of them under the root. A [`MutationEvent::PlacedStatement`] for a
+    /// statement not under the root yet (a detached statement `insert`
+    /// placed, or one moved in from outside the root) counts as newly placed,
+    /// as a created one does; for one already under the root it is a move. A
+    /// move or splice adds
+    /// nothing, but is recorded (see [`move_occurred`](Self::move_occurred)).
+    /// Other events add nothing; the next sweep visits what they changed.
     pub(super) fn push_affected<L: Dialect>(
         &mut self,
         stage: &StageInfo<L>,
@@ -141,13 +145,19 @@ impl Worklist {
     ) {
         for event in events {
             match *event {
-                MutationEvent::InsertedStatement { stmt } => {
+                MutationEvent::CreatedStatement { stmt } => {
+                    self.adopt(stage, stmt);
+                    self.push_neighbors(stage, stmt);
+                }
+                MutationEvent::PlacedStatement { stmt }
+                    if self.status.get(stmt) == Status::Outside =>
+                {
                     self.adopt(stage, stmt);
                     self.push_neighbors(stage, stmt);
                 }
                 MutationEvent::ChangedOperands { stmt }
                 | MutationEvent::ReplacedStatement { stmt } => self.push_neighbors(stage, stmt),
-                MutationEvent::MovedStatement { .. }
+                MutationEvent::PlacedStatement { .. }
                 | MutationEvent::SplicedBlock { .. }
                 | MutationEvent::SplicedCfg { .. } => self.move_occurred = true,
                 _ => {}

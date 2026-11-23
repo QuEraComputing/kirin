@@ -29,14 +29,18 @@ fn order(stage: &StageInfo<BuilderDialect>, block: Block) -> Vec<Statement> {
 fn with_terminators(stage: &StageInfo<BuilderDialect>, blocks: &[Block]) -> Vec<Statement> {
     blocks
         .iter()
-        .flat_map(|&block| order(stage, block).into_iter().chain(block.terminator(stage)))
+        .flat_map(|&block| {
+            order(stage, block)
+                .into_iter()
+                .chain(block.terminator(stage))
+        })
         .collect()
 }
 
 fn inserted(stmts: Vec<Statement>) -> Vec<MutationEvent> {
     stmts
         .into_iter()
-        .map(|stmt| MutationEvent::InsertedStatement { stmt })
+        .map(|stmt| MutationEvent::CreatedStatement { stmt })
         .collect()
 }
 
@@ -120,18 +124,20 @@ fn clone_statement_copies_nested_bodies_with_fresh_ids() {
     let mut map = IRMap::default();
     let copy = rw.clone_statement(owner, &mut map).unwrap();
 
-    // A statement is recorded when it is placed in a block. The statements
-    // copied into `copy`'s two blocks are placed there by the clone, so they
-    // are recorded now; `copy` has no parent until it is inserted.
+    // The clone records each statement it makes, outer first: `copy`, then
+    // the statements copied into its two blocks. `copy` has no parent until
+    // it is inserted, which records it being placed.
     assert_eq!(*copy.parent(rw.stage()), None);
     let BuilderDialect::OwnBlocks(then_arm, else_arm) = *definition(rw.stage(), copy) else {
         panic!("the copy keeps the original's definition");
     };
-    let mut expected = inserted(with_terminators(rw.stage(), &[then_arm, else_arm]));
+    let mut made = vec![copy];
+    made.extend(with_terminators(rw.stage(), &[then_arm, else_arm]));
+    let mut expected = inserted(made);
     assert_eq!(rw.events().to_vec(), expected);
     rw.insert(InsertionPoint::After(owner), copy).unwrap();
     assert_eq!(order(rw.stage(), entry)[1..], [owner, copy]);
-    expected.push(MutationEvent::InsertedStatement { stmt: copy });
+    expected.push(MutationEvent::PlacedStatement { stmt: copy });
     assert_eq!(rw.events().to_vec(), expected);
 
     // The copy owns copies of the arms, which hold copies of the statements.
@@ -208,7 +214,11 @@ fn a_clone_cannot_be_inserted_inside_itself() {
             reason: Box::new(RewriteError::InsertedIntoItself(copy)),
         })
     );
-    assert_eq!(rw.events().len(), cloned, "the rejected insert records nothing");
+    assert_eq!(
+        rw.events().len(),
+        cloned,
+        "the rejected insert records nothing"
+    );
 }
 
 /// ```text
@@ -484,7 +494,11 @@ fn create_adopts_only_unowned_bodies() {
         rw.create(InsertionPoint::After(f), BuilderDialect::OwnBlocks(b2, b2)),
         Err(RewriteError::BodyOwnedElsewhere(Body::Block(b2)))
     );
-    assert_eq!(rw.events().len(), cloned, "the rejected creates record nothing");
+    assert_eq!(
+        rw.events().len(),
+        cloned,
+        "the rejected creates record nothing"
+    );
 }
 
 #[test]

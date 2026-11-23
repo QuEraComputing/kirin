@@ -125,20 +125,23 @@ pub enum MutationEvent {
     /// Emitted once per [`Rewriter::replace_all_uses`] call, after the
     /// per-statement [`MutationEvent::ChangedOperands`] events it implies.
     ReplacedUses { old: SSAValue, new: SSAValue },
-    /// A new statement was spliced into a block's statement list or added to a
-    /// graph: a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
-    /// statement.
+    /// A new statement was made: [`Rewriter::create`] made it in a block or
+    /// graph (a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
+    /// statement), or [`Rewriter::clone_statement`] or
+    /// [`Rewriter::clone_cfg`] copied it.
     ///
-    /// Recorded once for every statement placed: one created or inserted
-    /// directly, and each statement a [`Rewriter::clone_statement`] or
-    /// [`Rewriter::clone_cfg`] copies into the copy's bodies. The bodies of a
-    /// copy record no [`MutationEvent::ChangedBlockList`],
+    /// Recorded once for every statement, so each is paired with the
+    /// [`MutationEvent::ErasedStatement`] recorded when it dies. The copy
+    /// [`Rewriter::clone_statement`] returns has no parent until
+    /// [`Rewriter::insert`] places it, which records
+    /// [`MutationEvent::PlacedStatement`]. The bodies of a copy record no
+    /// [`MutationEvent::ChangedBlockList`],
     /// [`MutationEvent::ChangedDiGraphTopology`], or
     /// [`MutationEvent::ChangedUnGraphTopology`] of their own.
     ///
     /// Covers the bodies it names, which now have `stmt` as their parent; no
     /// separate [`MutationEvent::ChangedBodyNesting`] is recorded for them.
-    InsertedStatement { stmt: Statement },
+    CreatedStatement { stmt: Statement },
     /// A statement was tombstoned and removed from its block or graph.
     ///
     /// Recorded once for every statement that dies: one erased directly, each
@@ -172,9 +175,12 @@ pub enum MutationEvent {
     /// (each statement in them records [`MutationEvent::ErasedStatement`]),
     /// and the bodies it gained now have `owner` as their parent.
     ChangedBodyNesting { owner: Statement },
-    /// `stmt` was moved to another place in a block body, keeping its id,
-    /// results, uses and nested bodies.
-    MovedStatement { stmt: Statement },
+    /// `stmt`, a statement that already existed, was put at a new place,
+    /// keeping its id, results, uses and nested bodies:
+    /// [`Rewriter::move_before`] or [`Rewriter::move_after`] moved it within
+    /// block bodies, or [`Rewriter::insert`] placed it, detached until then,
+    /// in a block or graph.
+    PlacedStatement { stmt: Statement },
     /// Every statement of `source`, except its terminator, was moved into
     /// `dest`, keeping their ids, results, uses and nested bodies.
     SplicedBlock { source: Block, dest: Block },

@@ -181,15 +181,15 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: a },
+            MutationEvent::CreatedStatement { stmt: a },
             topology,
-            MutationEvent::InsertedStatement { stmt: b },
+            MutationEvent::CreatedStatement { stmt: b },
             topology,
-            MutationEvent::InsertedStatement { stmt: c },
+            MutationEvent::CreatedStatement { stmt: c },
             topology,
             MutationEvent::ErasedStatement { stmt: c },
             topology,
-            MutationEvent::InsertedStatement { stmt: d },
+            MutationEvent::CreatedStatement { stmt: d },
             topology,
         ]
     );
@@ -259,11 +259,11 @@ fn insert_ungraph_edge_adds_a_wire_nodes_can_read() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: e },
+            MutationEvent::CreatedStatement { stmt: e },
             topology,
-            MutationEvent::InsertedStatement { stmt: n1 },
+            MutationEvent::CreatedStatement { stmt: n1 },
             topology,
-            MutationEvent::InsertedStatement { stmt: n2 },
+            MutationEvent::CreatedStatement { stmt: n2 },
             topology,
         ]
     );

@@ -24,7 +24,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::UnexpectedTerminator`]), or if `anchor` is nested in
     /// `stmt`'s own bodies ([`RewriteError::MovedIntoItself`]).
     ///
-    /// Records [`MutationEvent::MovedStatement`]. A walk visiting `stmt`
+    /// Records [`MutationEvent::PlacedStatement`]. A walk visiting `stmt`
     /// reports the move (see [`crate::walk`]).
     pub fn move_before(&mut self, stmt: Statement, anchor: Statement) -> Result<(), RewriteError> {
         self.move_relative(stmt, anchor, Side::Before)
@@ -74,7 +74,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .slot_at(anchor, side)
             .expect("the anchor was checked above and moving `stmt` does not touch it");
         self.link(LinkedList::single(stmt), block, prev, next);
-        self.events.push(MutationEvent::MovedStatement { stmt });
+        self.events.push(MutationEvent::PlacedStatement { stmt });
         Ok(())
     }
 

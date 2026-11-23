@@ -584,7 +584,7 @@ fn insert_terminator_wires_operands_and_edges() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: jump },
+            MutationEvent::CreatedStatement { stmt: jump },
             MutationEvent::ChangedTerminator { block: entry },
         ]
     );

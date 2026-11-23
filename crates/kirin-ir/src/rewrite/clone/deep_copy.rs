@@ -31,9 +31,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// terminator ([`RewriteError::UnexpectedTerminator`]: it could not be
     /// inserted), or if `map` replaces a value from outside the copy with one
     /// that is not live ([`RewriteError::UnknownValue`]). Records
-    /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
-    /// for each statement copied into the copy's bodies, outer statements
-    /// first. The copy itself is recorded when [`Rewriter::insert`] places it.
+    /// [`MutationEvent::CreatedStatement`](crate::MutationEvent::CreatedStatement)
+    /// for the copy and each statement copied into its bodies, outer
+    /// statements first. Inserting the copy records
+    /// [`MutationEvent::PlacedStatement`](crate::MutationEvent::PlacedStatement).
     pub fn clone_statement(
         &mut self,
         stmt: Statement,
@@ -72,7 +73,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::UnknownCfg`]), or if `map` replaces a value from
     /// outside the copy with one that is not live
     /// ([`RewriteError::UnknownValue`]). Records
-    /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
+    /// [`MutationEvent::CreatedStatement`](crate::MutationEvent::CreatedStatement)
     /// for each statement copied, outer statements first.
     pub fn clone_cfg(&mut self, source: CFG, map: &mut IRMap) -> Result<CFG, RewriteError> {
         if source.get_info(self.stage).is_none() {

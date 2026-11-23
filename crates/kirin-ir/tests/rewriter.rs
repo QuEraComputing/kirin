@@ -498,8 +498,8 @@ fn insert_before_and_after_splice_and_maintain_index() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: n0 },
-            MutationEvent::InsertedStatement { stmt: n1 },
+            MutationEvent::CreatedStatement { stmt: n0 },
+            MutationEvent::CreatedStatement { stmt: n1 },
         ]
     );
     // Operand uses for the inserted statements are recorded.
@@ -663,9 +663,9 @@ fn insert_binds_fresh_results() {
     assert_eq!(
         rw.events().to_vec(),
         vec![
-            MutationEvent::InsertedStatement { stmt: split },
-            MutationEvent::InsertedStatement { stmt: user },
-            MutationEvent::InsertedStatement { stmt: wire },
+            MutationEvent::CreatedStatement { stmt: split },
+            MutationEvent::CreatedStatement { stmt: user },
+            MutationEvent::CreatedStatement { stmt: wire },
         ]
     );
     drop(rw);
@@ -695,7 +695,7 @@ fn insert_before_terminator_fills_a_terminator_only_block() {
         (n0, rw.events().to_vec())
     };
 
-    assert_eq!(events, vec![MutationEvent::InsertedStatement { stmt: n0 }]);
+    assert_eq!(events, vec![MutationEvent::CreatedStatement { stmt: n0 }]);
     // The new statement is both ends of the chain: walking from `head` and
     // from `tail` each finds it alone.
     assert_eq!(block.statements(&stage).collect::<Vec<_>>(), vec![n0]);
@@ -1552,10 +1552,10 @@ fn move_before_and_after_reorder_a_block() {
     assert_eq!(
         rewriter.events().to_vec(),
         vec![
-            MutationEvent::MovedStatement { stmt: p },
-            MutationEvent::MovedStatement { stmt: owner },
-            MutationEvent::MovedStatement { stmt: q },
-            MutationEvent::MovedStatement { stmt: owner },
+            MutationEvent::PlacedStatement { stmt: p },
+            MutationEvent::PlacedStatement { stmt: owner },
+            MutationEvent::PlacedStatement { stmt: q },
+            MutationEvent::PlacedStatement { stmt: owner },
         ]
     );
     drop(rewriter);
