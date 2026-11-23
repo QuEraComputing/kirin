@@ -64,7 +64,7 @@ pub use kirin_lexer::Token;
 
 pub use ast::*;
 pub use function_text::*;
-pub use module_text::ParseModuleText;
+pub use module_text::*;
 pub use parsers::*;
 pub use traits::*;
 
