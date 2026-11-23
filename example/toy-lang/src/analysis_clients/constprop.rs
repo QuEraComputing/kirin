@@ -94,6 +94,11 @@ impl StatementRule<LowLevel> for FoldConstants {
             return Ok(WalkResult::Advance);
         }
         let result: SSAValue = (*definition.results().next().expect("arith has a result")).into();
+        // Constprop runs over `i64`, so its constants say nothing about a
+        // result of another type.
+        if *result.expect_info(rewriter.stage()).ty() != ArithType::I64 {
+            return Ok(WalkResult::Advance);
+        }
         let Some(ConstPropValue::Const(c)) = self.facts.value_at(self.stage, result) else {
             return Ok(WalkResult::Advance);
         };
