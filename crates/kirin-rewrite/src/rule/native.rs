@@ -8,10 +8,11 @@ use crate::{AnalysisCache, Requirement};
 ///
 /// Add one with [`RuleSet::add_statement_rule`](crate::RuleSet::add_statement_rule),
 /// which takes a recipe building the rule from the analysis results its pass
-/// was given. The driver builds a fresh rule every sweep, so anything the rule stores is gone by the next sweep.
-/// Within a sweep, the rule may be handed the same statement more than once,
-/// when an edit adds it back to the driver's worklist, and anything it
-/// stored about the IR may have changed in between.
+/// was given. The driver builds a fresh rule every sweep, so anything the
+/// rule stores is gone by the next sweep. Within a sweep, the rule may be
+/// handed the same statement more than once, when an edit adds it back to
+/// the driver's worklist, and anything it stored about the IR may have
+/// changed in between.
 pub trait StatementRule<L: Dialect> {
     /// Try the rule at `stmt`, editing through `rewriter`, and say how the
     /// driver goes on: `Interrupt` ends the sweep. The driver ignores `Skip`.
@@ -27,8 +28,9 @@ pub trait StatementRule<L: Dialect> {
 ///
 /// Add one with [`RuleSet::add_block_rule`](crate::RuleSet::add_block_rule),
 /// which takes a recipe building the rule from the analysis results its pass
-/// was given. The driver builds a fresh rule for every block, so anything the rule stores, such as a table of the
-/// expressions seen so far, is gone by the next block.
+/// was given. The driver builds a fresh rule for every block, so anything the
+/// rule stores, such as a table of the expressions seen so far, is gone by
+/// the next block.
 ///
 /// The rule walks the block itself. It may edit the block's statements,
 /// and redirect the uses of the block's values wherever they are, as

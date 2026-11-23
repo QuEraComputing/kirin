@@ -25,7 +25,8 @@ pub(crate) type Table<A> = HashMap<<A as AnalysisKind>::Key, Slot<<A as Analysis
 pub struct AnalysisCache {
     /// One [`Table`] per analysis, by the analysis's `TypeId`.
     tables: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
-    /// The program's revision: bumped once for each pass that edits it.
+    /// The program's revision: bumped once for each pass that edits it. A
+    /// failed pass always has, since it removes its stage.
     revision: u64,
 }
 

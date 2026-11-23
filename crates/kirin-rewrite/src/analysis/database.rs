@@ -4,9 +4,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
-use kirin_ir::{
-    CompileStage, Dialect, HasStageInfo, Program, Rewriter, StageMeta, StagePassError,
-};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, Program, Rewriter, StageMeta, StagePassError};
 
 use super::cache::Slot;
 use super::{Analysis, AnalysisCache, AnalysisError, AnalysisKind, Requirement, RunPassError};
@@ -115,15 +113,16 @@ impl<S> Database<S> {
 
     /// How many passes have edited the program, plus how many times
     /// [`program_mut`](Self::program_mut) was called, since the database
-    /// was created.
+    /// was created. A failed pass counts as an edit, since it removes its
+    /// stage from the program.
     pub fn revision(&self) -> u64 {
         self.cache.borrow().revision()
     }
 
     /// Compute every requirement in `requires` that is not cached, then run
     /// `pass` on `stage` through [`Program::run_pass`], handing it the
-    /// cached results. Bump the revision if the pass edited the IR, or
-    /// failed, since a failed pass may have left some of its edits in place.
+    /// cached results. Bump the revision if the pass edited the program,
+    /// which a failed pass always has, since it removes its stage.
     ///
     /// A requirement that cannot be computed, including one never
     /// [registered](Self::register), fails before the pass runs, so the stage
