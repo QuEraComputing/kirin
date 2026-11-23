@@ -305,6 +305,34 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
 }
 
 #[test]
+fn an_unowned_new_block_records_its_erasure_when_the_rewrite_ends() {
+    let mut f = fixture();
+    let (block, used, ret, events) = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        let block = rewriter.new_block([TestType::I32]);
+        let used = fill(&mut rewriter, block, f.x);
+        let ret = block.terminator(rewriter.stage()).unwrap();
+        (block, used, ret, rewriter.into_events())
+    };
+
+    // `fill` created the terminator, then `used` before it; ending the
+    // rewrite erases the block's chain, then its terminator.
+    assert_eq!(
+        events,
+        [
+            MutationEvent::CreatedStatement { stmt: ret },
+            MutationEvent::ChangedTerminator { block },
+            MutationEvent::CreatedStatement { stmt: used },
+            MutationEvent::ErasedStatement { stmt: used },
+            MutationEvent::ErasedStatement { stmt: ret },
+        ]
+    );
+    assert!(block.get_info(&f.stage).is_none());
+    assert!(f.x.expect_info(&f.stage).uses().is_empty());
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
 fn erase_block_discards_an_unowned_new_block() {
     let mut f = fixture();
     let (block, used, ret, events) = {

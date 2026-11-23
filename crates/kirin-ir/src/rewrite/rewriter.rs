@@ -111,11 +111,13 @@ use crate::{
 /// analyses can subscribe to the event kinds that invalidate them, and
 /// worklist drivers can re-enqueue the statements named in the events.
 ///
-/// Edits to detached code, such as a [`Rewriter::new_block`] block no
-/// statement owns yet, record events like any other edit. Creating detached
-/// code records nothing, and neither does tombstoning it when the `Rewriter`
-/// drops; the statement that attaches it records its usual event. An id an
-/// event names may therefore be dead by the time the log is read.
+/// Every statement records one [`MutationEvent::CreatedStatement`] when it is
+/// made and one [`MutationEvent::ErasedStatement`] when it dies. Edits to
+/// detached code, such as a [`Rewriter::new_block`] block no statement owns
+/// yet, record events like any other edit, and detached code nothing placed
+/// records the erasure of its statements when [`Rewriter::into_events`] is
+/// called or the `Rewriter` is dropped. An id an event names may therefore be
+/// dead by the time the log is read.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum MutationEvent {
     /// One or more operand slots of `stmt` were rewritten in place.
@@ -603,7 +605,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// End the rewrite and return every event it recorded, in application
     /// order. The log only grows while the `Rewriter` lives, so a position in
     /// [`events`](Self::events) stays valid until then.
+    ///
+    /// First tombstones the detached code nothing placed: statements no
+    /// [`Rewriter::insert`] placed, [`Rewriter::new_block`] blocks no
+    /// statement owns, and detached CFGs such as an unadopted
+    /// [`Rewriter::clone_cfg`] copy. The log then ends with an
+    /// [`MutationEvent::ErasedStatement`] for each statement in that code.
+    /// After a panic the pass boundary caught, the detached code is left in
+    /// place for inspection instead, and nothing is recorded for it.
     pub fn into_events(mut self) -> Vec<MutationEvent> {
+        self.tombstone_detached();
         std::mem::take(&mut self.events)
     }
 

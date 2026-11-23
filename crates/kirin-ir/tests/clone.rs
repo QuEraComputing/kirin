@@ -37,7 +37,7 @@ fn with_terminators(stage: &StageInfo<BuilderDialect>, blocks: &[Block]) -> Vec<
         .collect()
 }
 
-fn inserted(stmts: Vec<Statement>) -> Vec<MutationEvent> {
+fn created(stmts: Vec<Statement>) -> Vec<MutationEvent> {
     stmts
         .into_iter()
         .map(|stmt| MutationEvent::CreatedStatement { stmt })
@@ -133,7 +133,7 @@ fn clone_statement_copies_nested_bodies_with_fresh_ids() {
     };
     let mut made = vec![copy];
     made.extend(with_terminators(rw.stage(), &[then_arm, else_arm]));
-    let mut expected = inserted(made);
+    let mut expected = created(made);
     assert_eq!(rw.events().to_vec(), expected);
     rw.insert(InsertionPoint::After(owner), copy).unwrap();
     assert_eq!(order(rw.stage(), entry)[1..], [owner, copy]);
@@ -180,12 +180,29 @@ fn a_clone_never_inserted_is_tombstoned_with_the_rewriter() {
         ..
     } = if_like();
     let uses_before = uses_set(&stage, x);
-    let (copy, compute_copy) = {
+    let (copy, compute_copy, inner, events) = {
         let mut rw = Rewriter::new(&mut stage);
         let mut map = IRMap::default();
         let copy = rw.clone_statement(owner, &mut map).unwrap();
-        (copy, map.statement(compute).unwrap())
+        let compute_copy = map.statement(compute).unwrap();
+        // The statements copied into `copy`'s blocks, read while they live.
+        let BuilderDialect::OwnBlocks(then_arm, else_arm) = *definition(rw.stage(), copy) else {
+            panic!("the copy keeps the original's definition");
+        };
+        let inner = with_terminators(rw.stage(), &[then_arm, else_arm]);
+        (copy, compute_copy, inner, rw.into_events())
     };
+    // The clone records `copy` and then its contents. Ending the rewrite
+    // erases them in the opposite nesting order: the contents, then `copy`.
+    let mut expected = vec![MutationEvent::CreatedStatement { stmt: copy }];
+    expected.extend(created(inner.clone()));
+    expected.extend(
+        inner
+            .iter()
+            .map(|&stmt| MutationEvent::ErasedStatement { stmt }),
+    );
+    expected.push(MutationEvent::ErasedStatement { stmt: copy });
+    assert_eq!(events, expected);
     assert!(copy.get_info(&stage).is_none());
     assert!(compute_copy.get_info(&stage).is_none());
     assert_eq!(uses_set(&stage, x), uses_before);
@@ -298,7 +315,7 @@ fn clone_cfg_maps_forward_branches_and_values_from_later_blocks() {
     // Each copied statement is recorded, block by block.
     assert_eq!(
         rw.events().to_vec(),
-        inserted(with_terminators(rw.stage(), &[a2, b2, c2]))
+        created(with_terminators(rw.stage(), &[a2, b2, c2]))
     );
     // Branches point at the copies, and the predecessor mirror follows.
     assert_eq!(preds(rw.stage(), c2), HashSet::from([a2]));

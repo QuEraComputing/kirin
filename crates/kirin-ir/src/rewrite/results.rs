@@ -6,8 +6,9 @@
 //! allocates an id whose arena slot stays empty (so the value reads as not live
 //! and cannot be used yet) and keeps its type until [`Rewriter::create`] binds
 //! it. Dropping the `Rewriter` tombstones every value it never bound, so once
-//! it is gone each result slot is either bound or a real tombstone. It also
-//! tombstones every detached statement it never inserted.
+//! it is gone each result slot is either bound or a real tombstone.
+//! [`Rewriter::into_events`], or the drop, also tombstones the detached code
+//! nothing placed.
 
 use crate::{Body, Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
 
@@ -66,37 +67,49 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     pub(crate) fn keep_detached_on_drop(&mut self) {
         self.keep_detached_on_drop = true;
     }
+
+    /// Tombstone every detached statement no [`insert`](Rewriter::insert)
+    /// placed, with its results, operand uses and bodies, every
+    /// [`new_block`](Rewriter::new_block) block no statement owns, and every
+    /// detached CFG (such as a [`clone_cfg`](Rewriter::clone_cfg) copy) no
+    /// statement adopted. Records
+    /// [`MutationEvent::ErasedStatement`](crate::MutationEvent::ErasedStatement)
+    /// for each statement tombstoned. Run by [`Rewriter::into_events`] before it takes
+    /// the log, and by the drop.
+    ///
+    /// Does nothing after a panic: a panic part-way through an edit can leave
+    /// detached code inconsistent, so tombstoning it could panic again. Two
+    /// cases are covered. When this `Rewriter` is dropped while a panic
+    /// unwinds, a second panic would abort the process. When the pass boundary
+    /// has caught the panic, the unwind is over, so it sets
+    /// `keep_detached_on_drop` instead; a second panic would escape the
+    /// boundary and lose the quarantined stage, which keeps the detached code
+    /// for inspection.
+    pub(super) fn tombstone_detached(&mut self) {
+        if self.keep_detached_on_drop || std::thread::panicking() {
+            return;
+        }
+        for stmt in std::mem::take(&mut self.detached) {
+            self.tombstone_statement(stmt, None);
+        }
+        for block in std::mem::take(&mut self.unowned_blocks) {
+            self.tombstone_block(block);
+        }
+        for cfg in std::mem::take(&mut self.detached_cfgs) {
+            self.tombstone_body(Body::CFG(cfg));
+        }
+    }
 }
 
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
-    /// Tombstone every detached statement no [`insert`](Rewriter::insert)
-    /// placed, with its results, operand uses and bodies, every
-    /// [`new_block`](Rewriter::new_block) block no statement owns, every
-    /// detached CFG (such as a [`clone_cfg`](Rewriter::clone_cfg) copy) no
-    /// statement adopted, and every
+    /// Tombstone the detached code [`Rewriter::into_events`] has not already
+    /// tombstoned (statements no [`insert`](Rewriter::insert) placed,
+    /// [`new_block`](Rewriter::new_block) blocks and detached CFGs nothing
+    /// adopted), unless the drop follows a panic, and every
     /// [`new_result`](Rewriter::new_result) value no statement bound, so
     /// nothing detached or empty outlives the `Rewriter`.
-    ///
-    /// After a panic the detached statements and bodies are left in place: a
-    /// panic part-way through an edit can leave them inconsistent, so
-    /// tombstoning them could panic again. Two cases are covered. When this
-    /// `Rewriter` is dropped while a panic unwinds, a second panic would abort
-    /// the process. When the pass boundary has caught the panic, the unwind is
-    /// over before this drop runs, so it sets `keep_detached_on_drop` instead;
-    /// a second panic would escape the boundary and lose the quarantined
-    /// stage, which keeps the detached code for inspection.
     fn drop(&mut self) {
-        if !self.keep_detached_on_drop && !std::thread::panicking() {
-            for stmt in std::mem::take(&mut self.detached) {
-                self.tombstone_statement(stmt, None);
-            }
-            for block in std::mem::take(&mut self.unowned_blocks) {
-                self.tombstone_block(block);
-            }
-            for cfg in std::mem::take(&mut self.detached_cfgs) {
-                self.tombstone_body(Body::CFG(cfg));
-            }
-        }
+        self.tombstone_detached();
         for (value, _) in self.unbound_ssa_results.drain() {
             let _ = self.stage.ssas.delete(value);
         }
@@ -110,8 +123,8 @@ mod tests {
     use crate::arena::GetInfo;
     use crate::testing::dialect::{TestLang, TestType, new_stage};
     use crate::{
-        Block, InsertionPoint, Rewriter, SSAValue, StageInfo, Statement, StatementParent, Use,
-        verify_derived,
+        Block, InsertionPoint, MutationEvent, Rewriter, SSAValue, StageInfo, Statement,
+        StatementParent, Use, verify_derived,
     };
 
     /// A stage whose only block has one argument, returned as a live value
@@ -256,5 +269,29 @@ mod tests {
         assert!(result.is_err());
         let block = detached.expect("the closure made a block before panicking");
         assert!(block.get_info(&stage).is_some());
+    }
+
+    /// After the pass boundary catches a panic, `into_events` leaves detached
+    /// code in place and records no erasure for it.
+    #[test]
+    fn ending_after_a_caught_panic_keeps_detached_code_and_records_nothing() {
+        let mut stage = new_stage().finalize().unwrap();
+        let mut rw = Rewriter::new(&mut stage);
+        let block = rw.new_block([]);
+        let ret = rw
+            .create(InsertionPoint::Terminator(block), TestLang::Return)
+            .unwrap();
+        rw.keep_detached_on_drop();
+        let events = rw.into_events();
+
+        assert_eq!(
+            events,
+            [
+                MutationEvent::CreatedStatement { stmt: ret },
+                MutationEvent::ChangedTerminator { block },
+            ]
+        );
+        assert!(block.get_info(&stage).is_some());
+        assert!(ret.get_info(&stage).is_some());
     }
 }
