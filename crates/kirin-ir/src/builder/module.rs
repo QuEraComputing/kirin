@@ -1,8 +1,8 @@
 use crate::node::{LinkedList, Module, ModuleInfo};
-use crate::{BuilderStageInfo, Dialect, GlobalSymbol, Statement, StatementParent};
+use crate::{BuilderStageInfo, DeclaredName, Dialect, GlobalSymbol, Statement, StatementParent};
 
 #[bon::bon]
-impl<L: Dialect> BuilderStageInfo<L> {
+impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
     /// Create a module, optionally named and with initial members.
     ///
     /// # Panics
@@ -33,23 +33,44 @@ impl<L: Dialect> BuilderStageInfo<L> {
     }
 }
 
-impl<L: Dialect> BuilderStageInfo<L> {
+impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
     /// Append `member` to `module`.
     ///
-    /// # Panics
-    ///
-    /// If `member` already has a parent or is linked to another statement.
+    /// Panics if the statement is already attached or cannot be a member.
     pub fn add_module_member(&mut self, module: Module, member: Statement) {
+        self.try_add_module_member(module, member)
+            .unwrap_or_else(|message| panic!("{message}"));
+    }
+
+    /// Validate membership before attaching the statement. A failed append
+    /// leaves the module and the statement unchanged.
+    pub fn try_add_module_member(
+        &mut self,
+        module: Module,
+        member: Statement,
+    ) -> Result<(), String> {
+        let info = &self.nodes.statements[member];
+        if info.parent.is_some() || info.node.prev.is_some() || info.node.next.is_some() {
+            return Err(format!("statement {member:?} is already attached"));
+        }
+        if info.definition.is_terminator() {
+            return Err("a terminator cannot be a module member".into());
+        }
+        if info.definition.successors().next().is_some() {
+            return Err("a statement with successors cannot be a module member".into());
+        }
+        if let Some(name) = info.definition.declared_name()
+            && module.member_by_name(self, name).is_some()
+        {
+            let spelling = self
+                .symbol_table()
+                .resolve(name)
+                .map(String::as_str)
+                .unwrap_or("<unknown>");
+            return Err(format!("duplicate module member @{spelling}"));
+        }
         let tail = self.modules[module].members.tail;
         let info = &mut self.nodes.statements[member];
-        assert!(
-            info.parent.is_none(),
-            "Statement `{member:?}` already has a parent"
-        );
-        assert!(
-            info.node.prev.is_none() && info.node.next.is_none(),
-            "Statement `{member:?}` is already linked to another statement"
-        );
         info.parent = Some(StatementParent::Module(module));
         info.node.prev = tail;
         if let Some(tail) = tail {
@@ -59,5 +80,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
         members.head.get_or_insert(member);
         members.tail = Some(member);
         members.len += 1;
+        Ok(())
     }
 }

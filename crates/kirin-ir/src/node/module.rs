@@ -1,10 +1,16 @@
 use crate::arena::{GetInfo, GetInfoMut, Id, Item};
-use crate::{Dialect, identifier};
+use crate::{Dialect, StageArenas, Symbol, identifier};
 
 use super::block::StatementIter;
 use super::linked_list::LinkedList;
 use super::stmt::Statement;
 use super::symbol::GlobalSymbol;
+
+/// The local name introduced by this statement, if any. Referenced symbols
+/// are deliberately excluded. Implement this on languages used in modules.
+pub trait DeclaredName {
+    fn declared_name(&self) -> Option<Symbol>;
+}
 
 identifier! {
     /// A unique identifier for a module: a non-callable container of
@@ -59,6 +65,23 @@ impl<L: Dialect> GetInfoMut<L> for Module {
 }
 
 impl Module {
+    /// Find a declaration by its stage-local name among the explicit members.
+    pub fn member_by_name<L: Dialect + DeclaredName>(
+        self,
+        stage: &StageArenas<L>,
+        name: Symbol,
+    ) -> Option<Statement> {
+        let mut next = stage.modules.get(self)?.members.head;
+        while let Some(member) = next {
+            let info = &stage.statements[member];
+            if info.definition.declared_name() == Some(name) {
+                return Some(member);
+            }
+            next = info.node.next;
+        }
+        None
+    }
+
     /// The module's member statements, in order.
     pub fn members<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> StatementIter<'a, L> {
         StatementIter::over(self.expect_info(stage).members, stage)

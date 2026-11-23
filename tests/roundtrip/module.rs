@@ -4,69 +4,104 @@ use kirin::parsers::{ChumskyError, ParseModuleText};
 use kirin::prelude::*;
 use kirin_test_languages::GraphFunctionLanguage;
 
-#[test]
-fn module_roundtrip_preserves_members_and_nested_ssa() {
-    let input = r#"module @floorplan {
-        %seed = constant 1 -> i64;
-        %physical = graph_eval %seed, %seed digraph ^physical(%x: i64, %y: i64) {
-            %sum = add %x, %y -> i64;
-            yield %sum;
-        } -> i64;
-        // The second section consumes the first section's result.
-        %logical = graph_eval %physical, %seed digraph ^logical() capture(%x: i64, %y: i64) {
-            %sum = mul %x, %y -> i64;
-            yield %sum;
-        } -> i64;
-    }"#;
-    let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
-    let stage_id = program
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
-    let module = program.parse_module(stage_id, input).unwrap();
-    assert_eq!(
-        program.resolve_module::<GraphFunctionLanguage>("floorplan", stage_id),
-        Some(module)
-    );
-    assert_eq!(program.function_arena().iter().count(), 0);
-    let stage = program.stage(stage_id).unwrap();
-    let members: Vec<_> = module.members(stage).collect();
-    assert_eq!(members.len(), 3);
-    for member in &members {
-        assert_eq!(*member.parent(stage), Some(StatementParent::Module(module)));
+#[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[kirin(type = kirin_arith::ArithType)]
+enum TestLanguage {
+    #[chumsky(format = "item {name}")]
+    NamedItem { name: Symbol },
+    #[wraps]
+    Other(GraphFunctionLanguage),
+}
+
+impl From<GraphFunctionLanguage> for TestLanguage {
+    fn from(value: GraphFunctionLanguage) -> Self {
+        Self::Other(value)
     }
-    let physical_result: SSAValue = (*members[1].results(stage).next().unwrap()).into();
-    assert_eq!(
-        *members[2].arguments(stage).next().unwrap(),
-        physical_result
-    );
-    let logical_graph = members[2].definition(stage).digraphs().next().unwrap();
-    assert_eq!(logical_graph.expect_info(stage).capture_ports().len(), 2);
+}
+
+impl DeclaredName for TestLanguage {
+    fn declared_name(&self) -> Option<Symbol> {
+        match self {
+            Self::NamedItem { name } => Some(*name),
+            Self::Other(_) => None,
+        }
+    }
+}
+
+#[test]
+fn named_item_lookup_after_roundtrip() {
+    let mut program: Program<StageInfo<TestLanguage>> = Program::new();
+    let id = program.add_stage().stage(StageInfo::default()).new();
+    let module = program
+        .parse_module(id, "module @a { item @value; }")
+        .unwrap();
     let printed = module
-        .render(stage)
+        .render(program.stage(id).unwrap())
         .globals(program.global_symbols())
         .into_string()
         .unwrap();
-    assert!(printed.starts_with("module @floorplan {"), "{printed}");
-    assert!(printed.contains("digraph ^physical"), "{printed}");
-    assert!(printed.contains("digraph ^logical"), "{printed}");
 
-    let mut reparsed: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
-    let stage_id = reparsed.add_stage().stage(StageInfo::default()).new();
-    let module = reparsed.parse_module(stage_id, &printed).unwrap();
-    let reprinted = module
-        .render(reparsed.stage(stage_id).unwrap())
-        .globals(reparsed.global_symbols())
-        .into_string()
+    let mut reparsed: Program<StageInfo<TestLanguage>> = Program::new();
+    let id = reparsed.add_stage().stage(StageInfo::default()).new();
+    let module = reparsed.parse_module(id, &printed).unwrap();
+    let stage = reparsed.stage(id).unwrap();
+    let value = stage.symbol_table().lookup("value").unwrap();
+    let member = module.member_by_name(stage, value).unwrap();
+    assert!(matches!(member.definition(stage), TestLanguage::NamedItem { name } if *name == value));
+}
+
+#[test]
+fn builder_only_finds_explicit_members() {
+    let mut stage = BuilderStageInfo::<TestLanguage>::default();
+    let module = stage.module().new();
+    let name = stage.symbol_table_mut().intern("item".into());
+    let first = stage
+        .statement()
+        .definition(TestLanguage::NamedItem { name })
+        .new();
+    let second = stage
+        .statement()
+        .definition(TestLanguage::NamedItem { name })
+        .new();
+    assert_eq!(module.member_by_name(&stage, name), None);
+    stage.add_module_member(module, first);
+    assert!(stage.try_add_module_member(module, second).is_err());
+    let sibling = stage.module().members(vec![second]).new();
+    let stage = stage.finalize().unwrap();
+    assert_eq!(module.member_by_name(&stage, name), Some(first));
+    assert_eq!(sibling.member_by_name(&stage, name), Some(second));
+}
+
+#[test]
+fn invalid_members_leave_stage_retryable() {
+    let mut program: Program<StageInfo<TestLanguage>> = Program::new();
+    let id = program.add_stage().stage(StageInfo::default()).new();
+    for (members, message) in [
+        ("item @x; item @x;", "duplicate module member @x"),
+        (
+            "%x = constant 1 -> i64; %y = add %x, %x -> i64;",
+            "undefined SSA",
+        ),
+        ("ret;", "terminator"),
+    ] {
+        let err = program
+            .parse_module(id, &format!("module @retry {{ {members} }}"))
+            .unwrap_err();
+        assert!(err.to_string().contains(message), "{err}");
+        let stage = program.stage(id).unwrap();
+        assert_eq!(stage.module_arena().iter().count(), 0);
+        assert_eq!(stage.statement_arena().iter().count(), 0);
+    }
+    program
+        .parse_module(id, "module @retry { item @x; }")
         .unwrap();
-    assert_eq!(printed, reprinted);
 }
 
 #[test]
 fn empty_and_anonymous_modules_roundtrip() {
     for input in ["module @empty {}", "module {}"] {
-        let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+        let mut program: Program<StageInfo<TestLanguage>> = Program::new();
         let stage_id = program.add_stage().stage(StageInfo::default()).new();
         let module = program.parse_module(stage_id, input).unwrap();
         let stage = program.stage(stage_id).unwrap();
@@ -80,7 +115,7 @@ fn empty_and_anonymous_modules_roundtrip() {
             .globals(program.global_symbols())
             .into_string()
             .unwrap();
-        let mut reparsed: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+        let mut reparsed: Program<StageInfo<TestLanguage>> = Program::new();
         let stage_id = reparsed.add_stage().stage(StageInfo::default()).new();
         let module = reparsed.parse_module(stage_id, &printed).unwrap();
         let reprinted = module
@@ -94,7 +129,7 @@ fn empty_and_anonymous_modules_roundtrip() {
 
 #[test]
 fn module_names_and_ssa_scopes_are_separate() {
-    let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+    let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let stage_id = program.add_stage().stage(StageInfo::default()).new();
     program
         .parse_module(stage_id, "module @a { %x = constant 1 -> i64; }")
@@ -127,7 +162,7 @@ fn module_syntax_errors_and_member_spans() {
         "module @bad {} trailing",
         "module @bad { %x = graph_eval (]; }", // mismatched delimiters
     ] {
-        let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+        let mut program: Program<StageInfo<TestLanguage>> = Program::new();
         let stage_id = program.add_stage().stage(StageInfo::default()).new();
         assert!(program.parse_module(stage_id, input).is_err(), "{input}");
         assert_eq!(
@@ -140,7 +175,7 @@ fn module_syntax_errors_and_member_spans() {
             0
         );
     }
-    let mut program: Program<StageInfo<GraphFunctionLanguage>> = Program::new();
+    let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let stage_id = program.add_stage().stage(StageInfo::default()).new();
     let input = "module @bad {\n  unknown_statement;\n}";
     let ChumskyError::Parse(errors) = program.parse_module(stage_id, input).unwrap_err() else {

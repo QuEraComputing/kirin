@@ -1322,7 +1322,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// unchanged.
     ///
     /// Rejects (leaving the stage untouched) if `stmt` is unknown or owned by
-    /// nothing, changes result arity or terminator-ness, gives a
+    /// nothing, is a module member, changes result arity or terminator-ness, gives a
     /// non-terminator successors, names an operand or successor target that
     /// is not live, or — for an `UnGraph` member — changes whether it is an
     /// edge statement ([`RewriteError::EdgeRoleMismatch`]) or gives an edge
@@ -1368,6 +1368,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let Some(parent) = item.parent else {
                 return Err(RewriteError::NotInBlockBody(stmt));
             };
+            // Module declarations can be referenced by name or specialization.
+            // Keep them intact until replacements can validate both.
+            if matches!(parent, StatementParent::Module(_)) {
+                return Err(RewriteError::NotInBlockBody(stmt));
+            }
             (
                 item.definition
                     .arguments()
