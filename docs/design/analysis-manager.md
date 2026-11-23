@@ -256,7 +256,7 @@ function, at its stage, to its arguments:
 
 ```rust
 impl AnalysisKind for ConstPropFacts {
-    type Key = BTreeMap<(CompileStage, Callee), Vec<ConstPropValue<i64>>>;
+    type Key = BTreeMap<(CompileStage, Function), Vec<ConstPropValue<i64>>>;
     type Output = /* .. */;
 }
 
@@ -274,7 +274,7 @@ Roots have no order, so a root-based key is a map, not a list. A
 but is deterministic, so the same roots give the same key whatever order
 they are added in, and its `Eq` and `Hash` follow from that. A map also
 holds one root per function, which fits entry points: each is listed once,
-with conservative facts. This needs `Ord` on `CompileStage` and `Callee`,
+with conservative facts. This needs `Ord` on `CompileStage` and `Function`,
 which order by arena id; the argument values need only `Eq + Hash`.
 
 This is the shape of a query in salsa, `fn query(db, key) -> Output`: one
@@ -377,7 +377,7 @@ one of three ways, and each keeps the cache honest:
 
 Arena compaction (`Arena::gc`), which `rewrite-engine.md` allows only at pass
 boundaries, renumbers ids. It therefore drops every result. Keys hold ids too,
-such as `Callee::Specialized`, so compaction must also remap the keys that
+such as a root's `Function`, so compaction must also remap the keys that
 rules and requirements hold, or rebuild them.
 
 ## Facts during a pass
@@ -585,37 +585,3 @@ tracked accessors, as in salsa, so that nothing goes unrecorded; today
 `db.program()` is untracked. Adding this does not change how analyses are
 asked for; an analysis keeps whole-program invalidation until its reads are
 recorded.
-
-## Implementation steps
-
-Each step is reviewed before the next starts.
-
-1. **Core types.** `AnalysisKind`, `Analysis`, `AnalysisCache`, `Requirement`,
-   `Database`, `AnalysisError`, `RunPassError`, with cycle detection,
-   `Rewriter::edited` in `kirin-ir`, and `Ord` on the IR id types and
-   `Callee`, ordered by arena id. Tests in
-   `crates/kirin-rewrite/tests/analysis_database.rs` with test analyses
-   counting their runs: compute once then reuse; `get_cached` never computes;
-   a failure is not cached; distinct keys get distinct results; equal keys
-   share one; the same roots added in two orders share one; dependencies
-   through the database; cycles; `run_pass` computes every requirement,
-   including one analysis for two keys; an unregistered requirement fails
-   before the pass and leaves the stage untouched; `get` computes an
-   unregistered analysis; a pass with no edits keeps results and the revision;
-   a pass with an edit bumps the revision and drops every result, whatever its
-   key; a failed pass drops everything; `program_mut()` drops everything; a pass
-   reads the results computed before it.
-2. **Rules read results.** Recipes receive `&AnalysisCache`;
-   `AddedRule::requires::<A>(key)`; `RuleSet::required()`;
-   `RewriteDriver::with_cache`; the driver checks requirements and fails with
-   `MissingAnalysis`. Tests in
-   `crates/kirin-rewrite/tests/rule_requirements.rs`.
-3. **Constprop client.** The `ConstPropFacts` analysis type and its
-   `Analysis` impl for `toy-lang`, reading the [interpreter's
-   results](interpreter/index.md#reading-results--analysisresults); a
-   test-only constant-folding rule. Tests in
-   `example/toy-lang/src/analysis_clients.rs`.
-4. **Demand client.** The `DemandFacts` analysis type and its `Analysis`
-   impl for `toy-lang`; a test-only demand-based dead-code rule.
-5. **Docs.** Update the M3, `AnalysisManager` and `NativeRule` sections of
-   `rewrite-engine.md`.
