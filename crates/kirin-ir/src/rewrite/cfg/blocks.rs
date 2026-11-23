@@ -57,8 +57,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// are removed from the predecessor mirror.
     ///
     /// `block` may also be a [`Rewriter::new_block`] block that no statement
-    /// owns yet, such as one a pattern gives up on. It is not part of the IR,
-    /// so erasing it records no event.
+    /// owns yet, such as one a pattern gives up on. It is not part of a CFG,
+    /// so erasing it records no block-list or CFG event.
     ///
     /// Rejects, leaving the stage untouched, if `block` is unknown, is neither
     /// in a CFG nor an unowned [`Rewriter::new_block`] block
@@ -68,8 +68,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::BlockArgumentInUse`] /
     /// [`RewriteError::StatementResultsInUse`]); replace those uses first.
     ///
-    /// For a block in a CFG, records [`MutationEvent::ChangedBlockList`] then
-    /// [`MutationEvent::ChangedCfg`].
+    /// Records [`MutationEvent::ErasedStatement`] for each statement `block`
+    /// holds, nested statements first. For a block in a CFG, then records
+    /// [`MutationEvent::ChangedBlockList`] and [`MutationEvent::ChangedCfg`].
     pub fn erase_block(&mut self, block: Block) -> Result<(), RewriteError> {
         let cfg = if self.unowned_blocks.contains(&block) {
             None

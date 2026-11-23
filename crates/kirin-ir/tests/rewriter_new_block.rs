@@ -307,17 +307,26 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
 #[test]
 fn erase_block_discards_an_unowned_new_block() {
     let mut f = fixture();
-    let (block, used, events) = {
+    let (block, used, ret, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         let mut cursor = EventCursor::default();
         let block = rewriter.new_block([TestType::I32]);
         let used = fill(&mut rewriter, block, f.x);
+        let ret = block.terminator(rewriter.stage()).unwrap();
         cursor.advance(&rewriter);
         rewriter.erase_block(block).unwrap();
-        (block, used, cursor.read_and_advance(&rewriter))
+        (block, used, ret, cursor.read_and_advance(&rewriter))
     };
 
-    assert_eq!(events, [], "the block was never part of the IR");
+    // Filling the block recorded its statements' insertion, so their erasure
+    // is recorded too; the block was in no CFG, so no CFG event.
+    assert_eq!(
+        events,
+        [
+            MutationEvent::ErasedStatement { stmt: used },
+            MutationEvent::ErasedStatement { stmt: ret },
+        ]
+    );
     assert!(block.get_info(&f.stage).is_none());
     assert!(used.get_info(&f.stage).is_none());
     assert!(

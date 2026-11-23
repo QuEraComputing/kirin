@@ -352,9 +352,14 @@ fn erase_statement_tombstones_nested_bodies() {
     {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
+        // Each nested statement is recorded, before the statement holding it.
         assert_eq!(
             rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: owner }]
+            vec![
+                MutationEvent::ErasedStatement { stmt: inner_use },
+                MutationEvent::ErasedStatement { stmt: inner_ret },
+                MutationEvent::ErasedStatement { stmt: owner },
+            ]
         );
     }
 

@@ -336,7 +336,10 @@ fn erase_statement_tombstones_owned_digraph() {
         rw.erase_statement(owner).unwrap();
         assert_eq!(
             rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: owner }]
+            vec![
+                MutationEvent::ErasedStatement { stmt: p },
+                MutationEvent::ErasedStatement { stmt: owner },
+            ]
         );
     }
 

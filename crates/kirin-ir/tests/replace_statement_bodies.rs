@@ -108,6 +108,7 @@ fn a_dropped_body_is_erased_and_a_gained_one_adopted() {
     assert_eq!(
         events,
         [
+            MutationEvent::ErasedStatement { stmt: f.else_nop },
             MutationEvent::ReplacedStatement { stmt: f.owner },
             MutationEvent::ChangedBodyNesting { owner: f.owner },
         ]

@@ -45,7 +45,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             self.tombstone_statement(stmt, None);
         }
 
-        self.events.push(MutationEvent::ErasedStatement { stmt });
         self.events
             .push(MutationEvent::ChangedUnGraphTopology { graph });
         Ok(())

@@ -134,11 +134,13 @@ pub enum MutationEvent {
     InsertedStatement { stmt: Statement },
     /// A statement was tombstoned and removed from its block or graph.
     ///
-    /// Covers everything nested in it: the statement-owned blocks, `CFG`s,
-    /// `DiGraph`s, and `UnGraph`s it held were tombstoned with it, and no
-    /// separate [`MutationEvent::ChangedBlockList`],
+    /// Recorded once for every statement that dies: one erased directly, each
+    /// statement nested in it, each statement of an erased block, and each
+    /// statement of a body that [`Rewriter::replace_statement`] drops. A
+    /// statement nested in another is recorded before it. The bodies that die
+    /// with them record no [`MutationEvent::ChangedBlockList`],
     /// [`MutationEvent::ChangedCfg`], [`MutationEvent::ChangedDiGraphTopology`],
-    /// or [`MutationEvent::ChangedUnGraphTopology`] is recorded for them.
+    /// or [`MutationEvent::ChangedUnGraphTopology`] of their own.
     ErasedStatement { stmt: Statement },
     /// A statement's definition was swapped in place (same id and results).
     ReplacedStatement { stmt: Statement },
@@ -159,7 +161,8 @@ pub enum MutationEvent {
     /// at most once per graph per [`Rewriter`] call.
     ChangedUnGraphTopology { graph: UnGraph },
     /// `owner`'s definition was replaced with one naming different bodies:
-    /// the bodies it dropped were tombstoned with everything nested in them,
+    /// the bodies it dropped were tombstoned with everything nested in them
+    /// (each statement in them records [`MutationEvent::ErasedStatement`]),
     /// and the bodies it gained now have `owner` as their parent.
     ChangedBodyNesting { owner: Statement },
     /// `stmt` was moved to another place in a block body, keeping its id,
@@ -1017,8 +1020,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects — leaving the stage untouched — if `stmt` is unknown, is owned
     /// by nothing, or still has results that are used elsewhere (a `DiGraph`
     /// yield counts as a use, and so does a node reading an `UnGraph` edge
-    /// statement's wire). Records [`MutationEvent::ErasedStatement`], followed
-    /// by [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator,
+    /// statement's wire). Records [`MutationEvent::ErasedStatement`] for each
+    /// statement nested in `stmt` and then for `stmt`, followed by
+    /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator,
     /// [`MutationEvent::ChangedDiGraphTopology`] when it was a `DiGraph`
     /// member, or [`MutationEvent::ChangedUnGraphTopology`] when it was an
     /// `UnGraph` member.
@@ -1147,7 +1151,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// The per-statement step of [`Rewriter::tombstone_block`] and graph
     /// tombstoning: drop `stmt`'s uses and, for a block member, its outgoing
     /// edges from `block`; erase its nested bodies; then tombstone its results
-    /// and itself.
+    /// and itself, and record [`MutationEvent::ErasedStatement`].
     pub(super) fn tombstone_statement(&mut self, stmt: Statement, block: Option<Block>) {
         let (operands, results, successors) = {
             let definition = &stmt.expect_info(self.stage).definition;
@@ -1179,6 +1183,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let _ = self.stage.ssas.delete(result);
         }
         let _ = self.stage.statement_arena_mut().delete(stmt);
+        self.events.push(MutationEvent::ErasedStatement { stmt });
     }
 
     /// Tombstone the statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s
@@ -1260,7 +1265,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::BodyListedTwice`]), or encloses `stmt`
     /// ([`RewriteError::BodyEnclosesOwner`]).
     ///
-    /// Records [`MutationEvent::ReplacedStatement`], then
+    /// Records [`MutationEvent::ErasedStatement`] for each statement in a
+    /// dropped body, then [`MutationEvent::ReplacedStatement`], then
     /// [`MutationEvent::ChangedBodyNesting`] if the bodies changed, followed by
     /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator, or by
     /// [`MutationEvent::ChangedDiGraphTopology`] /

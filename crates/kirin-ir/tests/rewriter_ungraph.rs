@@ -528,9 +528,15 @@ fn erase_statement_tombstones_owned_ungraph() {
     {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
+        // Members in member order, then the owner.
         assert_eq!(
             rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: owner }]
+            vec![
+                MutationEvent::ErasedStatement { stmt: wire_stmt },
+                MutationEvent::ErasedStatement { stmt: n0 },
+                MutationEvent::ErasedStatement { stmt: n1 },
+                MutationEvent::ErasedStatement { stmt: owner },
+            ]
         );
     }
 

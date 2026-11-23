@@ -167,6 +167,8 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
     assert_eq!(
         events,
         vec![
+            MutationEvent::ErasedStatement { stmt: use_x },
+            MutationEvent::ErasedStatement { stmt: dead_br },
             MutationEvent::ChangedBlockList { cfg },
             MutationEvent::ChangedCfg { cfg },
         ]
@@ -373,10 +375,27 @@ fn erase_block_tombstones_nested_bodies() {
     let host = stage.block().stmt(owner).terminator(host_ret).new();
     let entry_ret = stage.statement().definition(BuilderDialect::Return).new();
     let entry = stage.block().terminator(entry_ret).new();
-    let _cfg = stage.cfg().add_block(entry).add_block(host).new();
+    let cfg = stage.cfg().add_block(entry).add_block(host).new();
 
     let mut stage = stage.finalize().unwrap();
-    Rewriter::new(&mut stage).erase_block(host).unwrap();
+    let events = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.erase_block(host).unwrap();
+        rw.events().to_vec()
+    };
+    // Every statement that died is recorded, innermost first, across both
+    // levels of nesting.
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::ErasedStatement { stmt: inner_nop },
+            MutationEvent::ErasedStatement { stmt: inner_ret },
+            MutationEvent::ErasedStatement { stmt: owner },
+            MutationEvent::ErasedStatement { stmt: host_ret },
+            MutationEvent::ChangedBlockList { cfg },
+            MutationEvent::ChangedCfg { cfg },
+        ]
+    );
 
     // Everything reachable from the erased block is tombstoned, not just
     // its direct statements.
