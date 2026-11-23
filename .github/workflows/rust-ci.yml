@@ -1,0 +1,77 @@
+name: Rust CI
+
+# Runs on every pull request, so a pull request stacked on another branch is
+# checked too, and on pushes to `rust`.
+on:
+  pull_request:
+  push:
+    branches: [rust]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # The workspace's minimum supported Rust version (`rust-version` in
+  # Cargo.toml). Every job is pinned to it: clippy's lint set and the
+  # compile-fail snapshots both change between compiler releases.
+  RUST_TOOLCHAIN: "1.98.0"
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt
+      - name: Check formatting
+        run: cargo "+$RUST_TOOLCHAIN" fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy
+      - uses: Swatinem/rust-cache@v2
+      # The same command as the `cargo-clippy` hook in prek.toml.
+      - name: Lint
+        run: cargo "+$RUST_TOOLCHAIN" clippy --workspace --locked -- -D warnings
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        # Compile-fail snapshots include standard-library source excerpts.
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt --component rust-src
+      - uses: Swatinem/rust-cache@v2
+      - name: Build workspace
+        run: cargo "+$RUST_TOOLCHAIN" build --workspace --all-targets --locked
+      - name: Test workspace (including doctests)
+        run: cargo "+$RUST_TOOLCHAIN" test --workspace --locked
+
+  # The one check to require in the branch ruleset: it passes only when every
+  # job above passed, so jobs can be added without touching the ruleset.
+  ci:
+    name: Rust CI
+    if: always()
+    needs: [fmt, clippy, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = "success" ] || exit 1
+          done
