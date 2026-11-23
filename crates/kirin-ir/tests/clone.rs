@@ -24,6 +24,22 @@ fn order(stage: &StageInfo<BuilderDialect>, block: Block) -> Vec<Statement> {
     block.statements(stage).collect()
 }
 
+/// `blocks`' statements, terminators included, in order: the order a copy
+/// records them in.
+fn with_terminators(stage: &StageInfo<BuilderDialect>, blocks: &[Block]) -> Vec<Statement> {
+    blocks
+        .iter()
+        .flat_map(|&block| order(stage, block).into_iter().chain(block.terminator(stage)))
+        .collect()
+}
+
+fn inserted(stmts: Vec<Statement>) -> Vec<MutationEvent> {
+    stmts
+        .into_iter()
+        .map(|stmt| MutationEvent::InsertedStatement { stmt })
+        .collect()
+}
+
 fn preds(stage: &StageInfo<BuilderDialect>, block: Block) -> HashSet<Block> {
     block
         .expect_info(stage)
@@ -104,15 +120,19 @@ fn clone_statement_copies_nested_bodies_with_fresh_ids() {
     let mut map = IRMap::default();
     let copy = rw.clone_statement(owner, &mut map).unwrap();
 
-    // Detached until inserted, and nothing reachable changed.
+    // A statement is recorded when it is placed in a block. The statements
+    // copied into `copy`'s two blocks are placed there by the clone, so they
+    // are recorded now; `copy` has no parent until it is inserted.
     assert_eq!(*copy.parent(rw.stage()), None);
-    assert!(rw.events().is_empty());
+    let BuilderDialect::OwnBlocks(then_arm, else_arm) = *definition(rw.stage(), copy) else {
+        panic!("the copy keeps the original's definition");
+    };
+    let mut expected = inserted(with_terminators(rw.stage(), &[then_arm, else_arm]));
+    assert_eq!(rw.events().to_vec(), expected);
     rw.insert(InsertionPoint::After(owner), copy).unwrap();
     assert_eq!(order(rw.stage(), entry)[1..], [owner, copy]);
-    assert_eq!(
-        rw.events().to_vec(),
-        vec![MutationEvent::InsertedStatement { stmt: copy }]
-    );
+    expected.push(MutationEvent::InsertedStatement { stmt: copy });
+    assert_eq!(rw.events().to_vec(), expected);
 
     // The copy owns copies of the arms, which hold copies of the statements.
     assert_eq!(map.statement(owner), Some(copy));
@@ -177,6 +197,7 @@ fn a_clone_cannot_be_inserted_inside_itself() {
     let mut rw = Rewriter::new(&mut stage);
     let mut map = IRMap::default();
     let copy = rw.clone_statement(owner, &mut map).unwrap();
+    let cloned = rw.events().len();
     // The copy of `use_t` sits in a body of `copy`.
     let inside = map.statement(use_t).unwrap();
     let insertion_pt = InsertionPoint::Before(inside);
@@ -187,7 +208,7 @@ fn a_clone_cannot_be_inserted_inside_itself() {
             reason: Box::new(RewriteError::InsertedIntoItself(copy)),
         })
     );
-    assert!(rw.events().is_empty());
+    assert_eq!(rw.events().len(), cloned, "the rejected insert records nothing");
 }
 
 /// ```text
@@ -261,10 +282,14 @@ fn clone_cfg_maps_forward_branches_and_values_from_later_blocks() {
     let mut rw = Rewriter::new(&mut stage);
     let mut map = IRMap::default();
     let copy = rw.clone_cfg(body, &mut map).unwrap();
-    assert!(rw.events().is_empty());
 
     let [a2, b2, c2] = [a, b, c].map(|block| map.block(block).unwrap());
     assert_eq!(copy.blocks(rw.stage()).collect::<Vec<_>>(), [a2, b2, c2]);
+    // Each copied statement is recorded, block by block.
+    assert_eq!(
+        rw.events().to_vec(),
+        inserted(with_terminators(rw.stage(), &[a2, b2, c2]))
+    );
     // Branches point at the copies, and the predecessor mirror follows.
     assert_eq!(preds(rw.stage(), c2), HashSet::from([a2]));
     assert_eq!(preds(rw.stage(), b2), HashSet::from([c2]));
@@ -443,6 +468,7 @@ fn create_adopts_only_unowned_bodies() {
     );
     let mut map = IRMap::default();
     let copy = rw.clone_cfg(body, &mut map).unwrap();
+    let cloned = rw.events().len();
     // A body cannot hold its own owner.
     let inside = map.statement(u).unwrap();
     assert_eq!(
@@ -458,7 +484,7 @@ fn create_adopts_only_unowned_bodies() {
         rw.create(InsertionPoint::After(f), BuilderDialect::OwnBlocks(b2, b2)),
         Err(RewriteError::BodyOwnedElsewhere(Body::Block(b2)))
     );
-    assert!(rw.events().is_empty());
+    assert_eq!(rw.events().len(), cloned, "the rejected creates record nothing");
 }
 
 #[test]

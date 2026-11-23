@@ -10,7 +10,7 @@ use crate::{
 
 use super::IRMap;
 use crate::rewrite::bodies::bodies_of;
-use crate::rewrite::rewriter::{Rewriter, add_predecessor, add_use};
+use crate::rewrite::rewriter::{MutationEvent, Rewriter, add_predecessor, add_use};
 
 /// What the second pass of a copy made, for the last step to finish: the
 /// copied statements, whose operand uses are recorded once every result is
@@ -29,7 +29,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Second pass for `stmt`: allocate its copy under `parent` with every id
     /// mapped, then copy its bodies' contents. Every statement copied is
     /// pushed onto `copied`, for its operand uses to be recorded once all
-    /// results are bound.
+    /// results are bound. A copy placed under a `parent` records
+    /// [`MutationEvent::InsertedStatement`]; a copy with none is recorded
+    /// when [`Rewriter::insert`] places it.
     pub(super) fn fill_statement(
         &mut self,
         stmt: Statement,
@@ -78,6 +80,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.bind_results(copy, results);
         map.map_statement(stmt, copy);
         copied.statements.push(copy);
+        if parent.is_some() {
+            self.events.push(MutationEvent::InsertedStatement { stmt: copy });
+        }
         // The copy owns the copied bodies, reserved empty by the first pass.
         for body in bodies {
             self.adopt_body(body, copy);

@@ -129,6 +129,13 @@ pub enum MutationEvent {
     /// graph: a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
     /// statement.
     ///
+    /// Recorded once for every statement placed: one created or inserted
+    /// directly, and each statement a [`Rewriter::clone_statement`] or
+    /// [`Rewriter::clone_cfg`] copies into the copy's bodies. The bodies of a
+    /// copy record no [`MutationEvent::ChangedBlockList`],
+    /// [`MutationEvent::ChangedDiGraphTopology`], or
+    /// [`MutationEvent::ChangedUnGraphTopology`] of their own.
+    ///
     /// Covers the bodies it names, which now have `stmt` as their parent; no
     /// separate [`MutationEvent::ChangedBodyNesting`] is recorded for them.
     InsertedStatement { stmt: Statement },

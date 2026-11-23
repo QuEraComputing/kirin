@@ -2074,12 +2074,15 @@ that dies, including each one nested in an erased statement, in an erased block,
 or in a body `replace_statement` drops, with nested statements before the
 statement that holds them; the bodies record no CFG or graph events of their
 own. Edits to detached code, such as a `new_block` block no statement owns yet
-or a detached statement, record events like any other edit; creating it and
-tombstoning it when the `Rewriter` drops record nothing, and the statement that
-attaches it records its usual event. An id an event names may therefore be dead
-by the time the log is read. The remaining documented event kind (result-type
-events) grows in as the corresponding mutation capability lands (see
-[Gap 3](#gap-3--mutationevent-vocabulary-vs-implementation)).
+or a detached statement, record events like any other edit, and the statement
+that attaches it records its usual event. Creating a `new_block` block records
+nothing. `clone_statement` and `clone_cfg` record `InsertedStatement` for each
+statement they copy into the copy's bodies, outer statements first; the copy
+`clone_statement` returns is recorded when it is inserted. Tombstoning detached
+code when the `Rewriter` drops records nothing. An id an event names may
+therefore be dead by the time the log is read. The remaining documented event
+kind (result-type events) grows in as the corresponding mutation capability
+lands (see [Gap 3](#gap-3--mutationevent-vocabulary-vs-implementation)).
 
 The design requirement is that all rewrite mutation flows through this object so
 it can:
