@@ -24,21 +24,62 @@ pub struct Signature<T, C = ()> {
     constraints: C,
 }
 
+impl<T> Signature<T> {
+    /// The empty signature: no parameters, no returns, no constraints.
+    ///
+    /// Build any other signature by chaining from it. The return arity is
+    /// what the chain says, never implied:
+    ///
+    /// ```
+    /// # use kirin_ir::Signature;
+    /// let none: Signature<&str> = Signature::new().takes(["A", "B"]);
+    /// let one = Signature::new().takes(["A", "B"]).returns("C");
+    /// let two = Signature::new().takes(["A", "B"]).returns_each(["C", "D"]);
+    /// assert_eq!(none.to_string(), "(A, B)");
+    /// assert_eq!(one.to_string(), "(A, B) -> C");
+    /// assert_eq!(two.to_string(), "(A, B) -> C, D");
+    /// ```
+    pub fn new() -> Self {
+        Signature {
+            params: Product::new(),
+            rets: Product::new(),
+            constraints: (),
+        }
+    }
+}
+
+impl<T> Default for Signature<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T, C> Signature<T, C> {
-    /// Creates a new signature with a single return type.
-    pub fn new(params: impl IntoIterator<Item = T>, ret: T, constraints: C) -> Self {
-        Self::with_rets(params, [ret], constraints)
+    /// Sets the parameter types, one per argument.
+    pub fn takes(mut self, params: impl IntoIterator<Item = T>) -> Self {
+        self.params = params.into_iter().collect();
+        self
     }
 
-    /// Creates a new signature with the given return types (empty means no returns).
-    pub fn with_rets(
-        params: impl IntoIterator<Item = T>,
-        rets: impl IntoIterator<Item = T>,
-        constraints: C,
-    ) -> Self {
+    /// Adds one return type. This is the form for a single return; use
+    /// [`returns_each`](Self::returns_each) for several.
+    pub fn returns(mut self, ret: T) -> Self {
+        self.rets.0.push(ret);
+        self
+    }
+
+    /// Adds one return type per item, in order. An empty iterator adds none.
+    pub fn returns_each(mut self, rets: impl IntoIterator<Item = T>) -> Self {
+        self.rets.0.extend(rets);
+        self
+    }
+
+    /// Attaches constraints (for example type-variable bindings), replacing
+    /// any already set.
+    pub fn given<D>(self, constraints: D) -> Signature<T, D> {
         Signature {
-            params: params.into_iter().collect(),
-            rets: rets.into_iter().collect(),
+            params: self.params,
+            rets: self.rets,
             constraints,
         }
     }

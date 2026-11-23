@@ -22,7 +22,7 @@ where
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
             .then(return_clause(T::parser()))
-            .map(|(params, rets)| Signature::with_rets(params, rets, ()))
+            .map(|(params, rets)| Signature::new().takes(params).returns_each(rets))
             .labelled("signature")
             .boxed()
     }

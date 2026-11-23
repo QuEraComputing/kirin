@@ -301,7 +301,7 @@ fn test_staged_function_unnamed() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new().returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -333,7 +333,7 @@ fn test_staged_function_no_params() {
     let staged_function = stage
         .staged_function()
         .name(test_func)
-        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new().returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -386,7 +386,7 @@ fn test_program_render_builder_write_to() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -426,7 +426,7 @@ fn test_function_render_builder_write_to() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new().returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -462,7 +462,7 @@ fn test_render_very_narrow_width() {
     let sf = stage
         .staged_function()
         .name(test_func)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64, SimpleType::F64, SimpleType::I64], SimpleType::F64, ()))
+        .signature(kirin_ir::Signature::new().takes([SimpleType::I64, SimpleType::F64, SimpleType::I64]).returns(SimpleType::F64))
         .new()
         .unwrap();
 

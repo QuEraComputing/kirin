@@ -89,7 +89,7 @@ One PR, stacked on #886. Implemented on `roger/mult-ret-product`.
 
 | Area | Change |
 |---|---|
-| `kirin-ir` `Signature` | `params` and `rets` are both `Product<T>`; `new`/`with_rets` accept any iterator; `rets_to_string` is a plain comma join |
+| `kirin-ir` `Signature` | `params` and `rets` are both `Product<T>`; built by chaining `Signature::new().takes(..).returns(..)` / `.returns_each(..)` / `.given(..)`; `rets_to_string` is a plain comma join |
 | `kirin-ir` function records | `return_types()` returns `&Product<L::Type>` |
 | `kirin-chumsky` | `return_clause` (optional `-> T, U`) and `return_type_list` (bare, possibly empty list, for `{sig:return}`) replace #886's parenthesized/`None` parser |
 | `kirin-derive-chumsky`, `kirin-prettyless` | parse and print the new syntax; no arrow when there are no returns |

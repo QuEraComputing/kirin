@@ -7,7 +7,7 @@ use common::{BuilderDialect, TestType, new_stage};
 use kirin_ir::*;
 
 fn sig(ty: TestType) -> Signature<TestType> {
-    Signature::new(vec![ty.clone()], ty, ())
+    Signature::new().takes([ty.clone()]).returns(ty)
 }
 
 // --- Staged function name policy tests ---
@@ -224,7 +224,9 @@ fn staged_function_all_matching_returns_most_specific() {
     let sf = stage.staged_function().new().unwrap();
 
     let definition1 = stage.statement().definition(BuilderDialect::Return).new();
-    let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
+    let sig_i32 = Signature::new()
+        .takes([TestType::I32])
+        .returns(TestType::Any);
     let _spec1 = stage
         .specialize()
         .staged_func(sf)
@@ -234,7 +236,9 @@ fn staged_function_all_matching_returns_most_specific() {
         .unwrap();
 
     let definition2 = stage.statement().definition(BuilderDialect::Return).new();
-    let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
+    let sig_i64 = Signature::new()
+        .takes([TestType::I64])
+        .returns(TestType::Any);
     let _spec2 = stage
         .specialize()
         .staged_func(sf)
@@ -312,7 +316,9 @@ fn staged_function_unique_live_specialization_rejects_ambiguous_live_set() {
     let sf = stage.staged_function().new().unwrap();
 
     let definition1 = stage.statement().definition(BuilderDialect::Return).new();
-    let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
+    let sig_i32 = Signature::new()
+        .takes([TestType::I32])
+        .returns(TestType::Any);
     stage
         .specialize()
         .staged_func(sf)
@@ -322,7 +328,9 @@ fn staged_function_unique_live_specialization_rejects_ambiguous_live_set() {
         .unwrap();
 
     let definition2 = stage.statement().definition(BuilderDialect::Return).new();
-    let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
+    let sig_i64 = Signature::new()
+        .takes([TestType::I64])
+        .returns(TestType::Any);
     stage
         .specialize()
         .staged_func(sf)

@@ -118,7 +118,7 @@ where
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
             .then(return_clause(T::parser()))
-            .map(|(params, rets)| Signature::with_rets(params, rets, ()))
+            .map(|(params, rets)| Signature::new().takes(params).returns_each(rets))
     }
 }
 ```
@@ -154,7 +154,7 @@ Invalid:
 
 - `{sig:inputs}` generates `T::parser().separated_by(just(Token::Comma)).collect::<Vec<_>>()`
 - `{sig:return}` generates `return_type_list(T::parser())`
-- After both are parsed, the codegen constructs `Signature::with_rets(inputs, rets, ())`
+- After both are parsed, the codegen constructs `Signature::new().takes(inputs).returns_each(rets)`
 
 **Printer codegen for projections:**
 
@@ -232,7 +232,7 @@ The parser parses `{sig}` from text `(T, T) -> T` via `Signature<T>::HasParser`.
 struct CircuitFunction { body: DiGraph, sig: Signature<QubitType> }
 ```
 
-The parser parses `{sig:inputs}` as a comma-separated type list and `{sig:return}` as a single type. The codegen constructs `Signature::new(inputs, ret, ())` from the two parsed values. This is for graph-based functions where the signature projections and body projections are separate concerns — `{sig:inputs}` / `{sig:return}` for the type interface, `{body:ports}` / `{body:captures}` for the IR structure. Types appear in both, mirroring MLIR's separation of function type from block argument declarations.
+The parser parses `{sig:inputs}` as a comma-separated type list and `{sig:return}` as a single type. The codegen constructs `Signature::new().takes(inputs).returns(ret)` from the two parsed values. This is for graph-based functions where the signature projections and body projections are separate concerns — `{sig:inputs}` / `{sig:return}` for the type interface, `{body:ports}` / `{body:captures}` for the IR structure. Types appear in both, mirroring MLIR's separation of function type from block argument declarations.
 
 **Validation:** The derive checks which Signature references appear in the format string and validates one of the two valid forms. A Signature field that has no corresponding `{sig}`, `{sig:inputs}`, or `{sig:return}` in the format string is a compile error.
 
@@ -245,7 +245,7 @@ The parser parses `{sig:inputs}` as a comma-separated type list and `{sig:return
 **Projected (`{sig:inputs}` + `{sig:return}`):** Each projection is an independent parser in the chain:
 - `{sig:inputs}` → `T::parser().separated_by(just(Token::Comma)).collect::<Vec<_>>()`
 - `{sig:return}` → `T::parser()`
-- After both are parsed, the AST constructor combines them: `Signature::new(inputs, ret, ())`
+- After both are parsed, the AST constructor combines them: `Signature::new().takes(inputs).returns(ret)`
 
 ### Printer codegen
 
