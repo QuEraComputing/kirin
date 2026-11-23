@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use kirin::ir::walk::WalkResult;
 use kirin::prelude::*;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_demand::{Demand, DemandAnalysis, DemandCallCtx};
 use kirin_interpreter::{AnalysisResults, Callee, InterpreterError, LinkTarget, StrongDemand};
-use kirin_ir::walk::WalkResult;
 use kirin_rewrite::{
     Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, PatternRule, RewriteDriver,
     RuleSet, StatementRule,

@@ -2,12 +2,12 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use kirin::ir::walk::WalkResult;
 use kirin::prelude::*;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_constprop::{CallCtx, ConstPropValue};
 use kirin_interpreter::{AnalysisResults, Callee, CrossStageLinker, ForwardEval, LinkTarget};
-use kirin_ir::walk::WalkResult;
 use kirin_rewrite::{
     Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, PatternRule, RewriteDriver,
     RuleSet, StatementRule,

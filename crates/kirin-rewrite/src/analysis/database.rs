@@ -72,8 +72,11 @@ impl<S> Database<S> {
             }
         }
 
-        // Clears the in-progress mark unless the result replaces it, so a
-        // failed or panicking `run` leaves nothing behind.
+        // If `run` fails or panics, the `InProgress` slot inserted above is
+        // never replaced by a result, and the next `get` would report a false
+        // cycle. `_mark` is never read: when it goes out of scope, however
+        // `get` returns, its `Drop` impl removes the slot if it is still
+        // `InProgress`.
         let _mark = InProgress::<A> {
             cache: &self.cache,
             key,
@@ -174,8 +177,9 @@ fn compute<S, A: Analysis<S>>(
     db.get::<A>(key).map(drop)
 }
 
-/// The in-progress mark on `A`'s entry for `key`, cleared on drop unless a
-/// result replaced it.
+/// Removes `A`'s `InProgress` slot for `key` when dropped, so a `run` that
+/// fails or panics leaves no slot behind. A slot that `get` has already
+/// replaced with the result is kept.
 struct InProgress<'a, A: AnalysisKind> {
     cache: &'a RefCell<AnalysisCache>,
     key: &'a A::Key,
