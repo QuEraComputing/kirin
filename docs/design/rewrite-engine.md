@@ -105,7 +105,7 @@ flowchart TB
     RD["RewriteDriver<br/>Walk · Chain · Fixpoint"]:::partial
     WM["WildcardMatcher"]:::planned
     RI["RuleIndex<br/>root-op indexing"]:::planned
-    AM["Database<br/>caches analysis results · drops them after an edit"]:::partial
+    AM["Database<br/>caches analysis results · drops them after an edit"]:::done
   end
 
   subgraph L2["kirin-wildcard — rule data"]
@@ -1150,7 +1150,8 @@ published as a successful commit record. The driver relies on these events
 twice: each rewrite's events decide which statements go back on the worklist,
 and the fixpoint ends at the first sweep that records none.
 
-The first analysis manager does not map events to analyses. Its policy is:
+The `Database` must not attempt fine-grained event-to-analysis mapping. Its
+safe policy is:
 
 ```text
 a pass that edited the IR ends
@@ -2972,7 +2973,7 @@ Designed in [`analysis-manager.md`](analysis-manager.md).
 - [x] Let native rules declare the results they read
   (`.requires::<A>(key)`) and read them through their recipe; have the
   driver check the cache holds them before editing.
-- [ ] Wire constprop and demand as first clients, caching the interpreter's
+- [x] Wire constprop and demand as first clients, caching the interpreter's
   owned `AnalysisResults`.
 - Defer selective invalidation (keeping the results an edit did not affect)
   until concrete clients justify it.
