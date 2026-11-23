@@ -1,5 +1,5 @@
 use crate::node::{LinkedList, Module, ModuleInfo};
-use crate::{BuilderStageInfo, DeclaredName, Dialect, GlobalSymbol, Statement, StatementParent};
+use crate::{BuilderStageInfo, DeclaredName, Dialect, Statement, StatementParent, Symbol};
 
 #[bon::bon]
 impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
@@ -9,11 +9,7 @@ impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
     ///
     /// If the stage already has a module named `name`.
     #[builder(finish_fn = new)]
-    pub fn module(
-        &mut self,
-        name: Option<GlobalSymbol>,
-        members: Option<Vec<Statement>>,
-    ) -> Module {
+    pub fn module(&mut self, name: Option<Symbol>, members: Option<Vec<Statement>>) -> Module {
         if let Some(name) = name {
             assert!(
                 self.module_by_name(name).is_none(),

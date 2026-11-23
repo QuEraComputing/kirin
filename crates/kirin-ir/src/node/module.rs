@@ -4,7 +4,6 @@ use crate::{Dialect, StageArenas, Symbol, identifier};
 use super::block::StatementIter;
 use super::linked_list::LinkedList;
 use super::stmt::Statement;
-use super::symbol::GlobalSymbol;
 
 /// The local name introduced by this statement, if any. Referenced symbols
 /// are deliberately excluded.
@@ -33,9 +32,9 @@ identifier! {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModuleInfo {
     pub(crate) id: Module,
-    /// A program-global name, so the same name refers to this module from
-    /// any stage. Unique among the stage's modules.
-    pub(crate) name: Option<GlobalSymbol>,
+    /// A stage-local name, like the names of the members. Unique among the
+    /// stage's modules; module and member names are looked up separately.
+    pub(crate) name: Option<Symbol>,
     pub(crate) members: LinkedList<Statement>,
 }
 
@@ -44,7 +43,7 @@ impl ModuleInfo {
         self.id
     }
 
-    pub fn name(&self) -> Option<GlobalSymbol> {
+    pub fn name(&self) -> Option<Symbol> {
         self.name
     }
 

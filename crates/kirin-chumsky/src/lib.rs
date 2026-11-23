@@ -33,8 +33,9 @@
 //! registration.
 //!
 //! [`ParseModuleText::parse_module`] parses a standalone
-//! `module @name { statement; ... }` into an explicitly selected program stage.
-//! It shares an SSA scope across members and reuses the dialect statement parser.
+//! `mod @name { statement; ... }` into a stage, located the same way as
+//! for [`ParseStatementText`].
+//! Each member has its own SSA scope and uses the dialect statement parser.
 //!
 //! # Defining Dialects
 //!
@@ -86,7 +87,7 @@ pub mod prelude {
     pub use crate::function_text::{
         FunctionParseError, FunctionParseErrorKind, ParseDispatch, ParseProgramText,
     };
-    pub use crate::module_text::ParseModuleText;
+    pub use crate::module_text::{ParseModuleText, ParseModuleTextExt};
     pub use crate::parsers::*;
     pub use crate::traits::{
         BoxedParser, ChumskyError, DirectlyParsable, EmitContext, EmitError, EmitIR,

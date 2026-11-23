@@ -18,7 +18,6 @@ pub enum StatementParent {
     Block(Block),
     DiGraph(DiGraph),
     UnGraph(UnGraph),
-    /// A top-level statement, such as a function definition, in a module.
     Module(Module),
 }
 

@@ -161,7 +161,7 @@ impl<L: Dialect> Arenas<L> {
     }
 
     /// The stage's module named `name`, if any.
-    pub fn module_by_name(&self, name: GlobalSymbol) -> Option<Module> {
+    pub fn module_by_name(&self, name: Symbol) -> Option<Module> {
         self.modules
             .iter()
             .find(|info| info.name == Some(name))

@@ -8,8 +8,8 @@ use kirin_test_languages::GraphFunctionLanguage;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[kirin(type = kirin_arith::ArithType)]
 enum TestLanguage {
-    #[chumsky(format = "item {name}")]
-    NamedItem {
+    #[chumsky(format = "decl {name}")]
+    Decl {
         #[kirin(declared_name)]
         name: Symbol,
     },
@@ -24,39 +24,38 @@ impl From<GraphFunctionLanguage> for TestLanguage {
 }
 
 #[test]
-fn named_item_lookup_after_roundtrip() {
+fn declaration_lookup_after_roundtrip() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let id = program.add_stage().stage(StageInfo::default()).new();
-    let module = program
-        .parse_module(id, "module @a { item @value; }")
-        .unwrap();
+    let module = program.parse_module(id, "mod @a { decl @value; }").unwrap();
+    // Module and member names are stage-local, so no global symbols are needed.
     let printed = module
         .render(program.stage(id).unwrap())
-        .globals(program.global_symbols())
         .into_string()
         .unwrap();
 
     let mut reparsed: Program<StageInfo<TestLanguage>> = Program::new();
     let id = reparsed.add_stage().stage(StageInfo::default()).new();
-    let module = reparsed.parse_module(id, &printed).unwrap();
+    reparsed.parse_module(id, &printed).unwrap();
+    let module = reparsed.resolve_module::<TestLanguage>("a", id).unwrap();
     let stage = reparsed.stage(id).unwrap();
     let value = stage.symbol_table().lookup("value").unwrap();
     let member = module.member_by_name(stage, value).unwrap();
-    assert!(matches!(member.definition(stage), TestLanguage::NamedItem { name } if *name == value));
+    assert!(matches!(member.definition(stage), TestLanguage::Decl { name } if *name == value));
 }
 
 #[test]
 fn builder_only_finds_explicit_members() {
     let mut stage = BuilderStageInfo::<TestLanguage>::default();
     let module = stage.module().new();
-    let name = stage.symbol_table_mut().intern("item".into());
+    let name = stage.symbol_table_mut().intern("value".into());
     let first = stage
         .statement()
-        .definition(TestLanguage::NamedItem { name })
+        .definition(TestLanguage::Decl { name })
         .new();
     let second = stage
         .statement()
-        .definition(TestLanguage::NamedItem { name })
+        .definition(TestLanguage::Decl { name })
         .new();
     assert_eq!(module.member_by_name(&stage, name), None);
     stage.add_module_member(module, first);
@@ -72,7 +71,7 @@ fn invalid_members_leave_stage_retryable() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let id = program.add_stage().stage(StageInfo::default()).new();
     for (members, message) in [
-        ("item @x; item @x;", "duplicate module member @x"),
+        ("decl @x; decl @x;", "duplicate module member @x"),
         (
             "%x = constant 1 -> i64; %y = add %x, %x -> i64;",
             "undefined SSA",
@@ -80,21 +79,19 @@ fn invalid_members_leave_stage_retryable() {
         ("ret;", "terminator"),
     ] {
         let err = program
-            .parse_module(id, &format!("module @retry {{ {members} }}"))
+            .parse_module(id, &format!("mod @retry {{ {members} }}"))
             .unwrap_err();
         assert!(err.to_string().contains(message), "{err}");
         let stage = program.stage(id).unwrap();
         assert_eq!(stage.module_arena().iter().count(), 0);
         assert_eq!(stage.statement_arena().iter().count(), 0);
     }
-    program
-        .parse_module(id, "module @retry { item @x; }")
-        .unwrap();
+    program.parse_module(id, "mod @retry { decl @x; }").unwrap();
 }
 
 #[test]
 fn empty_and_anonymous_modules_roundtrip() {
-    for input in ["module @empty {}", "module {}"] {
+    for input in ["mod @empty {}", "mod {}"] {
         let mut program: Program<StageInfo<TestLanguage>> = Program::new();
         let stage_id = program.add_stage().stage(StageInfo::default()).new();
         let module = program.parse_module(stage_id, input).unwrap();
@@ -126,12 +123,12 @@ fn module_names_and_ssa_scopes_are_separate() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let stage_id = program.add_stage().stage(StageInfo::default()).new();
     program
-        .parse_module(stage_id, "module @a { %x = constant 1 -> i64; }")
+        .parse_module(stage_id, "mod @a { %x = constant 1 -> i64; }")
         .unwrap();
     program
-        .parse_module(stage_id, "module @b { %x = constant 2 -> i64; }")
+        .parse_module(stage_id, "mod @b { %x = constant 2 -> i64; }")
         .unwrap();
-    let error = program.parse_module(stage_id, "module @a {}").unwrap_err();
+    let error = program.parse_module(stage_id, "mod @a {}").unwrap_err();
     assert!(error.to_string().contains("duplicate module @a"));
     assert_eq!(
         program
@@ -143,7 +140,7 @@ fn module_names_and_ssa_scopes_are_separate() {
         2
     );
     let error = program
-        .parse_module(stage_id, "module @c { %y = add %x, %x -> i64; }")
+        .parse_module(stage_id, "mod @c { %y = add %x, %x -> i64; }")
         .unwrap_err();
     assert!(error.to_string().contains("undefined SSA"), "{error}");
 }
@@ -151,10 +148,10 @@ fn module_names_and_ssa_scopes_are_separate() {
 #[test]
 fn module_syntax_errors_and_member_spans() {
     for input in [
-        "module @bad { %x = constant 1 -> i64 }", // missing semicolon
-        "module @bad {",                          // unclosed container
-        "module @bad {} trailing",
-        "module @bad { %x = graph_eval (]; }", // mismatched delimiters
+        "mod @bad { %x = constant 1 -> i64 }", // missing semicolon
+        "mod @bad {",                          // unclosed container
+        "mod @bad {} trailing",
+        "mod @bad { %x = graph_eval (]; }", // mismatched delimiters
     ] {
         let mut program: Program<StageInfo<TestLanguage>> = Program::new();
         let stage_id = program.add_stage().stage(StageInfo::default()).new();
@@ -171,7 +168,7 @@ fn module_syntax_errors_and_member_spans() {
     }
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let stage_id = program.add_stage().stage(StageInfo::default()).new();
-    let input = "module @bad {\n  unknown_statement;\n}";
+    let input = "mod @bad {\n  unknown_statement;\n}";
     let ChumskyError::Parse(errors) = program.parse_module(stage_id, input).unwrap_err() else {
         panic!("expected dialect syntax error");
     };

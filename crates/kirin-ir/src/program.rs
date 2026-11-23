@@ -301,8 +301,8 @@ impl<S> Program<S> {
 
     /// Resolve a module name at a given stage to its [`Module`].
     ///
-    /// Module names are program-global, so one name identifies the
-    /// corresponding module at every stage that has one.
+    /// Module names are stage-local: the name is looked up in that stage's
+    /// symbol table.
     ///
     /// Returns `None` if the name is unknown, the stage is missing or holds a
     /// different dialect, or the stage has no module with that name.
@@ -310,9 +310,8 @@ impl<S> Program<S> {
     where
         S: HasStageInfo<L>,
     {
-        let sym = self.lookup_symbol(name)?;
         let info = HasStageInfo::<L>::try_stage_info(self.stage(stage)?)?;
-        info.module_by_name(sym)
+        info.module_by_name(info.symbol_table().lookup(name)?)
     }
 
     /// Resolve a stage-local [`Symbol`] to a program-level [`Function`].

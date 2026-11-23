@@ -7,11 +7,10 @@ impl<'a, L: Dialect + PrettyPrint> Document<'a, L>
 where
     L::Type: std::fmt::Display,
 {
-    /// Print `module @name { statement; ... }`, without a stage prefix.
-    /// Supply the program's global symbols to preserve a named module's name.
+    /// Print `mod @name { statement; ... }`, without a stage prefix.
     pub fn print_module(&'a self, module: &Module) -> ArenaDoc<'a> {
         let info = module.expect_info(self.stage);
-        let mut header = self.text("module");
+        let mut header = self.text("mod");
         if let Some(name) = info.name() {
             header += self.text(" ") + name.pretty_print(self);
         }

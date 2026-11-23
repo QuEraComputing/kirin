@@ -50,7 +50,7 @@ impl<'t> HasParser<'t> for ModuleText<'t> {
             .to_span()
             .then_ignore(just(Token::Semicolon));
 
-        identifier("module")
+        identifier("mod")
             .ignore_then(symbol().or_not())
             .then(
                 member
@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn member_spans_keep_nested_delimiters_strings_and_comments() {
-        let input = r#"module @m {
+        let input = r#"mod @m {
             first "a; } b" [1, (2, 3)] { nested; }; // ignored ; }
             second;
         }"#;
