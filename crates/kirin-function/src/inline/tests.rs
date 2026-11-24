@@ -4,8 +4,15 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
 use kirin_cf::ControlFlow;
 
-use super::{FunctionOps, InlineError, inline_calls};
-use crate::{Call, CallLike, Function, Return};
+use super::{FunctionOps, InlineError, InlineReport, NotInlined, inline_calls};
+use crate::{Call, CallLike, Function, Lambda, Return};
+
+/// A statement owning a block, like an `scf.if` arm or a loop body.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(builders, type = ArithType)]
+struct Nest {
+    body: Block,
+}
 
 /// A language wrapping this crate's function operations with branches and
 /// arithmetic.
@@ -22,6 +29,10 @@ enum TestLang {
     Cf(ControlFlow<ArithType>),
     #[wraps]
     Arith(Arith<ArithType>),
+    #[wraps]
+    Lambda(Lambda<ArithType>),
+    #[wraps]
+    Nest(Nest),
 }
 
 impl FunctionOps<ArithType> for TestLang {
@@ -119,6 +130,22 @@ fn choose(b: &mut Builder) -> SpecializedFunction {
     define(b, body, 2)
 }
 
+/// The report of a run that inlined `count` calls and skipped none.
+fn inlined(count: usize) -> Result<InlineReport, InlineError> {
+    Ok(InlineReport {
+        inlined: count,
+        skipped: vec![],
+    })
+}
+
+/// The report of a run that inlined nothing and skipped one call, for `reason`.
+fn skipped(reason: NotInlined) -> Result<InlineReport, InlineError> {
+    Ok(InlineReport {
+        inlined: 0,
+        skipped: vec![reason],
+    })
+}
+
 fn definition(stage: &StageInfo<TestLang>, stmt: Statement) -> &TestLang {
     stmt.expect_info(stage).definition()
 }
@@ -168,7 +195,7 @@ fn a_single_block_callee_is_inlined_in_place() {
     let d = d_id;
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
     drop(rw);
 
     // ^g(%x): %s = add %x, %x; %d = add %s, %s; ret %d
@@ -185,6 +212,71 @@ fn a_single_block_callee_is_inlined_in_place() {
         TestLang::Arith(Arith::Add { lhs, rhs, .. }) if *lhs == s && *rhs == s
     ));
     assert_eq!(body.blocks(&stage).count(), 1);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn a_call_reading_an_earlier_blocks_inlined_call_reads_the_inlined_value() {
+    // ^g(%x): %c = call @f(%x); br ^b
+    // ^b: %d = call @f(%c); ret %d
+    let mut b = Builder::default();
+    let f = add_twice(&mut b);
+    let x = b.block_argument().index(0);
+    let first = Call::<ArithType>::build(&mut b)
+        .specialized(f)
+        .args(vec![x])
+        .results(1)
+        .insert();
+    let c: SSAValue = first.results[0].into();
+    let second = Call::<ArithType>::build(&mut b)
+        .specialized(f)
+        .args(vec![c])
+        .results(1)
+        .insert();
+    let ret = Return::<ArithType>::new(&mut b, vec![second.results[0].into()]);
+    let ret_id = ret.id;
+    let bb = b.block().stmt(second).terminator(ret).new();
+    let br = b.statement().definition(branch(bb, vec![])).new();
+    let g = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(first)
+        .terminator(br)
+        .new();
+    let body = b.cfg().add_block(g).add_block(bb).new();
+    define(&mut b, body, 1);
+    let mut stage = b.finalize().unwrap();
+    let x = arg(&stage, g, 0);
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
+    drop(rw);
+
+    // ^g(%x): %s = add %x, %x; br ^b
+    // ^b: %t = add %s, %s; ret %t
+    let [s_stmt] = g.statements(&stage).collect::<Vec<_>>()[..] else {
+        panic!("expected one statement in ^g");
+    };
+    let s = result(&stage, s_stmt);
+    assert!(matches!(
+        definition(&stage, s_stmt),
+        TestLang::Arith(Arith::Add { lhs, rhs, .. }) if *lhs == x && *rhs == x
+    ));
+    let [t_stmt] = bb.statements(&stage).collect::<Vec<_>>()[..] else {
+        panic!("expected one statement in ^b");
+    };
+    let t = result(&stage, t_stmt);
+    assert!(matches!(
+        definition(&stage, t_stmt),
+        TestLang::Arith(Arith::Add { lhs, rhs, .. }) if *lhs == s && *rhs == s
+    ));
+    assert_eq!(
+        definition(&stage, ret_id)
+            .arguments()
+            .copied()
+            .collect::<Vec<_>>(),
+        [t]
+    );
     verify_derived(&stage).unwrap();
 }
 
@@ -219,7 +311,7 @@ fn a_multi_block_callee_is_inlined_between_the_halves_of_the_block() {
     let d = d_id;
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
     drop(rw);
 
     // ^g(%x, %y): br ^e'(%x, %y)
@@ -323,7 +415,7 @@ fn a_callee_whose_entry_is_a_loop_header_keeps_its_entry_arguments() {
     let k = arg(rw.stage(), back, 0);
     rw.create(InsertionPoint::Terminator(back), branch(entry, vec![k]))
         .unwrap();
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
     drop(rw);
 
     // ^g(%x): br ^e'(%x)
@@ -400,7 +492,7 @@ fn calls_the_inlined_code_brings_in_are_left_for_another_run() {
     let mut rw = Rewriter::new(&mut stage);
     // One level: `@k` and `@h` are inlined, the call to `@f` `@k` brings in is
     // left.
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(2));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
     let left = calls(rw.stage(), body);
     assert_eq!(left.len(), 1);
     assert!(matches!(
@@ -408,8 +500,8 @@ fn calls_the_inlined_code_brings_in_are_left_for_another_run() {
         Some(Call::Specialized(call)) if call.target() == f
     ));
     // A second run inlines it, and a third finds nothing left.
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(0));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(0));
     drop(rw);
 
     assert!(calls(&stage, body).is_empty());
@@ -462,7 +554,7 @@ fn several_multi_block_calls_in_one_block_are_all_inlined() {
     let mut stage = b.finalize().unwrap();
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(2));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
     drop(rw);
 
     assert!(calls(&stage, body).is_empty());
@@ -514,7 +606,7 @@ fn a_call_with_several_results_takes_every_returned_value() {
     let d = d_id;
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
     drop(rw);
 
     let s = result(&stage, g.statements(&stage).next().unwrap());
@@ -545,27 +637,14 @@ fn calling(b: &mut Builder, target: SpecializedFunction, results: usize) -> (CFG
 }
 
 #[test]
-fn calls_that_cannot_be_inlined_are_rejected_before_any_edit() {
+fn calls_that_do_not_match_their_callee_are_rejected_before_any_edit() {
     let mut b = Builder::default();
     let f = add_twice(&mut b);
     let h = choose(&mut b);
-    // A specialization whose definition has no body.
-    let x = b.block_argument().index(0);
-    let plain = Arith::<ArithType>::op_add(&mut b, x, x);
-    let plain_id = plain.id;
-    let ret = Return::<ArithType>::new(&mut b, vec![]);
-    let _holder = b
-        .block()
-        .argument(ArithType::I64)
-        .stmt(plain)
-        .terminator(ret)
-        .new();
-    let bodiless = specialize(&mut b, plain_id, 1);
     // `@f` takes one argument, `calling` passes two.
     let (too_many_args, call_f) = calling(&mut b, f, 1);
     // `@h` returns one value, the call takes two.
     let (too_many_results, call_h) = calling(&mut b, h, 2);
-    let (no_body, call_bodiless) = calling(&mut b, bodiless, 1);
     let mut stage = b.finalize().unwrap();
 
     let mut rw = Rewriter::new(&mut stage);
@@ -585,9 +664,266 @@ fn calls_that_cannot_be_inlined_are_rejected_before_any_edit() {
             returned: 1
         })
     );
+    assert!(rw.events().is_empty());
+}
+
+#[test]
+fn calls_to_a_callee_with_no_cfg_body_or_an_empty_one_are_left_untouched() {
+    let mut b = Builder::default();
+    // A specialization whose definition has no body.
+    let x = b.block_argument().index(0);
+    let plain = Arith::<ArithType>::op_add(&mut b, x, x);
+    let plain_id = plain.id;
+    let ret = Return::<ArithType>::new(&mut b, vec![]);
+    let _holder = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(plain)
+        .terminator(ret)
+        .new();
+    let bodiless = specialize(&mut b, plain_id, 1);
+    // A function whose body is a CFG with no blocks.
+    let empty_body = b.cfg().new();
+    let empty = define(&mut b, empty_body, 1);
+    let (no_body, call_bodiless) = calling(&mut b, bodiless, 1);
+    let (empty_callee, call_empty) = calling(&mut b, empty, 1);
+    let mut stage = b.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
         inline_calls(&mut rw, no_body, branch),
-        Err(InlineError::CalleeBodyNotCfg(call_bodiless))
+        skipped(NotInlined::CalleeBodyNotCfg(call_bodiless))
+    );
+    assert_eq!(
+        inline_calls(&mut rw, empty_callee, branch),
+        skipped(NotInlined::EmptyCalleeBody(call_empty))
+    );
+    assert!(rw.events().is_empty());
+}
+
+/// `nest { ret %v }`, and the return in it.
+fn nest_returning(b: &mut Builder, v: SSAValue) -> (Statement, Statement) {
+    let ret = Return::<ArithType>::new(b, vec![v]);
+    let ret_id: Statement = ret.into();
+    let body = b.block().terminator(ret_id).new();
+    let nest = b
+        .statement()
+        .definition(TestLang::Nest(Nest { body }))
+        .new();
+    (nest, ret_id)
+}
+
+#[test]
+fn calls_to_a_callee_with_a_return_nested_in_a_body_are_left_untouched() {
+    let mut b = Builder::default();
+    // fn @f(%p, %q) { ^e(%p, %q): %s = add %p, %p; nest { ret %s }; ret %p }:
+    // one block, one top-level return, so it would be inlined in place.
+    let p = b.block_argument().index(0);
+    let add = Arith::<ArithType>::op_add(&mut b, p, p);
+    let (nest, in_place_ret) = nest_returning(&mut b, add.result.into());
+    let ret = Return::<ArithType>::new(&mut b, vec![p]);
+    let entry = b
+        .block()
+        .argument(ArithType::I64)
+        .argument(ArithType::I64)
+        .stmt(add)
+        .stmt(nest)
+        .terminator(ret)
+        .new();
+    let body = b.cfg().add_block(entry).new();
+    let in_place = define(&mut b, body, 2);
+    // fn @h(%p, %q) { ^e(%p, %q): %s = add %p, %p; nest { ret %s }; br ^t(%q);
+    // ^t(%a): ret %a }
+    let a = b.block_argument().index(0);
+    let ret_a = Return::<ArithType>::new(&mut b, vec![a]);
+    let t = b.block().argument(ArithType::I64).terminator(ret_a).new();
+    let p = b.block_argument().index(0);
+    let q = b.block_argument().index(1);
+    let add = Arith::<ArithType>::op_add(&mut b, p, p);
+    let (nest, blocks_ret) = nest_returning(&mut b, add.result.into());
+    let br = b.statement().definition(branch(t, vec![q])).new();
+    let entry = b
+        .block()
+        .argument(ArithType::I64)
+        .argument(ArithType::I64)
+        .stmt(add)
+        .stmt(nest)
+        .terminator(br)
+        .new();
+    let body = b.cfg().add_block(entry).add_block(t).new();
+    let as_blocks = define(&mut b, body, 2);
+    let (calls_in_place, call_in_place) = calling(&mut b, in_place, 1);
+    let (calls_as_blocks, call_as_blocks) = calling(&mut b, as_blocks, 1);
+    let mut stage = b.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(
+        inline_calls(&mut rw, calls_in_place, branch),
+        skipped(NotInlined::NestedReturn {
+            call: call_in_place,
+            ret: in_place_ret
+        })
+    );
+    assert_eq!(
+        inline_calls(&mut rw, calls_as_blocks, branch),
+        skipped(NotInlined::NestedReturn {
+            call: call_as_blocks,
+            ret: blocks_ret
+        })
+    );
+    assert!(rw.events().is_empty());
+}
+
+#[test]
+fn a_return_nested_in_a_lambda_of_the_callee_is_copied_as_is() {
+    // fn @f(%p, %q) { ^e(%p, %q):
+    //   %l = lambda { ^b(%y): %z = add %y, %y; nest { ret %z }; ret %y };
+    //   ret %p }
+    let mut b = Builder::default();
+    let y = b.block_argument().index(0);
+    let add = Arith::<ArithType>::op_add(&mut b, y, y);
+    let (nest, _) = nest_returning(&mut b, add.result.into());
+    let ret_y = Return::<ArithType>::new(&mut b, vec![y]);
+    let lambda_entry = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(add)
+        .stmt(nest)
+        .terminator(ret_y)
+        .new();
+    let lambda_body = b.cfg().add_block(lambda_entry).new();
+    let name = b.symbol_table_mut().intern("l".to_string());
+    let lambda = Lambda::<ArithType>::new(&mut b, name, vec![], lambda_body);
+    let p = b.block_argument().index(0);
+    let ret = Return::<ArithType>::new(&mut b, vec![p]);
+    let entry = b
+        .block()
+        .argument(ArithType::I64)
+        .argument(ArithType::I64)
+        .stmt(lambda)
+        .terminator(ret)
+        .new();
+    let body = b.cfg().add_block(entry).new();
+    let f = define(&mut b, body, 2);
+    let (caller, _) = calling(&mut b, f, 1);
+    let mut stage = b.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(inline_calls(&mut rw, caller, branch), inlined(1));
+    drop(rw);
+
+    // ^g(%x): %l = lambda { ^b(%y): %z = add %y, %y; nest { ret %z }; ret %y }; ret
+    let g = caller.blocks(&stage).next().unwrap();
+    let stmts: Vec<Statement> = g.statements(&stage).collect();
+    assert_eq!(stmts.len(), 1);
+    let TestLang::Lambda(copy) = definition(&stage, stmts[0]) else {
+        panic!("the lambda is copied in front of the call");
+    };
+    let Some(Body::CFG(copy_body)) = copy.callable_body() else {
+        panic!("the copied lambda has a CFG body");
+    };
+    let copy_entry = copy_body.blocks(&stage).next().unwrap();
+    let nest_copy = copy_entry.statements(&stage).nth(1).unwrap();
+    let TestLang::Nest(Nest { body: nest_body }) = definition(&stage, nest_copy) else {
+        panic!("the lambda's nest is copied");
+    };
+    let nested_ret = nest_body.terminator(&stage).unwrap();
+    assert!(definition(&stage, nested_ret).as_return().is_some());
+    verify_derived(&stage).unwrap();
+}
+
+/// `^g(%x): %first = call @first(..); %second = call @second(..); ret`, where
+/// each call passes `%x` as many times as its `args` says. Returns the CFG,
+/// `^g`, and the two calls.
+fn two_calls(
+    b: &mut Builder,
+    first: (SpecializedFunction, usize),
+    second: (SpecializedFunction, usize),
+) -> (CFG, Block, Statement, Statement) {
+    let x = b.block_argument().index(0);
+    let call = |b: &mut Builder, (target, args): (SpecializedFunction, usize)| {
+        Call::<ArithType>::build(b)
+            .specialized(target)
+            .args(vec![x; args])
+            .results(1)
+            .insert()
+    };
+    let first = call(b, first);
+    let second = call(b, second);
+    let (first_id, second_id) = (first.id, second.id);
+    let ret = Return::<ArithType>::new(b, vec![]);
+    let g = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(first)
+        .stmt(second)
+        .terminator(ret)
+        .new();
+    (b.cfg().add_block(g).new(), g, first_id, second_id)
+}
+
+#[test]
+fn a_call_left_as_a_call_does_not_stop_the_others_being_inlined() {
+    // fn @n(%p) { ^e(%p): %s = add %p, %p; nest { ret %s }; ret %p }
+    let mut b = Builder::default();
+    let f = add_twice(&mut b);
+    let p = b.block_argument().index(0);
+    let add = Arith::<ArithType>::op_add(&mut b, p, p);
+    let (nest, nested_ret) = nest_returning(&mut b, add.result.into());
+    let ret = Return::<ArithType>::new(&mut b, vec![p]);
+    let entry = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(add)
+        .stmt(nest)
+        .terminator(ret)
+        .new();
+    let n_body = b.cfg().add_block(entry).new();
+    let n = define(&mut b, n_body, 1);
+    // ^g(%x): %a = call @f(%x); %b = call @n(%x); ret
+    let (body, g, _, call_n) = two_calls(&mut b, (f, 1), (n, 1));
+    let mut stage = b.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(
+        inline_calls(&mut rw, body, branch),
+        Ok(InlineReport {
+            inlined: 1,
+            skipped: vec![NotInlined::NestedReturn {
+                call: call_n,
+                ret: nested_ret
+            }],
+        })
+    );
+    drop(rw);
+
+    // ^g(%x): %s = add %x, %x; %b = call @n(%x); ret
+    let stmts: Vec<Statement> = g.statements(&stage).collect();
+    assert_eq!(stmts.len(), 2);
+    assert!(matches!(
+        definition(&stage, stmts[0]),
+        TestLang::Arith(Arith::Add { .. })
+    ));
+    assert_eq!(calls(&stage, body), vec![call_n]);
+}
+
+#[test]
+fn a_call_that_does_not_match_its_callee_stops_the_run_before_any_edit() {
+    // ^g(%x): %a = call @f(%x, %x); %b = call @f(%x); ret. The calls are
+    // inlined last to first, so `%b`, which matches, comes before `%a`.
+    let mut b = Builder::default();
+    let f = add_twice(&mut b);
+    let (body, _, call_a, _) = two_calls(&mut b, (f, 2), (f, 1));
+    let mut stage = b.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(
+        inline_calls(&mut rw, body, branch),
+        Err(InlineError::ArgumentCountMismatch {
+            call: call_a,
+            parameters: 1,
+            arguments: 2
+        })
     );
     assert!(rw.events().is_empty());
 }

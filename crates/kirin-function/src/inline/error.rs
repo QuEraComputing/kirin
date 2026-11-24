@@ -2,14 +2,14 @@ use std::fmt;
 
 use kirin::prelude::*;
 
-/// A call [`inline_calls`](super::inline_calls) could not inline. Calls
-/// inlined before it stay inlined.
+/// A call [`inline_calls`](super::inline_calls) found whose callee is not a
+/// live specialization, or whose argument or result count does not match the
+/// callee's signature. Every call is checked before any edit, so the stage is
+/// left as it was.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InlineError {
     /// The callee of the call is not a live specialization in this stage.
     UnknownCallee(Statement),
-    /// The callee's body is not a CFG with an entry block.
-    CalleeBodyNotCfg(Statement),
     /// The call passes `arguments` values to a callee whose entry block takes
     /// `parameters`.
     ArgumentCountMismatch {
@@ -24,14 +24,6 @@ pub enum InlineError {
         results: usize,
         returned: usize,
     },
-    /// An edit failed. The checks above should prevent this.
-    Rewrite(RewriteError),
-}
-
-impl From<RewriteError> for InlineError {
-    fn from(error: RewriteError) -> Self {
-        InlineError::Rewrite(error)
-    }
 }
 
 impl fmt::Display for InlineError {
@@ -39,12 +31,6 @@ impl fmt::Display for InlineError {
         match self {
             InlineError::UnknownCallee(call) => {
                 write!(f, "the callee of {call:?} is not a live specialization")
-            }
-            InlineError::CalleeBodyNotCfg(call) => {
-                write!(
-                    f,
-                    "the callee of {call:?} has no CFG body with an entry block"
-                )
             }
             InlineError::ArgumentCountMismatch {
                 call,
@@ -63,7 +49,6 @@ impl fmt::Display for InlineError {
                 "a return of the callee of {call:?} returns {returned} values, \
                  the call has {results} results"
             ),
-            InlineError::Rewrite(error) => write!(f, "{error}"),
         }
     }
 }

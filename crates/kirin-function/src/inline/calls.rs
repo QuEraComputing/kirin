@@ -1,18 +1,30 @@
 use kirin::prelude::*;
 
+use super::check::{Callee, Checked, check_call};
 use super::ops::{InlinableCall, inlinable_call};
-use super::{FunctionOps, InlineError};
+use super::{FunctionOps, InlineError, NotInlined};
 
-/// Inline every specialized function call in `cfg`'s blocks, and return how
-/// many were inlined. Only calls to a function in this stage whose body is a
-/// CFG are inlined.
+/// What a run of [`inline_calls`] did.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct InlineReport {
+    /// How many calls were inlined.
+    pub inlined: usize,
+    /// The calls to a function in this stage left as calls, and why, in the
+    /// order they were met. Calls of another kind, to another stage, or nested
+    /// in statements' bodies are not listed.
+    pub skipped: Vec<NotInlined>,
+}
+
+/// Inline every specialized function call in `cfg`'s blocks, and report how
+/// many were inlined and which were left as calls. Only calls to a function
+/// in this stage whose body is a CFG are inlined.
 ///
 /// A callee that is a single block ending in a return has its statements
 /// copied in front of the call, and the call's results are replaced by the
-/// returned values. Any other callee is copied as blocks: the call's block is split
-/// after the call, the copied blocks go in between and are entered with a
-/// branch passing the call's arguments, each copied return becomes a branch to
-/// the second half with the returned values, and that half takes the call's
+/// returned values. Any other callee is copied as blocks: the call's block is
+/// split after the call, the copied blocks go in between and are entered with
+/// a branch passing the call's arguments, each copied return becomes a branch
+/// to the second half with the returned values, and that half takes the call's
 /// results as its arguments.
 /// `branch` builds the language's branch to a block with arguments.
 ///
@@ -20,103 +32,87 @@ use super::{FunctionOps, InlineError};
 /// another run to inline. Calls of another kind, to another stage, or nested
 /// in statements' bodies are left as they are too.
 ///
+/// Every call is checked before any edit. A call this inliner does not
+/// handle is left as a call, untouched, and reported (see [`NotInlined`]);
+/// the others are still inlined. For example, a callee with a return nested
+/// in a statement's body, such as an `scf.if` arm or a loop body, is not
+/// inlined: that return cannot become a branch, and copied as is it would
+/// return from the caller. Returns of a callable nested in the callee, such as
+/// a lambda, are copied as they are: they still return from it.
+///
 /// It is the caller's responsibility to ensure there is no recursion, self or
 /// mutual, among the calls inlined.
 ///
-/// Each block is walked from its last statement to its first, so a split only
+/// Each block's calls are inlined from its last to its first, so a split only
 /// moves statements after the call, which no earlier split moved: a run is
 /// linear in `cfg`'s size plus the size of the callees it copies. Running this
 /// on each callee's body earlier than on its callers' bodies inlines everything
 /// with one run per function, since a callee with no calls left brings none in.
 ///
-/// Stops at the first call it cannot inline (see [`InlineError`]), leaving
-/// the calls inlined before it inlined.
+/// Rejects, leaving the stage untouched, if a call's callee is not a live
+/// specialization, or the call's argument or result count does not match the
+/// callee's signature (see [`InlineError`]).
 pub fn inline_calls<L, T>(
     rewriter: &mut Rewriter<'_, L>,
     cfg: CFG,
     branch: impl Fn(Block, Vec<SSAValue>) -> L,
-) -> Result<usize, InlineError>
+) -> Result<InlineReport, InlineError>
 where
     L: Dialect + HasCallableBody + FunctionOps<T>,
     T: CompileTimeValue,
 {
-    let mut inlined = 0;
-    let blocks: Vec<Block> = cfg.blocks(rewriter.stage()).collect();
-    for block in blocks {
-        let mut cursor = block
-            .expect_info(rewriter.stage())
-            .statements()
-            .tail()
-            .copied();
-        while let Some(stmt) = cursor {
-            // Read before inlining: the statement before the call, whatever
-            // inlining puts in between.
-            cursor = *stmt.prev(rewriter.stage());
-            if let Some(call) = inlinable_call::<L, T>(rewriter.stage(), stmt) {
-                inline_call(rewriter, stmt, call, &branch)?;
-                inlined += 1;
+    // Check every call before any edit, each block from its last statement to
+    // its first: the order they are inlined in.
+    let stage = rewriter.stage();
+    let mut report = InlineReport::default();
+    let mut accepted = Vec::new();
+    for block in cfg.blocks(stage) {
+        let stmts: Vec<Statement> = block.statements(stage).collect();
+        for stmt in stmts.into_iter().rev() {
+            let Some(call) = inlinable_call::<L, T>(stage, stmt) else {
+                continue;
+            };
+            match check_call::<L, T>(stage, stmt, &call)? {
+                Checked::Inline(callee) => accepted.push((stmt, callee)),
+                Checked::Skip(reason) => report.skipped.push(reason),
             }
         }
     }
-    Ok(inlined)
+    // Inlining a call copies its callee and never edits one, so each saved
+    // `callee` still describes its callee. It can change what a later call
+    // reads, though: it redirects uses of its results, which a call in a later
+    // block may take as arguments. So each call's operands are read again here,
+    // which costs only its argument and result lists; the callee is not checked
+    // again.
+    for (stmt, callee) in accepted {
+        let call = inlinable_call::<L, T>(rewriter.stage(), stmt)
+            .expect("inlining other calls only redirects this call's arguments");
+        inline_call(rewriter, stmt, call, callee, &branch)
+            .expect("`check_call` accepted the call, so inlining it cannot fail");
+        report.inlined += 1;
+    }
+    Ok(report)
 }
 
-/// Inline `stmt`, the call `call`, after checking that it can be.
-fn inline_call<L, T>(
+/// Inline `stmt`, the call `call` to `callee`, which [`check_call`] accepted.
+fn inline_call<L>(
     rewriter: &mut Rewriter<'_, L>,
     stmt: Statement,
     call: InlinableCall,
+    callee: Callee,
     branch: &impl Fn(Block, Vec<SSAValue>) -> L,
-) -> Result<(), InlineError>
+) -> Result<(), RewriteError>
 where
-    L: Dialect + HasCallableBody + FunctionOps<T>,
-    T: CompileTimeValue,
+    L: Dialect,
 {
     let stage = rewriter.stage();
-    let definition = call
-        .target
-        .get_info(stage)
-        .map(|info| *info.definition())
-        .filter(|definition| definition.get_info(stage).is_some())
-        .ok_or(InlineError::UnknownCallee(stmt))?;
-    let Some(Body::CFG(callee)) = definition.expect_info(stage).definition().callable_body() else {
-        return Err(InlineError::CalleeBodyNotCfg(stmt));
-    };
-    let blocks: Vec<Block> = callee.blocks(stage).collect();
-    let &[entry, ..] = blocks.as_slice() else {
-        return Err(InlineError::CalleeBodyNotCfg(stmt));
-    };
-    let entry_args: Vec<SSAValue> = entry
-        .expect_info(stage)
-        .arguments()
-        .iter()
-        .map(|&arg| arg.into())
-        .collect();
-    if entry_args.len() != call.args.len() {
-        return Err(InlineError::ArgumentCountMismatch {
-            call: stmt,
-            parameters: entry_args.len(),
-            arguments: call.args.len(),
-        });
-    }
-    // Every return of the callee, by its block.
-    let mut returns = Vec::new();
-    for &block in &blocks {
-        let Some(terminator) = block.terminator(stage) else {
-            continue;
-        };
-        if let Some(ret) = terminator.expect_info(stage).definition().as_return() {
-            let returned = ret.arguments().count();
-            if returned != call.results.len() {
-                return Err(InlineError::ReturnCountMismatch {
-                    call: stmt,
-                    results: call.results.len(),
-                    returned,
-                });
-            }
-            returns.push(terminator);
-        }
-    }
+    let Callee {
+        body: callee,
+        blocks,
+        entry,
+        entry_args,
+        returns,
+    } = callee;
     let in_place = blocks.len() == 1 && returns.len() == 1;
     let mut map = IRMap::default();
 

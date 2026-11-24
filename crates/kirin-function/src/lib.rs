@@ -27,7 +27,6 @@ pub mod ret;
 pub use bind::Bind;
 pub use call::{Call, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged};
 pub use function::Function;
-pub use inline::{FunctionOps, InlineError, inline_calls};
 pub use lambda::Lambda;
 pub use ret::Return;
 
