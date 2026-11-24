@@ -120,7 +120,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     }
 
     /// Whether `parent` is `body` or nested in it at any depth.
-    fn body_contains(&self, body: Body, parent: StatementParent) -> bool {
+    pub(in crate::rewrite) fn body_contains(&self, body: Body, parent: StatementParent) -> bool {
         let mut current = parent;
         loop {
             let owner = match current {
@@ -182,7 +182,7 @@ impl<L: Dialect> Rewriter<'_, L> {
         false
     }
 
-    /// Make `owner` the parent of `body`.
+    /// Make `owner` the parent of `body`, which is no longer detached.
     pub(super) fn adopt_body(&mut self, body: Body, owner: Statement) {
         match body {
             Body::Block(block) => {
@@ -192,6 +192,7 @@ impl<L: Dialect> Rewriter<'_, L> {
                 }
             }
             Body::CFG(cfg) => {
+                self.detached_cfgs.remove(&cfg);
                 if let Some(item) = cfg.get_info_mut(self.stage) {
                     item.parent = Some(owner);
                 }

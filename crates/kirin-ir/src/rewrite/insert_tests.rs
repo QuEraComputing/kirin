@@ -3,8 +3,11 @@
 //! members already reading its results, and makes an `UnGraph` wire already
 //! read by nodes an edge.
 //!
-//! In-crate because both need a detached statement, made by
-//! [`Rewriter::build_statement`], which no public API exposes yet.
+//! In-crate so the tests can build each detached statement directly with
+//! [`Rewriter::build_statement`], choosing how deeply its bodies nest and
+//! what reads its results before it is placed. `tests/clone.rs` covers the
+//! nested-body rejection for a statement copied with
+//! [`Rewriter::clone_statement`].
 
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
