@@ -45,7 +45,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // such value is read as it is, so none can be rejected.
         if map.has_values() {
             let copied = bodies_of(&stmt.expect_info(self.stage).definition);
-            self.check_replacements_live(stmt, map, &copied)?;
+            self.check_replacements_live(stmt, map, Some(stmt), &copied)?;
         }
 
         self.reserve_statement(stmt, map);
@@ -78,7 +78,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // as in `clone_statement`.
         if map.has_values() {
             for stmt in self.body_statements(Body::CFG(source)) {
-                self.check_replacements_live(stmt, map, &[Body::CFG(source)])?;
+                self.check_replacements_live(stmt, map, None, &[Body::CFG(source)])?;
             }
         }
 
@@ -91,13 +91,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Reject `stmt` if the copy would read a value from `map` that is not
-    /// live, in `stmt` or anything nested in it. A value defined in `copied`,
-    /// the bodies being copied, is skipped: copying overwrites its entry in
-    /// `map` before anything reads it.
+    /// live, in `stmt` or anything nested in it. A value the copy defines, a
+    /// result of `root` (the statement being copied, if any) or a value
+    /// defined in `copied` (the bodies being copied), is skipped: copying
+    /// overwrites its entry in `map` before anything reads it.
     fn check_replacements_live(
         &self,
         stmt: Statement,
         map: &IRMap,
+        root: Option<Statement>,
         copied: &[Body],
     ) -> Result<(), RewriteError> {
         let definition = &stmt.expect_info(self.stage).definition;
@@ -108,27 +110,28 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for &read in definition.arguments().chain(yields) {
             if let Some(replacement) = map.value(read)
                 && replacement.get_info(self.stage).is_none()
-                && !self.defined_in(read, copied)
+                && !self.defined_in(read, root, copied)
             {
                 return Err(RewriteError::UnknownValue(replacement));
             }
         }
         for body in bodies_of(definition) {
             for nested in self.body_statements(body) {
-                self.check_replacements_live(nested, map, copied)?;
+                self.check_replacements_live(nested, map, root, copied)?;
             }
         }
         Ok(())
     }
 
-    /// Whether `value` is defined in one of `bodies`, at any depth: a result
-    /// of a statement in it, or an argument or port of it or of a body nested
-    /// in it.
-    fn defined_in(&self, value: SSAValue, bodies: &[Body]) -> bool {
+    /// Whether `value` is defined by the copy: a result of `root`, or defined
+    /// in one of `bodies` at any depth (a result of a statement in it, or an
+    /// argument or port of it or of a body nested in it).
+    fn defined_in(&self, value: SSAValue, root: Option<Statement>, bodies: &[Body]) -> bool {
         let Some(info) = value.get_info(self.stage) else {
             return false;
         };
         let place = match *info.kind() {
+            SSAKind::Result(stmt, _) if Some(stmt) == root => return true,
             SSAKind::Result(stmt, _) => {
                 match stmt.get_info(self.stage).and_then(|item| item.parent) {
                     Some(parent) => parent,

@@ -520,6 +520,51 @@ fn a_clone_reuses_a_map_whose_earlier_copy_is_gone() {
 }
 
 #[test]
+fn a_clone_reuses_a_map_whose_earlier_copy_of_a_self_reading_member_is_gone() {
+    // A `DiGraph` member reading its own result: %r = compute %r.
+    let mut stage = new_stage();
+    let r = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Unresolved(ResolutionInfo::Result(0)))
+        .new();
+    let member = stage
+        .statement()
+        .definition(BuilderDialect::Compute(r, r.into()))
+        .new();
+    let graph = stage.digraph().node(member).new();
+    let mut stage = stage.finalize().unwrap();
+
+    let mut map = IRMap::default();
+    // The first copy is tombstoned with its rewriter, so `map` takes `%r` to
+    // a dead value. (`erase_statement` would refuse it: the copy reads its
+    // own result.)
+    let first_r = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.clone_statement(member, &mut map).unwrap();
+        map.value(r).unwrap()
+    };
+    assert!(first_r.get_info(&stage).is_none());
+
+    // The copy defines `%r` again, so the dead entry is never read.
+    let mut rw = Rewriter::new(&mut stage);
+    let copy = rw.clone_statement(member, &mut map).unwrap();
+    let r2 = map.value(r).unwrap();
+    assert_ne!(r2, first_r);
+    assert_eq!(
+        *definition(rw.stage(), copy),
+        BuilderDialect::Compute(r2, r2.into())
+    );
+    rw.insert(InsertionPoint::DiGraph(graph), copy).unwrap();
+    drop(rw);
+    assert_eq!(
+        digraph_edges(&stage, graph),
+        HashSet::from([(member, member, r), (copy, copy, r2)])
+    );
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
 fn a_clone_of_a_clone_reads_its_own_values() {
     let IfLike {
         mut stage,
