@@ -1,14 +1,17 @@
-//! What the pass boundary does with metadata that was already stale.
+//! What the pass boundary does with metadata that was already stale, and with
+//! detached code a pass leaves behind.
 //!
-//! In-crate because both tests have to desync a mirror first, which a pass
-//! cannot do through a [`Rewriter`](crate::Rewriter). The rest of the
-//! boundary's behaviour is covered through the public API in `tests/pass.rs`.
+//! In-crate because the stale-metadata tests have to desync a mirror first,
+//! which a pass cannot do through a [`Rewriter`](crate::Rewriter), and the
+//! detached-code tests need [`Rewriter::build_statement`], which no public API
+//! exposes yet. The rest of the boundary's behaviour is covered through the
+//! public API in `tests/pass.rs`.
 
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{
-    Block, CompileStage, Mismatch, Program, QuarantineCause, Quarantined, RewriteError, Rewriter,
-    SSAValue, StageInfo, StagePassError, Statement, VerifyError,
+    Block, CompileStage, Finding, InsertionPoint, Mismatch, Program, QuarantineCause, Quarantined,
+    RewriteError, Rewriter, SSAValue, StageInfo, StagePassError, Statement, Use, VerifyError,
 };
 
 /// Empty a value's use list while its operand slots still read it.
@@ -135,8 +138,8 @@ fn a_panicking_pass_leaves_its_detached_code_in_place() {
     let (_, result) =
         crate::rewrite::pass::drive_pass(f.stage_mut(), |rw| -> Result<(), RewriteError> {
             let block = rw.new_block([]);
-            let ret = rw.insert_terminator(block, TestLang::Return)?;
-            let nop = rw.insert_before(ret, TestLang::Nop)?;
+            let ret = rw.create(InsertionPoint::Terminator(block), TestLang::Return)?;
+            let nop = rw.create(InsertionPoint::Before(ret), TestLang::Nop)?;
             // Leave the block half-built, as a panic part-way through an edit
             // could: its chain still names a statement whose slot is gone.
             let _ = rw.stage.statement_arena_mut().delete(nop);
@@ -150,5 +153,75 @@ fn a_panicking_pass_leaves_its_detached_code_in_place() {
     assert!(
         block.get_info(f.stage()).is_some(),
         "the drop left the detached block for inspection instead of tombstoning it"
+    );
+}
+
+#[test]
+fn a_panicking_pass_leaves_its_detached_statements_in_place() {
+    let mut f = fixture();
+    let x = f.x();
+    let mut built = None;
+
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let (_, result) =
+        crate::rewrite::pass::drive_pass(f.stage_mut(), |rw| -> Result<(), RewriteError> {
+            let reader = rw.build_statement(TestLang::Use(x))?;
+            let value = rw.new_result(TestType::I32);
+            let def = rw.build_statement(TestLang::Def(value))?;
+            built = Some((reader, def, SSAValue::from(value)));
+            panic!("rule gave up")
+        });
+    std::panic::set_hook(previous_hook);
+
+    assert!(matches!(result, Err(QuarantineCause::Panic(_))));
+    let (reader, def, value) = built.expect("the pass built statements before panicking");
+    let stage = f.stage();
+    assert!(reader.get_info(stage).is_some());
+    assert!(def.get_info(stage).is_some());
+    assert!(value.get_info(stage).is_some());
+    assert!(
+        x.expect_info(stage)
+            .uses()
+            .contains(&Use::StatementOperand {
+                stmt: reader,
+                index: 0
+            }),
+        "the detached reader kept its use of x"
+    );
+}
+
+#[test]
+fn reading_a_result_of_a_discarded_statement_quarantines_the_stage() {
+    let mut f = fixture();
+    let nop = f.nop;
+    let mut built = None;
+
+    // `def` is never inserted, so the drop tombstones it with `value`, which
+    // the placed `reader` still reads.
+    f.run_pass(|rw| -> Result<(), RewriteError> {
+        let value = rw.new_result(TestType::I32);
+        rw.build_statement(TestLang::Def(value))?;
+        let value = SSAValue::from(value);
+        let reader = rw.create(InsertionPoint::Before(nop), TestLang::Use(value))?;
+        built = Some((reader, value));
+        Ok(())
+    })
+    .expect_err("a dangling operand must not survive the boundary");
+
+    let (reader, value) = built.expect("the pass ran to completion");
+    let QuarantineCause::Verify(VerifyError::Derive(error)) = f.quarantined().cause() else {
+        panic!(
+            "expected a derive finding, got {:?}",
+            f.quarantined().cause()
+        );
+    };
+    assert_eq!(
+        error.findings(),
+        [Finding::DanglingOperand {
+            stmt: reader,
+            index: 0,
+            value
+        }]
     );
 }
