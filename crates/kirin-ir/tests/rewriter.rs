@@ -1644,3 +1644,321 @@ fn move_rejects_graph_members() {
     );
     assert!(rewriter.events().is_empty());
 }
+
+/// ```text
+/// entry(%x): a = nop; owner = own_blocks { arm(%t): u = use %t; w = nop; yret } { }; ret
+/// ```
+struct SpliceFixture {
+    stage: StageInfo<BuilderDialect>,
+    entry: Block,
+    arm: Block,
+    x: SSAValue,
+    t: SSAValue,
+    a: Statement,
+    u: Statement,
+    w: Statement,
+    yret: Statement,
+    owner: Statement,
+    ret: Statement,
+}
+
+fn splice_fixture() -> SpliceFixture {
+    let mut stage = new_stage();
+    let t = stage.block_argument().index(0);
+    let u = stage.statement().definition(BuilderDialect::Use(t)).new();
+    let w = stage.statement().definition(BuilderDialect::Nop).new();
+    let yret = stage.statement().definition(BuilderDialect::Return).new();
+    let arm = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(u)
+        .stmt(w)
+        .terminator(yret)
+        .new();
+    let empty = stage.block().new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(arm, empty))
+        .new();
+    let a = stage.statement().definition(BuilderDialect::Nop).new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let entry = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(a)
+        .stmt(owner)
+        .terminator(ret)
+        .new();
+    let stage = stage.finalize().unwrap();
+    let x = arg_of(&stage, entry);
+    let t = arg_of(&stage, arm);
+    SpliceFixture {
+        stage,
+        entry,
+        arm,
+        x,
+        t,
+        a,
+        u,
+        w,
+        yret,
+        owner,
+        ret,
+    }
+}
+
+fn arg_of(stage: &StageInfo<BuilderDialect>, block: Block) -> SSAValue {
+    block.expect_info(stage).arguments()[0].into()
+}
+
+#[test]
+fn splice_block_before_moves_statements_and_redirects_arguments() {
+    let SpliceFixture {
+        mut stage,
+        entry,
+        arm,
+        x,
+        t,
+        a,
+        u,
+        w,
+        yret,
+        owner,
+        ..
+    } = splice_fixture();
+    let mut rewriter = Rewriter::new(&mut stage);
+
+    rewriter.splice_block_before(arm, owner, &[x]).unwrap();
+    assert_eq!(order(rewriter.stage(), entry), [a, u, w, owner]);
+    for stmt in [u, w] {
+        assert_eq!(
+            *stmt.parent(rewriter.stage()),
+            Some(StatementParent::Block(entry))
+        );
+    }
+    // `arm` is left with its argument and terminator, and no statements.
+    assert_eq!(order(rewriter.stage(), arm), []);
+    assert_eq!(arm.terminator(rewriter.stage()), Some(yret));
+    assert_eq!(arg_of(rewriter.stage(), arm), t);
+    // `u` now reads `%x`.
+    assert_eq!(uses_set(rewriter.stage(), x), HashSet::from([so(u, 0)]));
+    assert!(uses_set(rewriter.stage(), t).is_empty());
+    assert_eq!(
+        rewriter.events().to_vec(),
+        vec![
+            MutationEvent::ChangedOperands { stmt: u },
+            MutationEvent::ReplacedUses { old: t, new: x },
+            MutationEvent::SplicedBlock {
+                source: arm,
+                dest: entry,
+            },
+        ]
+    );
+    drop(rewriter);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn splice_block_after_and_before_a_terminator_place_the_chain() {
+    let SpliceFixture {
+        mut stage,
+        entry,
+        arm,
+        x,
+        a,
+        u,
+        w,
+        owner,
+        ..
+    } = splice_fixture();
+    let mut rewriter = Rewriter::new(&mut stage);
+    rewriter.splice_block_after(arm, a, &[x]).unwrap();
+    assert_eq!(order(rewriter.stage(), entry), [a, u, w, owner]);
+    drop(rewriter);
+    verify_derived(&stage).unwrap();
+
+    let SpliceFixture {
+        mut stage,
+        entry,
+        arm,
+        x,
+        a,
+        u,
+        w,
+        owner,
+        ret,
+        ..
+    } = splice_fixture();
+    let mut rewriter = Rewriter::new(&mut stage);
+    // Before the terminator: to the end of the chain.
+    rewriter.splice_block_before(arm, ret, &[x]).unwrap();
+    assert_eq!(order(rewriter.stage(), entry), [a, owner, u, w]);
+    drop(rewriter);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn splice_block_may_keep_its_own_arguments() {
+    let SpliceFixture {
+        mut stage,
+        entry,
+        arm,
+        t,
+        a,
+        u,
+        w,
+        owner,
+        ..
+    } = splice_fixture();
+    let mut rewriter = Rewriter::new(&mut stage);
+    rewriter.splice_block_before(arm, owner, &[t]).unwrap();
+    assert_eq!(order(rewriter.stage(), entry), [a, u, w, owner]);
+    assert_eq!(uses_set(rewriter.stage(), t), HashSet::from([so(u, 0)]));
+    assert_eq!(
+        rewriter.events().to_vec(),
+        vec![MutationEvent::SplicedBlock {
+            source: arm,
+            dest: entry,
+        }],
+        "nothing to redirect"
+    );
+}
+
+#[test]
+fn splice_block_of_an_emptied_block_records_nothing() {
+    let SpliceFixture {
+        mut stage,
+        entry,
+        arm,
+        x,
+        a,
+        u,
+        w,
+        yret,
+        owner,
+        ..
+    } = splice_fixture();
+    let mut rewriter = Rewriter::new(&mut stage);
+    rewriter.splice_block_before(arm, owner, &[x]).unwrap();
+    let recorded = rewriter.events().len();
+    // `arm` has only its terminator left, and its argument has no uses.
+    rewriter.splice_block_before(arm, owner, &[x]).unwrap();
+    assert_eq!(rewriter.events().len(), recorded, "nothing moved");
+    assert_eq!(order(rewriter.stage(), entry), [a, u, w, owner]);
+    assert_eq!(order(rewriter.stage(), arm), []);
+    assert_eq!(arm.terminator(rewriter.stage()), Some(yret));
+    drop(rewriter);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn splice_block_of_an_empty_block_still_redirects_its_terminator() {
+    // entry(%x) { owner { arm(%t) { yield %t } }; return }
+    let mut stage = new_stage();
+    let t = stage.block_argument().index(0);
+    let yld = stage.statement().definition(BuilderDialect::Yield(t)).new();
+    let arm = stage.block().argument(TestType::I32).terminator(yld).new();
+    let empty = stage.block().new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(arm, empty))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let entry = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(owner)
+        .terminator(ret)
+        .new();
+    let mut stage = stage.finalize().unwrap();
+    let x = arg_of(&stage, entry);
+    let t = arg_of(&stage, arm);
+
+    let mut rewriter = Rewriter::new(&mut stage);
+    rewriter.splice_block_before(arm, owner, &[x]).unwrap();
+    // Nothing moved, but the terminator now reads `%x`.
+    assert_eq!(order(rewriter.stage(), entry), [owner]);
+    assert_eq!(order(rewriter.stage(), arm), []);
+    assert_eq!(uses_set(rewriter.stage(), x), HashSet::from([so(yld, 0)]));
+    assert!(uses_set(rewriter.stage(), t).is_empty());
+    assert_eq!(
+        rewriter.events().to_vec(),
+        vec![
+            MutationEvent::ChangedOperands { stmt: yld },
+            MutationEvent::ReplacedUses { old: t, new: x },
+        ],
+        "no SplicedBlock: nothing moved"
+    );
+    // Again: `%t` has no uses left, so nothing changes.
+    rewriter.splice_block_before(arm, owner, &[x]).unwrap();
+    assert_eq!(rewriter.events().len(), 2);
+    drop(rewriter);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn splice_block_rejects_illegal_splices_leaving_the_stage_untouched() {
+    let SpliceFixture {
+        mut stage,
+        entry,
+        arm,
+        x,
+        a,
+        u,
+        w,
+        owner,
+        ret,
+        ..
+    } = splice_fixture();
+    let dead_stmt = stage.statement_arena().next_id();
+    let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
+    let dead_value = SSAValue::from(Id::from(TestSSAValue(9_999)));
+    let mut rewriter = Rewriter::new(&mut stage);
+
+    assert_eq!(
+        rewriter.splice_block_before(dead_block, a, &[]),
+        Err(RewriteError::UnknownBlock(dead_block))
+    );
+    assert_eq!(
+        rewriter.splice_block_before(arm, dead_stmt, &[x]),
+        Err(RewriteError::UnknownStatement(dead_stmt))
+    );
+    assert_eq!(
+        rewriter.splice_block_after(arm, ret, &[x]),
+        Err(RewriteError::AnchorIsTerminator(ret))
+    );
+    // The anchor is in the source block.
+    assert_eq!(
+        rewriter.splice_block_before(arm, w, &[x]),
+        Err(RewriteError::SplicedIntoItself {
+            source: arm,
+            anchor: w
+        })
+    );
+    // The anchor is nested in one of the source's statements (`owner`).
+    assert_eq!(
+        rewriter.splice_block_before(entry, u, &[x]),
+        Err(RewriteError::SplicedIntoItself {
+            source: entry,
+            anchor: u
+        })
+    );
+    assert_eq!(
+        rewriter.splice_block_before(arm, owner, &[]),
+        Err(RewriteError::BlockArgumentArityMismatch {
+            block: arm,
+            expected: 1,
+            found: 0,
+        })
+    );
+    assert_eq!(
+        rewriter.splice_block_before(arm, owner, &[dead_value]),
+        Err(RewriteError::UnknownValue(dead_value))
+    );
+    assert!(rewriter.events().is_empty());
+    drop(rewriter);
+
+    assert_eq!(order(&stage, entry), [a, owner]);
+    assert_eq!(order(&stage, arm), [u, w]);
+    verify_derived(&stage).unwrap();
+}
