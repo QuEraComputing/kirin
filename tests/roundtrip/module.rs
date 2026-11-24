@@ -9,10 +9,7 @@ use kirin_test_languages::GraphFunctionLanguage;
 #[kirin(type = kirin_arith::ArithType)]
 enum TestLanguage {
     #[chumsky(format = "decl {name}")]
-    Decl {
-        #[kirin(declared_name)]
-        name: Symbol,
-    },
+    Decl { name: Symbol },
     #[wraps]
     Other(GraphFunctionLanguage),
 }
@@ -57,8 +54,9 @@ fn program_text_keeps_modules_in_their_stages() {
         panic!("@decls holds TestLanguage");
     };
     let value = decls.symbol_table().lookup("value").unwrap();
-    let member = module.member_by_name(decls, value).unwrap();
-    assert!(matches!(member.definition(decls), TestLanguage::Decl { name } if *name == value));
+    let members: Vec<_> = module.members(decls).collect();
+    assert_eq!(members.len(), 1);
+    assert!(matches!(members[0].definition(decls), TestLanguage::Decl { name } if *name == value));
 
     let code_id = reparsed.stage_by_name("code").unwrap();
     let module = reparsed
@@ -82,7 +80,7 @@ fn program_text_rejects_duplicate_module_in_a_stage() {
 }
 
 #[test]
-fn declaration_lookup_after_roundtrip() {
+fn named_module_roundtrip() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let id = program.add_stage().stage(StageInfo::default()).new();
     let module = program.parse_module(id, "mod @a { decl @value; }").unwrap();
@@ -98,12 +96,13 @@ fn declaration_lookup_after_roundtrip() {
     let module = reparsed.resolve_module::<TestLanguage>("a", id).unwrap();
     let stage = reparsed.stage(id).unwrap();
     let value = stage.symbol_table().lookup("value").unwrap();
-    let member = module.member_by_name(stage, value).unwrap();
-    assert!(matches!(member.definition(stage), TestLanguage::Decl { name } if *name == value));
+    let members: Vec<_> = module.members(stage).collect();
+    assert_eq!(members.len(), 1);
+    assert!(matches!(members[0].definition(stage), TestLanguage::Decl { name } if *name == value));
 }
 
 #[test]
-fn builder_only_finds_explicit_members() {
+fn builder_attaches_each_statement_once() {
     let mut stage = BuilderStageInfo::<TestLanguage>::default();
     let module = stage.module().new();
     let name = stage.symbol_table_mut().intern("value".into());
@@ -115,13 +114,12 @@ fn builder_only_finds_explicit_members() {
         .statement()
         .definition(TestLanguage::Decl { name })
         .new();
-    assert_eq!(module.member_by_name(&stage, name), None);
     stage.add_module_member(module, first);
-    assert!(stage.try_add_module_member(module, second).is_err());
+    assert!(stage.try_add_module_member(module, first).is_err());
     let sibling = stage.module().members(vec![second]).new();
     let stage = stage.finalize().unwrap();
-    assert_eq!(module.member_by_name(&stage, name), Some(first));
-    assert_eq!(sibling.member_by_name(&stage, name), Some(second));
+    assert_eq!(module.members(&stage).collect::<Vec<_>>(), [first]);
+    assert_eq!(sibling.members(&stage).collect::<Vec<_>>(), [second]);
 }
 
 #[test]
@@ -129,7 +127,6 @@ fn invalid_members_leave_stage_retryable() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let id = program.add_stage().stage(StageInfo::default()).new();
     for (members, message) in [
-        ("decl @x; decl @x;", "duplicate module member @x"),
         (
             "%x = constant 1 -> i64; %y = add %x, %x -> i64;",
             "undefined SSA",

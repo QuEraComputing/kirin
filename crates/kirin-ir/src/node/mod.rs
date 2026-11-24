@@ -21,7 +21,7 @@ pub use function::{
 };
 pub use graph::{DiGraphExtra, GraphInfo, GraphMember, MemberRole, UnGraphExtra};
 pub use linked_list::{LinkedList, LinkedListNode};
-pub use module::{DeclaredName, Module, ModuleInfo};
+pub use module::{Module, ModuleInfo};
 pub use port::{Port, PortParent};
 pub use ssa::{
     BlockArgument, BuilderKey, BuilderSSAInfo, BuilderSSAKind, DeletedSSAValue, ResolutionInfo,

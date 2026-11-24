@@ -1,8 +1,8 @@
 use crate::node::{LinkedList, Module, ModuleInfo};
-use crate::{BuilderStageInfo, DeclaredName, Dialect, Statement, StatementParent, Symbol};
+use crate::{BuilderStageInfo, Dialect, Statement, StatementParent, Symbol};
 
 #[bon::bon]
-impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
+impl<L: Dialect> BuilderStageInfo<L> {
     /// Create a module, optionally named and with initial members.
     ///
     /// # Panics
@@ -29,7 +29,7 @@ impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
     }
 }
 
-impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
+impl<L: Dialect> BuilderStageInfo<L> {
     /// Append `member` to `module`.
     ///
     /// Panics if the statement is already attached or cannot be a member.
@@ -54,16 +54,6 @@ impl<L: Dialect + DeclaredName> BuilderStageInfo<L> {
         }
         if info.definition.successors().next().is_some() {
             return Err("a statement with successors cannot be a module member".into());
-        }
-        if let Some(name) = info.definition.declared_name()
-            && module.member_by_name(self, name).is_some()
-        {
-            let spelling = self
-                .symbol_table()
-                .resolve(name)
-                .map(String::as_str)
-                .unwrap_or("<unknown>");
-            return Err(format!("duplicate module member @{spelling}"));
         }
         let tail = self.modules[module].members.tail;
         let info = &mut self.nodes.statements[member];

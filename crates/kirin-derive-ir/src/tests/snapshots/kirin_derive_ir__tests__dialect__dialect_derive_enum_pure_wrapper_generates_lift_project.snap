@@ -658,21 +658,6 @@ where
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::DeclaredName for CompositeOps
-where
-    AlphaOp: ::kirin::ir::DeclaredName,
-    BetaOp: ::kirin::ir::DeclaredName,
-    GammaOp: ::kirin::ir::DeclaredName,
-{
-    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
-        match self {
-            Self::Alpha(field_0) => <AlphaOp as ::kirin::ir::DeclaredName>::declared_name(field_0),
-            Self::Beta(field_0) => <BetaOp as ::kirin::ir::DeclaredName>::declared_name(field_0),
-            Self::Gamma(field_0) => <GammaOp as ::kirin::ir::DeclaredName>::declared_name(field_0),
-        }
-    }
-}
-#[automatically_derived]
 impl ::kirin::ir::BranchOp for CompositeOps {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

@@ -11,7 +11,7 @@
 //! For multi-dialect stage enums, use `#[derive(ParseDispatch)]` from
 //! `kirin-derive-ir`.
 
-use kirin_ir::{CompileStage, DeclaredName, Dialect, Module, StageInfo, StageMeta};
+use kirin_ir::{CompileStage, Dialect, Module, StageInfo, StageMeta};
 
 use crate::{ChumskyError, HasParser, ParseEmit, ParseModuleText};
 
@@ -52,7 +52,7 @@ pub trait ParseDispatch: StageMeta {
 /// not a type parameter being resolved recursively through the trait solver.
 impl<L> ParseDispatch for StageInfo<L>
 where
-    L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L> + DeclaredName,
+    L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L>,
     L::Type: kirin_ir::Placeholder, // Still needed for staged_function() on StageInfo
     for<'t> L: HasParser<'t>,
     for<'t> L::Type: HasParser<'t, Output = L::Type>,

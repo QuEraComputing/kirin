@@ -385,12 +385,6 @@ impl ::kirin::ir::HasCallableBody for Nop {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::DeclaredName for Nop {
-    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
-        ::core::option::Option::None
-    }
-}
-#[automatically_derived]
 impl ::kirin::ir::BranchOp for Nop {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         {

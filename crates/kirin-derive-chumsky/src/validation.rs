@@ -611,7 +611,6 @@ mod tests {
             },
             fields,
             callable_body: None,
-            declared_name: None,
             wraps: None,
             extra: (),
             extra_attrs: ChumskyStatementAttrs { format: None },

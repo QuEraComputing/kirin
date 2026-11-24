@@ -658,21 +658,6 @@ where
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::DeclaredName for CallableLanguage
-where
-    LambdaOp: ::kirin::ir::DeclaredName,
-{
-    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
-        match self {
-            Self::Function { body } => ::core::option::Option::None,
-            Self::Nop { value } => ::core::option::Option::None,
-            Self::Lambda(field_0) => {
-                <LambdaOp as ::kirin::ir::DeclaredName>::declared_name(field_0)
-            }
-        }
-    }
-}
-#[automatically_derived]
 impl ::kirin::ir::BranchOp for CallableLanguage {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

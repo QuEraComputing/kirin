@@ -44,9 +44,9 @@ pub use language::{
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
 pub use node::{
     Block, BlockArgument, BlockInfo, BlockParent, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CFG,
-    CompileStage, DeclaredName, DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function,
-    FunctionInfo, GlobalSymbol, GraphInfo, GraphMember, LinkedList, LinkedListNode, MemberRole,
-    Module, ModuleInfo, Port, PortParent, ResolutionInfo, ResultValue, SSAInfo, SSAKind, SSAValue,
+    CompileStage, DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo,
+    GlobalSymbol, GraphInfo, GraphMember, LinkedList, LinkedListNode, MemberRole, Module,
+    ModuleInfo, Port, PortParent, ResolutionInfo, ResultValue, SSAInfo, SSAKind, SSAValue,
     SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo,
     StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor, Symbol, TestSSAValue,
     UnGraph, UnGraphExtra, UnGraphInfo, UniqueLiveSpecializationError, Use,

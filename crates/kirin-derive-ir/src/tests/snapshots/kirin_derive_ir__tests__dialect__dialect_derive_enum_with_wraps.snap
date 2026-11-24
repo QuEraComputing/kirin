@@ -554,19 +554,6 @@ where
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::DeclaredName for ArithLanguage
-where
-    AddOp: ::kirin::ir::DeclaredName,
-    SubOp: ::kirin::ir::DeclaredName,
-{
-    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
-        match self {
-            Self::Add(field_0) => <AddOp as ::kirin::ir::DeclaredName>::declared_name(field_0),
-            Self::Sub(field_0) => <SubOp as ::kirin::ir::DeclaredName>::declared_name(field_0),
-        }
-    }
-}
-#[automatically_derived]
 impl ::kirin::ir::BranchOp for ArithLanguage {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

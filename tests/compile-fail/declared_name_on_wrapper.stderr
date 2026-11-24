@@ -1,5 +1,0 @@
-error: #[wraps] delegates the declared name; mark the name on the wrapped statement
- --> tests/compile-fail/declared_name_on_wrapper.rs:6:16
-  |
-6 | struct Invalid(#[kirin(declared_name)] Symbol);
-  |                ^

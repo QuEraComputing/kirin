@@ -230,8 +230,7 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
         .add(crate::has_signature::has_signature_template(crate_path))
         .add(crate::has_callable_body::has_callable_body_template(
             crate_path,
-        ))
-        .add(crate::declared_name::declared_name_template(crate_path));
+        ));
 
     // `#[kirin(branch_op)]` dialects implement `BranchOp` by hand.
     if !ir.attrs.branch_op {

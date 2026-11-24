@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{BuilderStageInfo, CompileStage, DeclaredName, Dialect, Module, Program, StageInfo};
+use kirin_ir::{BuilderStageInfo, CompileStage, Dialect, Module, Program, StageInfo};
 
 use crate::{ChumskyError, EmitContext, ParseEmit, ParseError, parse_ast};
 
@@ -10,11 +10,10 @@ use super::syntax::ModuleText;
 /// Like [`ParseStatementText`](crate::ParseStatementText), `Ctx` locates the
 /// stage: `()` on `StageInfo<L>`, [`CompileStage`] on `Program<S>`.
 ///
-/// The module name is stage-local. Members have independent SSA scopes, and
-/// named members must be unique within the module. Use the function text API
-/// for definitions with projected names (`{:name}`): standalone module
-/// parsing does not register them or preserve names supplied by the function
-/// registry. On error the stage is unchanged.
+/// The module name is stage-local. Members have independent SSA scopes.
+/// Use the function text API for definitions with projected names
+/// (`{:name}`): standalone module parsing does not register them or preserve
+/// names supplied by the function registry. On error the stage is unchanged.
 ///
 /// In whole-program text the same module is written `stage @A mod @name
 /// { ... }` and parsed by `ParseProgramText`.
@@ -43,7 +42,7 @@ fn parse_module_on_builder_stage<L>(
     input: &str,
 ) -> Result<Module, ChumskyError>
 where
-    L: Dialect + ParseEmit<L> + DeclaredName,
+    L: Dialect + ParseEmit<L>,
 {
     let ast = parse_ast::<ModuleText<'_>>(input)?;
     let name = ast
@@ -82,7 +81,7 @@ where
 
 impl<L> ParseModuleText<L> for StageInfo<L>
 where
-    L: Dialect + ParseEmit<L> + DeclaredName,
+    L: Dialect + ParseEmit<L>,
 {
     fn parse_module(&mut self, (): (), input: &str) -> Result<Module, ChumskyError> {
         // Build on a copy so a failed parse leaves no partial module behind.
@@ -96,7 +95,7 @@ where
 
 impl<L, S> ParseModuleText<L, CompileStage> for Program<S>
 where
-    L: Dialect + ParseEmit<L> + DeclaredName,
+    L: Dialect + ParseEmit<L>,
     S: kirin_ir::HasStageInfo<L>,
 {
     fn parse_module(

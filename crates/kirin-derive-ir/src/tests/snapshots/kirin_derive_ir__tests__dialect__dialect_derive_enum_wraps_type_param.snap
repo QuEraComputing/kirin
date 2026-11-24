@@ -565,21 +565,6 @@ where
     }
 }
 #[automatically_derived]
-impl<L: Dialect> ::kirin::ir::DeclaredName for PatternOps<L>
-where
-    L: ::kirin::ir::DeclaredName,
-    HoleOp<L::Type>: ::kirin::ir::DeclaredName,
-{
-    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
-        match self {
-            Self::Op(field_0) => <L as ::kirin::ir::DeclaredName>::declared_name(field_0),
-            Self::Hole(field_0) => {
-                <HoleOp<L::Type> as ::kirin::ir::DeclaredName>::declared_name(field_0)
-            }
-        }
-    }
-}
-#[automatically_derived]
 impl<L: Dialect> ::kirin::ir::BranchOp for PatternOps<L> {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         match self {

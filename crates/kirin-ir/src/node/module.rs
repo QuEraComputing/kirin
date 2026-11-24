@@ -1,19 +1,9 @@
 use crate::arena::{GetInfo, GetInfoMut, Id, Item};
-use crate::{Dialect, StageArenas, Symbol, identifier};
+use crate::{Dialect, Symbol, identifier};
 
 use super::block::StatementIter;
 use super::linked_list::LinkedList;
 use super::stmt::Statement;
-
-/// The local name introduced by this statement, if any. Referenced symbols
-/// are deliberately excluded.
-///
-/// `#[derive(Dialect)]` implements it: an unmarked statement returns `None`,
-/// `#[kirin(declared_name)]` on a `Symbol` field returns that field, and
-/// `#[wraps]` delegates.
-pub trait DeclaredName {
-    fn declared_name(&self) -> Option<Symbol>;
-}
 
 identifier! {
     /// A unique identifier for a module: a non-callable container of
@@ -32,8 +22,7 @@ identifier! {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModuleInfo {
     pub(crate) id: Module,
-    /// A stage-local name, like the names of the members. Unique among the
-    /// stage's modules; module and member names are looked up separately.
+    /// A stage-local name, unique among the stage's modules.
     pub(crate) name: Option<Symbol>,
     pub(crate) members: LinkedList<Statement>,
 }
@@ -68,23 +57,6 @@ impl<L: Dialect> GetInfoMut<L> for Module {
 }
 
 impl Module {
-    /// Find a declaration by its stage-local name among the explicit members.
-    pub fn member_by_name<L: Dialect + DeclaredName>(
-        self,
-        stage: &StageArenas<L>,
-        name: Symbol,
-    ) -> Option<Statement> {
-        let mut next = stage.modules.get(self)?.members.head;
-        while let Some(member) = next {
-            let info = &stage.statements[member];
-            if info.definition.declared_name() == Some(name) {
-                return Some(member);
-            }
-            next = info.node.next;
-        }
-        None
-    }
-
     /// The module's member statements, in order.
     pub fn members<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> StatementIter<'a, L> {
         StatementIter::over(self.expect_info(stage).members, stage)

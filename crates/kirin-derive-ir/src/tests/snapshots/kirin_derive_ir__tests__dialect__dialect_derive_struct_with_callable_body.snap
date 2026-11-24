@@ -453,12 +453,6 @@ impl ::kirin::ir::HasCallableBody for FuncOp {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::DeclaredName for FuncOp {
-    fn declared_name(&self) -> ::core::option::Option<::kirin::ir::Symbol> {
-        ::core::option::Option::None
-    }
-}
-#[automatically_derived]
 impl ::kirin::ir::BranchOp for FuncOp {
     fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
         {
