@@ -104,7 +104,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Records the [`Rewriter::replace_all_uses`] events for the argument
     /// redirection, then [`MutationEvent::SplicedBlock`]. A walk visiting a
-    /// statement of `source` reports the splice (see [`crate::walk`]).
+    /// statement of `source` reports the splice (see [`crate::walk`]). If
+    /// `source` has no statements besides its terminator, nothing moves and
+    /// only the redirection events are recorded; splicing it again with the
+    /// same replacements records no event.
     pub fn splice_block_before(
         &mut self,
         source: Block,
@@ -177,6 +180,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             Some(info) => std::mem::take(&mut info.statements),
             None => LinkedList::new(),
         };
+        // Nothing to move: `source` has only its terminator (for example,
+        // after an earlier splice emptied it).
+        if chain.is_empty() {
+            return Ok(());
+        }
         self.link(chain, dest, prev, next);
         self.events
             .push(MutationEvent::SplicedBlock { source, dest });

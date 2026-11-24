@@ -37,6 +37,7 @@ impl Placeholder for TestType {
 ///
 /// - `Nop`: no operands, no results
 /// - `Return`: terminator
+/// - `Yield(a)`: terminator reading one operand, with no successor
 /// - `Add(a, b)`: two SSAValue operands (block arg substitution, digraph edges)
 /// - `Use(a)`: one SSAValue operand (ungraph node)
 /// - `Gate(a, b)`: two SSAValue operands (ungraph node)
@@ -64,6 +65,7 @@ impl Placeholder for TestType {
 pub enum BuilderDialect {
     Nop,
     Return,
+    Yield(SSAValue),
     Add(SSAValue, SSAValue),
     Use(SSAValue),
     Gate(SSAValue, SSAValue),
@@ -90,6 +92,7 @@ impl<'a> HasArguments<'a> for BuilderDialect {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
             BuilderDialect::Use(a)
+            | BuilderDialect::Yield(a)
             | BuilderDialect::Compute(a, _)
             | BuilderDialect::ParamWire(a, _) => vec![a].into_iter(),
             BuilderDialect::Jump(_, args) => args.iter().collect::<Vec<_>>().into_iter(),
@@ -104,6 +107,7 @@ impl<'a> HasArgumentsMut<'a> for BuilderDialect {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
             BuilderDialect::Use(a)
+            | BuilderDialect::Yield(a)
             | BuilderDialect::Compute(a, _)
             | BuilderDialect::ParamWire(a, _) => vec![a].into_iter(),
             BuilderDialect::Jump(_, args) => args.iter_mut().collect::<Vec<_>>().into_iter(),
@@ -225,6 +229,7 @@ impl IsTerminator for BuilderDialect {
         matches!(
             self,
             BuilderDialect::Return
+                | BuilderDialect::Yield(_)
                 | BuilderDialect::Branch(_)
                 | BuilderDialect::CondBranch(_, _)
                 | BuilderDialect::Jump(_, _)
