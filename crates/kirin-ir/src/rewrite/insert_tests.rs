@@ -1,6 +1,7 @@
 //! [`Rewriter::insert`] of detached statements: it rejects a place nested in
-//! the statement's own bodies, and gives a `DiGraph` producer edges to the
-//! members already reading its results.
+//! the statement's own bodies, gives a `DiGraph` producer edges to the
+//! members already reading its results, and makes an `UnGraph` wire already
+//! read by nodes an edge.
 //!
 //! In-crate because both need a detached statement, made by
 //! [`Rewriter::build_statement`], which no public API exposes yet.
@@ -10,8 +11,8 @@ use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 use crate::arena::GetInfo;
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{
-    DiGraph, InsertionPoint, RewriteError, Rewriter, SSAValue, StageInfo, Statement,
-    StatementParent, verify_derived,
+    DiGraph, Finding, InsertionPoint, RewriteError, Rewriter, SSAValue, StageInfo, Statement,
+    StatementParent, UnGraph, VerifyError, verify_derived,
 };
 
 /// `graph`'s edges as `(producer, consumer, value)`, in petgraph's order.
@@ -93,4 +94,107 @@ fn insert_into_a_digraph_connects_members_already_reading_its_results() {
     let edge = (producer, consumer, SSAValue::from(value));
     assert_eq!(edges(&stage, graph), [edge, edge]);
     verify_derived(&stage).unwrap();
+}
+
+/// An `UnGraph` holding one `Nop` node, which only makes the graph non-empty
+/// and reads no wire.
+fn seeded_ungraph() -> (StageInfo<TestLang>, UnGraph) {
+    let mut stage = new_stage();
+    let seed = stage.statement().definition(TestLang::Nop).new();
+    let graph = stage.ungraph().node(seed).new();
+    (stage.finalize().unwrap(), graph)
+}
+
+/// `graph`'s edges as `(end, end, wire)`, in petgraph's order.
+fn ungraph_edges(
+    stage: &StageInfo<TestLang>,
+    graph: UnGraph,
+) -> Vec<(Statement, Statement, SSAValue)> {
+    let petgraph = graph.expect_info(stage).graph();
+    petgraph
+        .edge_references()
+        .map(|edge| {
+            (
+                petgraph[edge.source()],
+                petgraph[edge.target()],
+                *edge.weight(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn insert_into_an_ungraph_joins_the_two_nodes_already_reading_a_wire() {
+    let (mut stage, graph) = seeded_ungraph();
+    let mut rw = Rewriter::new(&mut stage);
+    let value = rw.new_result(TestType::I32);
+    let wire = rw.build_statement(TestLang::Wire(value)).unwrap();
+    let w = SSAValue::from(value);
+    // While `wire` is detached, `w` is not a wire of the graph, so its
+    // readers are endpoints of nothing.
+    let a = rw
+        .create(InsertionPoint::UnGraph(graph), TestLang::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(graph), TestLang::Use(w))
+        .unwrap();
+    assert_eq!(ungraph_edges(rw.stage(), graph), []);
+
+    rw.insert(InsertionPoint::UnGraph(graph), wire).unwrap();
+    drop(rw);
+    let edges = ungraph_edges(&stage, graph);
+    assert!(
+        edges == [(a, b, w)] || edges == [(b, a, w)],
+        "expected one edge joining {a:?} and {b:?}, got {edges:?}"
+    );
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn insert_into_an_ungraph_makes_a_wire_read_twice_by_one_node_a_self_loop() {
+    let (mut stage, graph) = seeded_ungraph();
+    let mut rw = Rewriter::new(&mut stage);
+    let value = rw.new_result(TestType::I32);
+    let wire = rw.build_statement(TestLang::Wire(value)).unwrap();
+    let w = SSAValue::from(value);
+    let node = rw
+        .create(InsertionPoint::UnGraph(graph), TestLang::Add(w, w))
+        .unwrap();
+    assert_eq!(ungraph_edges(rw.stage(), graph), []);
+
+    rw.insert(InsertionPoint::UnGraph(graph), wire).unwrap();
+    drop(rw);
+    assert_eq!(ungraph_edges(&stage, graph), [(node, node, w)]);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn insert_into_an_ungraph_gives_an_overfull_wire_no_edge() {
+    let (mut stage, graph) = seeded_ungraph();
+    let mut rw = Rewriter::new(&mut stage);
+    let value = rw.new_result(TestType::I32);
+    let wire = rw.build_statement(TestLang::Wire(value)).unwrap();
+    let w = SSAValue::from(value);
+    let readers: Vec<Statement> = (0..3)
+        .map(|_| {
+            rw.create(InsertionPoint::UnGraph(graph), TestLang::Use(w))
+                .unwrap()
+        })
+        .collect();
+
+    // Accepted, but three endpoints make no edge; verification reports it.
+    rw.insert(InsertionPoint::UnGraph(graph), wire).unwrap();
+    drop(rw);
+    assert_eq!(ungraph_edges(&stage, graph), []);
+    match verify_derived(&stage) {
+        Err(VerifyError::Derive(error)) => assert_eq!(
+            error.findings(),
+            [Finding::UnGraphDegreeExceeded {
+                graph,
+                value: w,
+                occurrences: readers.iter().map(|&reader| (reader, 0)).collect(),
+            }]
+        ),
+        other => panic!("expected a degree finding, got {other:?}"),
+    }
 }
