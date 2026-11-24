@@ -1368,8 +1368,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let Some(parent) = item.parent else {
                 return Err(RewriteError::NotInBlockBody(stmt));
             };
-            // Module declarations can be referenced by name or specialization.
-            // Keep them intact until replacements can validate both.
+            // A module member may be a specialization's definition. Keep it
+            // intact until replacement can check the records that point at it.
             if matches!(parent, StatementParent::Module(_)) {
                 return Err(RewriteError::NotInBlockBody(stmt));
             }

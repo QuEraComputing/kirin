@@ -84,7 +84,7 @@ fn named_module_roundtrip() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
     let id = program.add_stage().stage(StageInfo::default()).new();
     let module = program.parse_module(id, "mod @a { decl @value; }").unwrap();
-    // Module and member names are stage-local, so no global symbols are needed.
+    // Module names are stage-local, so no global symbols are needed.
     let printed = module
         .render(program.stage(id).unwrap())
         .into_string()
