@@ -2898,7 +2898,7 @@ policy.
   lands.
 - [x] Ensure dead ids in worklists are skipped.
 - [x] Treat fixpoint-budget exhaustion as a pass error rather than silent
-  incomplete success. The limits default to 10,000 sweeps and 10,000 rewrites
+  incomplete success. The limits default to 10,000 sweeps and 100,000 rewrites
   in one sweep, far above what a terminating rule set needs, so they only
   catch rules that never reach a fixpoint.
 

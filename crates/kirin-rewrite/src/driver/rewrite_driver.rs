@@ -133,7 +133,7 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
     pub const DEFAULT_MAX_SWEEPS: usize = 10_000;
 
     /// The limit on rewrites in one sweep of a new driver.
-    pub const DEFAULT_MAX_REWRITES_PER_SWEEP: usize = 10_000;
+    pub const DEFAULT_MAX_REWRITES_PER_SWEEP: usize = 100_000;
 
     /// Fill each sweep's worklist in the walk order `P` instead.
     pub fn walk_order<P: WalkOrder>(self) -> RewriteDriver<'r, L, P> {
