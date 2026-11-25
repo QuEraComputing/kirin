@@ -12,8 +12,9 @@ use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, St
 ///
 /// One worklist serves every sweep of a run, and every root of
 /// [`RewriteDriver::run`](super::RewriteDriver::run): each statement's
-/// status is kept at its arena index, allocated once, and seeding a sweep
-/// resets only the statuses the previous sweep set.
+/// status is kept at its arena index in one vector, which grows with the
+/// arena and is never reallocated per sweep, and seeding a sweep resets
+/// only the statuses the previous sweep set.
 #[derive(Default)]
 pub(super) struct Worklist {
     /// The walk the sweep starts from, in order.
