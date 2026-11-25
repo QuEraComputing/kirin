@@ -119,6 +119,19 @@ impl Statement {
         }
     }
 
+    /// Whether this statement is `ancestor` or nested in one of its bodies,
+    /// at any depth.
+    pub fn is_within<L: Dialect>(&self, stage: &crate::StageInfo<L>, ancestor: Statement) -> bool {
+        let mut current = Some(*self);
+        while let Some(stmt) = current {
+            if stmt == ancestor {
+                return true;
+            }
+            current = stmt.owner(stage);
+        }
+        false
+    }
+
     /// The next link in the parent block's non-terminator chain.
     ///
     /// `None` after the last non-terminator, even when a terminator follows.

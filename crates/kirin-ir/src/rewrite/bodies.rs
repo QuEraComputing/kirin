@@ -172,14 +172,7 @@ impl<L: Dialect> Rewriter<'_, L> {
         if !tree::owns_bodies(self.stage, stmt) {
             return false;
         }
-        let mut current = owner;
-        while let Some(outer) = current {
-            if outer == stmt {
-                return true;
-            }
-            current = outer.owner(self.stage);
-        }
-        false
+        owner.is_some_and(|owner| owner.is_within(self.stage, stmt))
     }
 
     /// Make `owner` the parent of `body`, which is no longer detached.

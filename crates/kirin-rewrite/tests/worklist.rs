@@ -285,3 +285,115 @@ fn run_at_visits_only_the_tree_under_its_root() {
         assert_eq!(sweep[&b], 1);
     }
 }
+
+/// A statement moved out of the root's tree while still in the queue.
+mod moved_out_of_the_root {
+    use kirin_scf::StructuredControlFlow;
+    use kirin_test_languages::ScfFunctionLanguage as L;
+
+    use super::*;
+
+    /// A loop whose body computes `%p` before its `yield`.
+    const LOOP: &str = "stage @arith fn @f(i64, i64, i64) -> i64;
+specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %r = for %lo in %lo..%hi step %s iter_args() do block ^body(%i: i64) {
+      %p = add %lo, %hi -> i64;
+      yield %i;
+    } -> i64;
+    ret %r;
+  }
+}
+";
+
+    /// At an `scf.for`, moves the first statement of its body in front of
+    /// it if that statement is a loop-invariant `add`: none of its operands
+    /// is defined in the loop. An `add` is pure, so computing it even when
+    /// the loop runs zero times changes nothing.
+    struct Hoist;
+
+    impl StatementRule<L> for Hoist {
+        fn apply(
+            &mut self,
+            rewriter: &mut Rewriter<'_, L>,
+            stmt: Statement,
+        ) -> Result<WalkResult, RewriteError> {
+            let stage = rewriter.stage();
+            let L::Scf(StructuredControlFlow::For(op)) = stmt.expect_info(stage).definition()
+            else {
+                return Ok(WalkResult::Advance);
+            };
+            let body = op.body();
+            let Some(first) = body.statements(stage).next() else {
+                return Ok(WalkResult::Advance);
+            };
+            let L::Arith(Arith::Add { lhs, rhs, .. }) = *first.expect_info(stage).definition()
+            else {
+                return Ok(WalkResult::Advance);
+            };
+            let defined_in_loop =
+                |operand: SSAValue| match operand.get_info(stage).map(|v| *v.kind()) {
+                    Some(SSAKind::BlockArgument(block, _)) => block == body,
+                    Some(SSAKind::Result(producer, _)) => producer.is_within(stage, stmt),
+                    _ => false,
+                };
+            if !defined_in_loop(lhs) && !defined_in_loop(rhs) {
+                rewriter.move_before(first, stmt)?;
+            }
+            Ok(WalkResult::Advance)
+        }
+    }
+
+    /// Counts the statements it is handed, by statement.
+    struct CountVisits(Rc<RefCell<HashMap<Statement, usize>>>);
+
+    impl StatementRule<L> for CountVisits {
+        fn apply(
+            &mut self,
+            _rewriter: &mut Rewriter<'_, L>,
+            stmt: Statement,
+        ) -> Result<WalkResult, RewriteError> {
+            *self.0.borrow_mut().entry(stmt).or_default() += 1;
+            Ok(WalkResult::Advance)
+        }
+    }
+
+    /// The loop is visited before its body, so the hoist moves `%p` out of
+    /// the root's tree while `%p` is still in the queue: no rule is handed
+    /// it.
+    #[test]
+    fn run_at_skips_a_statement_moved_out_of_its_root() {
+        let visits: Rc<RefCell<HashMap<Statement, usize>>> = Rc::default();
+        let mut rules = RuleSet::<L>::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
+        rules.add_statement_rule("hoist", || Hoist);
+        let counting = Rc::clone(&visits);
+        rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&counting)));
+        let driver = RewriteDriver::new(&rules);
+
+        let mut program: Program<StageInfo<L>> = Program::new();
+        program.parse(LOOP).expect("the program parses");
+        let stage = program.stage_by_name("arith").expect("the stage exists");
+        let mut p = None;
+        program
+            .run_pass(stage, |rewriter| {
+                let function = rewriter
+                    .stage()
+                    .staged_function_arena()
+                    .iter()
+                    .flat_map(|function| function.specializations())
+                    .map(|specialization| *specialization.definition())
+                    .next()
+                    .expect("the program has a function");
+                let [_, for_stmt, stmt, ..] = PreOrder::schedule(rewriter.stage(), function)[..]
+                else {
+                    panic!("the function has a loop");
+                };
+                p = Some(stmt);
+                driver.run_at(rewriter, for_stmt)
+            })
+            .expect("the pass succeeds");
+
+        let p = p.expect("the pass ran");
+        assert_eq!(visits.borrow().get(&p), None);
+    }
+}

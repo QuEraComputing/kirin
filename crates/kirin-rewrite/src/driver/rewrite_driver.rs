@@ -41,11 +41,12 @@ impl std::ops::AddAssign for RewriteSummary {
 /// statements they may have given a new match: for each statement changed,
 /// replaced or inserted, its owner, the producers of its operands, the
 /// statement itself and the users of its results. Only statements under the
-/// root are added, so a run never leaves its root's tree. A statement still
-/// in the queue keeps its place, so it is visited once, after the edit; one
-/// already visited goes to the back. Other edits, such as erasing a
-/// statement or changing a `CFG`, add nothing: the next sweep, which starts
-/// from every statement again, sees them.
+/// root are added, and a statement an edit moved out of the root's tree
+/// before its turn is not visited, so a run never leaves that tree. A
+/// statement still in the queue keeps its place, so it is visited once,
+/// after the edit; one already visited goes to the back. Other edits, such
+/// as erasing a statement or changing a `CFG`, add nothing: the next sweep,
+/// which starts from every statement again, sees them.
 ///
 /// When the worklist is empty, the sweep erases the dead code under the
 /// root. The run ends after the first sweep that records no
@@ -209,8 +210,9 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
         let mut sweep_rules: Vec<SweepRule<'_, L>> =
             self.rules.rules().iter().map(SweepRule::new).collect();
         while let Some(stmt) = worklist.pop() {
-            // An earlier visit erased it.
-            if stmt.get_info(rewriter.stage()).is_none() {
+            // An earlier visit erased it, or moved it out of the root's tree.
+            if stmt.get_info(rewriter.stage()).is_none() || !stmt.is_within(rewriter.stage(), root)
+            {
                 continue;
             }
             let num_prior_events = rewriter.events().len();

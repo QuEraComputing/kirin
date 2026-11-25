@@ -1282,6 +1282,7 @@ repeat:                                    # a sweep; at most max_sweeps
     worklist = all statements, in walk order (a snapshot)
     while worklist not empty:
         stmt = worklist.pop()
+        skip stmt if it was erased or moved out of the root's tree
         for rule in rules_for(stmt.root_op):
             if rule applies:
                 apply rewrite in place through Rewriter
