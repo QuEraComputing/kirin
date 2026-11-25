@@ -4,6 +4,7 @@ use crate::arena::{Arena, Id, Item};
 use crate::builder::error::{ProgramError, ProgramStagedError};
 use crate::intern::InternTable;
 use crate::language::Dialect;
+use crate::node::Module;
 use crate::node::function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction,
@@ -296,6 +297,21 @@ impl<S> Program<S> {
         let func = self.function_by_name(sym)?;
         let info = self.function_info(func)?;
         info.staged_function(stage)
+    }
+
+    /// Resolve a module name at a given stage to its [`Module`].
+    ///
+    /// Module names are stage-local: the name is looked up in that stage's
+    /// symbol table.
+    ///
+    /// Returns `None` if the name is unknown, the stage is missing or holds a
+    /// different dialect, or the stage has no module with that name.
+    pub fn resolve_module<L: Dialect>(&self, name: &str, stage: CompileStage) -> Option<Module>
+    where
+        S: HasStageInfo<L>,
+    {
+        let info = HasStageInfo::<L>::try_stage_info(self.stage(stage)?)?;
+        info.module_by_name(info.symbol_table().lookup(name)?)
     }
 
     /// Resolve a stage-local [`Symbol`] to a program-level [`Function`].

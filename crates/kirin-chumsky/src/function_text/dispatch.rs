@@ -11,9 +11,9 @@
 //! For multi-dialect stage enums, use `#[derive(ParseDispatch)]` from
 //! `kirin-derive-ir`.
 
-use kirin_ir::{CompileStage, Dialect, StageInfo, StageMeta};
+use kirin_ir::{CompileStage, Dialect, Module, StageInfo, StageMeta};
 
-use crate::{HasParser, ParseEmit};
+use crate::{ChumskyError, HasParser, ParseEmit, PendingModule};
 
 use super::error::FunctionParseError;
 use super::parse_text::{FirstPassCtx, FirstPassDispatchResult, SecondPassCtx};
@@ -39,6 +39,17 @@ pub trait ParseDispatch: StageMeta {
         stage_id: CompileStage,
         ctx: &mut SecondPassCtx<'_>,
     ) -> Result<Option<usize>, FunctionParseError>;
+
+    /// Parse `mod @name { ... }` and emit its members into this stage with
+    /// [`PendingModule::emit`], without creating the module. Returns the module
+    /// text API's error; the program parser reports it at the declaration's
+    /// position.
+    fn dispatch_module(&mut self, input: &str) -> Result<Option<PendingModule>, ChumskyError>;
+
+    /// Create a module that [`dispatch_module`](Self::dispatch_module) emitted
+    /// into this stage. The program parser calls it once the whole parse has
+    /// succeeded.
+    fn dispatch_attach_module(&mut self, pending: PendingModule) -> Module;
 }
 
 /// Blanket impl for single-dialect programs (`Program<StageInfo<L>>`).
@@ -66,5 +77,13 @@ where
         ctx: &mut SecondPassCtx<'_>,
     ) -> Result<Option<usize>, FunctionParseError> {
         second_pass_concrete::<L>(self, stage_id, ctx).map(Some)
+    }
+
+    fn dispatch_module(&mut self, input: &str) -> Result<Option<PendingModule>, ChumskyError> {
+        PendingModule::emit(self, input).map(Some)
+    }
+
+    fn dispatch_attach_module(&mut self, pending: PendingModule) -> Module {
+        pending.attach(self)
     }
 }

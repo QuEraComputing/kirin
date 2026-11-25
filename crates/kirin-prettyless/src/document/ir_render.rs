@@ -1,6 +1,6 @@
 use kirin_ir::{
-    Block, CFG, DiGraph, Dialect, GetInfo, GlobalSymbol, GraphMember, Id, Port, SSAInfo, SSAValue,
-    Signature, SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
+    Block, CFG, DiGraph, Dialect, GetInfo, GlobalSymbol, GraphMember, Id, Module, Port, SSAInfo,
+    SSAValue, Signature, SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
 };
 use prettyless::DocAllocator;
 
@@ -363,6 +363,14 @@ where
         sig: &Signature<L::Type>,
     ) -> ArenaDoc<'a> {
         self.text("fn @") + self.print_fn_signature(name, sig)
+    }
+
+    /// Print a module as written in program text: `stage @A mod @name { ... }`.
+    pub fn print_stage_module(&'a self, module: &Module) -> ArenaDoc<'a> {
+        self.text("stage @")
+            + self.text(self.stage_symbol_text())
+            + self.text(" ")
+            + self.print_module(module)
     }
 
     fn print_stage_header(

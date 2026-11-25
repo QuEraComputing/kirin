@@ -5,6 +5,7 @@ pub mod function;
 pub(crate) mod graph;
 mod graph_topology;
 pub mod linked_list;
+pub(crate) mod module;
 pub(crate) mod port;
 pub mod ssa;
 pub mod stmt;
@@ -20,6 +21,7 @@ pub use function::{
 };
 pub use graph::{DiGraphExtra, GraphInfo, GraphMember, MemberRole, UnGraphExtra};
 pub use linked_list::{LinkedList, LinkedListNode};
+pub use module::{Module, ModuleInfo};
 pub use port::{Port, PortParent};
 pub use ssa::{
     BlockArgument, BuilderKey, BuilderSSAInfo, BuilderSSAKind, DeletedSSAValue, ResolutionInfo,

@@ -1,7 +1,10 @@
 //! Stage-dispatched program parser for textual function declarations.
 //!
 //! This module parses a sequence of `stage` and `specialize` declarations into
-//! a [`Program`](kirin_ir::Program). Each declaration starts with a symbolic
+//! a [`Program`](kirin_ir::Program). A `stage @A mod @name { ... }`
+//! declaration places a module in stage `A`; its members are parsed and
+//! emitted in pass 1 with the stage's dialect, and the module is created only
+//! once the whole parse has succeeded. Each declaration starts with a symbolic
 //! stage (for example `@A`), and the concrete dialect parser is chosen at
 //! runtime by dispatching on that stage's actual `StageInfo<L>` variant.
 //!
@@ -89,7 +92,7 @@ use kirin_ir::{
 use kirin_lexer::Token;
 use strsim::levenshtein;
 
-use crate::{EmitContext, HasParser, ParseEmit};
+use crate::{EmitContext, HasParser, ParseEmit, PendingModule};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
@@ -338,9 +341,17 @@ where
         // references like `specialize @A fn @foo ...` before `stage @A fn @foo`
         // are validated against the full header set.
         let mut pending_specializations: Vec<(usize, CompileStage, SymbolName<'_>)> = Vec::new();
+        // Created only after pass 2, so a failed parse leaves no module behind.
+        let mut pending_modules: Vec<(CompileStage, PendingModule)> = Vec::new();
 
         let mut index = 0;
         while index < tokens.len() {
+            if let Some(next) =
+                parse_module_declaration(self, &tokens, src, index, &mut pending_modules)?
+            {
+                index = next;
+                continue;
+            }
             let head = parse_declaration_head(&tokens, index)?;
             let stage_id = resolve_or_create_stage_symbol(self, &head.stage)?;
             let (function, function_symbol) = if matches!(head.keyword, DeclKeyword::Stage) {
@@ -454,6 +465,12 @@ where
             )?;
         }
 
+        for (stage_id, pending) in pending_modules {
+            self.stage_mut(stage_id)
+                .expect("a module's stage stays available during parsing")
+                .dispatch_attach_module(pending);
+        }
+
         Ok(state.touched_functions)
     }
 }
@@ -461,6 +478,119 @@ where
 // ---------------------------------------------------------------------------
 // Internal helpers (unchanged from original)
 // ---------------------------------------------------------------------------
+
+/// Parse `stage @A mod [@name] { ... }` at `start_index` into stage `A`
+/// and return the token index after the closing brace, or `None` if the
+/// tokens there start some other declaration.
+fn parse_module_declaration<S>(
+    program: &mut Program<S>,
+    tokens: &[(Token<'_>, SimpleSpan)],
+    src: &str,
+    start_index: usize,
+    pending_modules: &mut Vec<(CompileStage, PendingModule)>,
+) -> Result<Option<usize>, FunctionParseError>
+where
+    S: StageMeta + ParseDispatch,
+{
+    let [
+        (Token::Identifier("stage"), _),
+        (Token::Symbol(stage_name), stage_span),
+        (Token::Identifier("mod"), mod_span),
+        rest @ ..,
+    ] = &tokens[start_index..]
+    else {
+        return Ok(None);
+    };
+    // Only the extent is found here; the module parser checks the body.
+    // `mod [@name]` must be followed directly by `{`, so a malformed header
+    // is reported here rather than at a later declaration.
+    let name_len = usize::from(matches!(rest.first(), Some((Token::Symbol(_), _))));
+    let header_end = rest[..name_len]
+        .last()
+        .map_or(mod_span.end, |(_, span)| span.end);
+    let header = SimpleSpan::from(mod_span.start..header_end);
+    let header_text = &src[header.start..header.end];
+    let body = &rest[name_len..];
+    let Some((Token::LBrace, open_span)) = body.first() else {
+        let found = body
+            .first()
+            .map_or("end of input".to_string(), |(token, _)| {
+                format!("`{token}`")
+            });
+        return Err(FunctionParseError::new(
+            FunctionParseErrorKind::InvalidModule,
+            Some(header),
+            format!("expected '{{' after `{header_text}`, found {found}"),
+        ));
+    };
+    // Walk only through the `}` that closes the module's `{`.
+    let mut depth = 0usize;
+    let close = body
+        .iter()
+        .position(|(token, _)| {
+            match token {
+                Token::LBrace => depth += 1,
+                Token::RBrace => depth -= 1,
+                _ => {}
+            }
+            depth == 0
+        })
+        .ok_or_else(|| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::InvalidModule,
+                Some(*open_span),
+                format!("unclosed '{{' in `{header_text}`"),
+            )
+        })?;
+    let close_index = start_index + 3 + name_len + close;
+    let span = SimpleSpan::from(mod_span.start..tokens[close_index].1.end);
+
+    let stage_symbol = SymbolName {
+        name: stage_name,
+        span: *stage_span,
+    };
+    let stage_id = resolve_or_create_stage_symbol(program, &stage_symbol)?;
+    let status = program.stage_status(stage_id);
+    let stage = program
+        .stage_mut(stage_id)
+        .ok_or_else(|| stage_missing_error(stage_name, status, Some(*stage_span)))?;
+    let shift =
+        |inner: SimpleSpan| SimpleSpan::from(inner.start + span.start..inner.end + span.start);
+    let pending = stage
+        .dispatch_module(&src[span.start..span.end])
+        .map_err(|error| match error {
+            crate::ChumskyError::Parse(errors) => FunctionParseError::new(
+                FunctionParseErrorKind::InvalidModule,
+                errors.first().map(|error| shift(error.span)),
+                errors
+                    .iter()
+                    .map(|error| error.message.clone())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ),
+            crate::ChumskyError::Emit(error) => FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                Some(span),
+                error.to_string(),
+            ),
+        })?
+        .ok_or_else(|| stage_dialect_mismatch_error(stage_name, Some(*stage_span)))?;
+    // Earlier modules in this text are not in the stage yet.
+    if let (Some(name), Some(name_span)) = (pending.name, pending.name_span)
+        && pending_modules
+            .iter()
+            .any(|(stage, other)| *stage == stage_id && other.name == Some(name))
+    {
+        let name_span = shift(name_span);
+        return Err(FunctionParseError::new(
+            FunctionParseErrorKind::InvalidModule,
+            Some(name_span),
+            format!("duplicate module {}", &src[name_span.start..name_span.end]),
+        ));
+    }
+    pending_modules.push((stage_id, pending));
+    Ok(Some(close_index + 1))
+}
 
 fn parse_declaration_head<'src>(
     tokens: &[(Token<'src>, SimpleSpan)],

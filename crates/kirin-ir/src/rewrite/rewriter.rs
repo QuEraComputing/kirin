@@ -1250,7 +1250,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// unchanged.
     ///
     /// Rejects (leaving the stage untouched) if `stmt` is unknown or owned by
-    /// nothing, changes result arity or terminator-ness, gives a
+    /// nothing, is a module member, changes result arity or terminator-ness, gives a
     /// non-terminator successors, names an operand or successor target that
     /// is not live, or — for an `UnGraph` member — changes whether it is an
     /// edge statement ([`RewriteError::EdgeRoleMismatch`]) or gives an edge
@@ -1296,6 +1296,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let Some(parent) = item.parent else {
                 return Err(RewriteError::NotInBlockBody(stmt));
             };
+            // A module member may be a specialization's definition. Keep it
+            // intact until replacement can check the records that point at it.
+            if matches!(parent, StatementParent::Module(_)) {
+                return Err(RewriteError::NotInBlockBody(stmt));
+            }
             (
                 item.definition
                     .arguments()
@@ -1472,6 +1477,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                         .push(MutationEvent::ChangedUnGraphTopology { graph });
                 }
                 return;
+            }
+            StatementParent::Module(_) => {
+                unreachable!("prepare_replacement rejects module members")
             }
         };
 

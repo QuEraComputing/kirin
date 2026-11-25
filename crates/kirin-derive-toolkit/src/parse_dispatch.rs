@@ -42,7 +42,8 @@ fn parse_chumsky_crate_path(attrs: &[syn::Attribute]) -> Result<String, syn::Err
 /// Generate a `ParseDispatch` implementation for a stage enum.
 ///
 /// For each unique dialect type `L` among the variants, generates a match arm
-/// that calls `first_pass_concrete::<L>` / `second_pass_concrete::<L>`.
+/// that calls `first_pass_concrete::<L>` / `second_pass_concrete::<L>`, and
+/// `ParseModuleText` on the variant's `StageInfo<L>`.
 pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let variants = stage::parse_stage_variants(input)?;
 
@@ -58,20 +59,14 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     // Build dispatch arms: for each variant, dispatch to the dialect's concrete helper
-    let first_pass_arms = build_dispatch_arms(
-        &variants,
-        enum_ident,
-        &ir_crate,
-        &chumsky_crate,
-        DispatchPass::First,
-    );
-    let second_pass_arms = build_dispatch_arms(
-        &variants,
-        enum_ident,
-        &ir_crate,
-        &chumsky_crate,
-        DispatchPass::Second,
-    );
+    let first_pass_arms =
+        build_dispatch_arms(&variants, enum_ident, &chumsky_crate, DispatchPass::First);
+    let second_pass_arms =
+        build_dispatch_arms(&variants, enum_ident, &chumsky_crate, DispatchPass::Second);
+    let module_arms =
+        build_dispatch_arms(&variants, enum_ident, &chumsky_crate, DispatchPass::Module);
+    let attach_arms =
+        build_dispatch_arms(&variants, enum_ident, &chumsky_crate, DispatchPass::Attach);
 
     Ok(quote! {
         #[automatically_derived]
@@ -101,6 +96,27 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
                     #second_pass_arms
                 }
             }
+
+            fn dispatch_module(
+                &mut self,
+                input: &str,
+            ) -> ::core::result::Result<
+                ::core::option::Option<#chumsky_crate::PendingModule>,
+                #chumsky_crate::ChumskyError,
+            > {
+                match self {
+                    #module_arms
+                }
+            }
+
+            fn dispatch_attach_module(
+                &mut self,
+                pending: #chumsky_crate::PendingModule,
+            ) -> #ir_crate::Module {
+                match self {
+                    #attach_arms
+                }
+            }
         }
     })
 }
@@ -108,12 +124,13 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 enum DispatchPass {
     First,
     Second,
+    Module,
+    Attach,
 }
 
 fn build_dispatch_arms(
     variants: &[StageVariantInfo],
     enum_ident: &syn::Ident,
-    _ir_crate: &syn::Path,
     chumsky_crate: &syn::Path,
     pass: DispatchPass,
 ) -> TokenStream {
@@ -131,6 +148,13 @@ fn build_dispatch_arms(
             DispatchPass::Second => quote! {
                 #chumsky_crate::second_pass_concrete::<#dialect_ty>(stage_info, stage_id, ctx)
                     .map(::core::option::Option::Some)
+            },
+            DispatchPass::Module => quote! {
+                #chumsky_crate::PendingModule::emit::<#dialect_ty>(stage_info, input)
+                    .map(::core::option::Option::Some)
+            },
+            DispatchPass::Attach => quote! {
+                pending.attach(stage_info)
             },
         };
 

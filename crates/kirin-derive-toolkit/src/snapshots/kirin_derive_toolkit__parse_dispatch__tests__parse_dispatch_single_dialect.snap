@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-toolkit/src/parse_dispatch.rs
-assertion_line: 163
+assertion_line: 187
 expression: generate_parse_dispatch_code(input)
 ---
 #[automatically_derived]
@@ -31,6 +31,28 @@ impl kirin_chumsky::ParseDispatch for SimpleStage {
                 kirin_chumsky::second_pass_concrete::<ArithDialect>(stage_info, stage_id, ctx)
                     .map(::core::option::Option::Some)
             }
+        }
+    }
+    fn dispatch_module(
+        &mut self,
+        input: &str,
+    ) -> ::core::result::Result<
+        ::core::option::Option<kirin_chumsky::PendingModule>,
+        kirin_chumsky::ChumskyError,
+    > {
+        match self {
+            SimpleStage::Arith(stage_info) => {
+                kirin_chumsky::PendingModule::emit::<ArithDialect>(stage_info, input)
+                    .map(::core::option::Option::Some)
+            }
+        }
+    }
+    fn dispatch_attach_module(
+        &mut self,
+        pending: kirin_chumsky::PendingModule,
+    ) -> kirin_ir::Module {
+        match self {
+            SimpleStage::Arith(stage_info) => pending.attach(stage_info),
         }
     }
 }

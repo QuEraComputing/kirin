@@ -24,4 +24,18 @@ impl ::kirin::pretty::RenderDispatch for Stage {
             ),
         }
     }
+    fn render_modules(
+        &self,
+        config: &::kirin::pretty::Config,
+        global_symbols: &kirin_ir::InternTable<String, kirin_ir::GlobalSymbol>,
+    ) -> Result<Vec<String>, std::fmt::Error> {
+        match self {
+            Stage::Source(s) => {
+                ::kirin::pretty::RenderDispatch::render_modules(s, config, global_symbols)
+            }
+            Stage::Lowered(s) => {
+                ::kirin::pretty::RenderDispatch::render_modules(s, config, global_symbols)
+            }
+        }
+    }
 }
