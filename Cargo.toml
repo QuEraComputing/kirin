@@ -132,6 +132,7 @@ kirin-constprop = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true, features = ["derive"] }
+kirin-rewrite = { workspace = true }
 kirin-test-languages = { workspace = true, features = [
   "arith-function-language",
   "graph-function-language",
@@ -145,6 +146,7 @@ kirin-test-languages = { workspace = true, features = [
 ] }
 kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 kirin-tuple = { workspace = true }
+kirin-wildcard = { workspace = true }
 trybuild = { workspace = true }
 
 [features]
@@ -161,4 +163,9 @@ required-features = ["serde", "parser", "pretty"]
 [[example]]
 name = "constprop"
 path = "benchmarks/constprop/rust/main.rs"
+required-features = ["serde", "parser", "pretty"]
+
+[[example]]
+name = "rewrite"
+path = "benchmarks/rewrite/rust/main.rs"
 required-features = ["serde", "parser", "pretty"]

@@ -7,7 +7,9 @@ use kirin_function::{Call, Return};
 use kirin_test_languages::SimpleType;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Serialize, Deserialize,
+)]
 #[kirin(builders, type = SimpleType)]
 pub enum BenchmarkLanguage {
     #[chumsky(format = "fn {:name}{signature} {body}")]

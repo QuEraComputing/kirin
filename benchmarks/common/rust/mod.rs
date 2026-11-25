@@ -1,4 +1,4 @@
-mod language;
+pub mod language;
 pub mod spec;
 pub mod workload;
 
