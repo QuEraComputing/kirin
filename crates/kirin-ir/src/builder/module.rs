@@ -1,4 +1,4 @@
-use crate::node::{LinkedList, Module, ModuleInfo};
+use crate::node::Module;
 use crate::{BuilderStageInfo, Dialect, Statement, StatementParent, Symbol};
 
 #[bon::bon]
@@ -10,18 +10,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// If the stage already has a module named `name`.
     #[builder(finish_fn = new)]
     pub fn module(&mut self, name: Option<Symbol>, members: Option<Vec<Statement>>) -> Module {
-        if let Some(name) = name {
-            assert!(
-                self.module_by_name(name).is_none(),
-                "Stage already has a module named `{name:?}`"
-            );
-        }
-        let id = self.modules.next_id();
-        let _ = self.modules.alloc(ModuleInfo {
-            id,
-            name,
-            members: LinkedList::new(),
-        });
+        let id = self
+            .modules
+            .alloc(name)
+            .unwrap_or_else(|name| panic!("Stage already has a module named `{name:?}`"));
         for member in members.unwrap_or_default() {
             self.add_module_member(id, member);
         }
@@ -46,23 +38,22 @@ impl<L: Dialect> BuilderStageInfo<L> {
         module: Module,
         member: Statement,
     ) -> Result<(), String> {
-        let tail = self
-            .modules
-            .get(module)
-            .ok_or_else(|| format!("module {module:?} is deleted or not in this stage"))?
-            .members
-            .tail;
         self.check_module_member(member)?;
+        let members = &mut self
+            .modules
+            .get_mut(module)
+            .ok_or_else(|| format!("module {module:?} is deleted or not in this stage"))?
+            .members;
+        let tail = members.tail;
+        members.head.get_or_insert(member);
+        members.tail = Some(member);
+        members.len += 1;
         let info = &mut self.nodes.statements[member];
         info.parent = Some(StatementParent::Module(module));
         info.node.prev = tail;
         if let Some(tail) = tail {
             self.nodes.statements[tail].node.next = Some(member);
         }
-        let members = &mut self.modules[module].members;
-        members.head.get_or_insert(member);
-        members.tail = Some(member);
-        members.len += 1;
         Ok(())
     }
 

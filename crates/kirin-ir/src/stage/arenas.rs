@@ -2,7 +2,7 @@ use crate::arena::Arena;
 use crate::node::cfg::CFGInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
-use crate::node::module::{Module, ModuleInfo};
+use crate::node::module::{Module, ModuleInfo, Modules};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{Dialect, InternTable, node::*};
 
@@ -37,7 +37,7 @@ pub struct Arenas<L: Dialect> {
     pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
     pub(crate) ungraphs: Arena<UnGraph, UnGraphInfo<L>>,
     #[cfg_attr(feature = "serde", serde(default))]
-    pub(crate) modules: Arena<Module, ModuleInfo>,
+    pub(crate) modules: Modules,
     pub(crate) symbols: InternTable<String, Symbol>,
 }
 
@@ -56,7 +56,7 @@ where
             statements: Arena::default(),
             digraphs: Arena::default(),
             ungraphs: Arena::default(),
-            modules: Arena::default(),
+            modules: Modules::default(),
             symbols: InternTable::default(),
         }
     }
@@ -157,15 +157,12 @@ impl<L: Dialect> Arenas<L> {
 
     /// Get a reference to the modules arena.
     pub fn module_arena(&self) -> &Arena<Module, ModuleInfo> {
-        &self.modules
+        self.modules.arena()
     }
 
     /// The stage's module named `name`, if any.
     pub fn module_by_name(&self, name: Symbol) -> Option<Module> {
-        self.modules
-            .iter()
-            .find(|info| info.name == Some(name))
-            .map(|info| info.id)
+        self.modules.by_name(name)
     }
 
     /// Get a reference to the undirected graph arena.
