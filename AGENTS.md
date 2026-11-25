@@ -12,6 +12,27 @@
 
 ## Build and Test
 
+### Pre-commit setup
+
+Before committing, ensure the prek hook is installed. A checked-in `prek.toml`
+does not install Git hooks automatically. Run this setup for a fresh clone;
+linked worktrees normally share the repository's hooks directory.
+
+```bash
+mise install
+rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component clippy --component rust-src
+mise exec -- prek install
+mise exec -- prek validate-config prek.toml
+```
+
+The hooks run formatting, workspace checks, and Clippy with warnings denied.
+Rust hooks use CI's pinned toolchain; keep their version and commands aligned
+with `.github/workflows/rust-ci.yml` when updating CI. They also run for Cargo
+manifest, lockfile, and hook-configuration changes where applicable.
+Run `mise exec -- prek run --all-files` to check the repository manually.
+Do not bypass failing hooks; fix the failure before committing. Passing tests
+alone does not replace the hook checks.
+
 ```bash
 cargo build --workspace          # Build all crates
 cargo nextest run --workspace    # Run all tests (preferred, parallelizes test binaries)
