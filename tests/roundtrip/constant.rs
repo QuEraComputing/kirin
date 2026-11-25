@@ -79,16 +79,16 @@ specialize @test fn @main() -> i64 cfg {
 #[test]
 fn test_sig_multiple_and_no_returns() {
     let input = r#"
-stage @test fn @pair(i64, f64) -> (i64, f64);
-stage @test fn @sink(i64) -> None;
+stage @test fn @pair(i64, f64) -> i64, f64;
+stage @test fn @sink(i64);
 
-specialize @test fn @pair(i64, f64) -> (i64, f64) cfg {
+specialize @test fn @pair(i64, f64) -> i64, f64 cfg {
   ^entry(%a: i64, %b: f64) {
     ret %a, %b;
   }
 }
 
-specialize @test fn @sink(i64) -> None cfg {
+specialize @test fn @sink(i64) cfg {
   ^entry(%a: i64) {
     ret;
   }

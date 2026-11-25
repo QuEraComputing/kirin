@@ -37,11 +37,11 @@ fn create_test_function() -> (
     let staged_function = stage
         .staged_function()
         .name(test_func)
-        .signature(kirin_ir::Signature::new(
-            vec![SimpleType::I64],
-            SimpleType::I64,
-            (),
-        ))
+        .signature(
+            kirin_ir::Signature::new()
+                .takes([SimpleType::I64])
+                .returns(SimpleType::I64),
+        )
         .new()
         .unwrap();
 

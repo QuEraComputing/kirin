@@ -123,7 +123,7 @@ use kirin_ir::Signature;
 fn test_parse_signature_two_params() {
     assert_eq!(
         parse_with::<Signature<i32>>("(1, 2) -> 3"),
-        Ok(Signature::new(vec![1, 2], 3, ()))
+        Ok(Signature::new().takes([1, 2]).returns(3))
     );
 }
 
@@ -131,7 +131,7 @@ fn test_parse_signature_two_params() {
 fn test_parse_signature_zero_params() {
     assert_eq!(
         parse_with::<Signature<i32>>("() -> 42"),
-        Ok(Signature::new(vec![], 42, ()))
+        Ok(Signature::new().returns(42))
     );
 }
 
@@ -139,19 +139,19 @@ fn test_parse_signature_zero_params() {
 fn test_parse_signature_single_param() {
     assert_eq!(
         parse_with::<Signature<i32>>("(1) -> 2"),
-        Ok(Signature::new(vec![1], 2, ()))
+        Ok(Signature::new().takes([1]).returns(2))
     );
 }
 
 #[test]
 fn test_signature_display() {
-    let sig = Signature::new(vec![1, 2], 3, ());
+    let sig = Signature::new().takes([1, 2]).returns(3);
     assert_eq!(format!("{}", sig), "(1, 2) -> 3");
 }
 
 #[test]
 fn test_signature_display_empty_params() {
-    let sig: Signature<i32> = Signature::new(vec![], 42, ());
+    let sig: Signature<i32> = Signature::new().returns(42);
     assert_eq!(format!("{}", sig), "() -> 42");
 }
 
@@ -159,11 +159,11 @@ fn test_signature_display_empty_params() {
 fn test_signature_returns_roundtrip() {
     for (text, rets) in [
         ("(1) -> 2", vec![2]),
-        ("(1) -> (2, 3)", vec![2, 3]),
-        ("(1) -> None", vec![]),
+        ("(1) -> 2, 3", vec![2, 3]),
+        ("(1)", vec![]),
     ] {
         let sig = parse_with::<Signature<i32>>(text).unwrap();
-        assert_eq!(sig, Signature::with_rets(vec![1], rets, ()));
+        assert_eq!(sig, Signature::new().takes([1]).returns_each(rets));
         assert_eq!(sig.to_string(), text);
     }
 }

@@ -208,7 +208,7 @@ mod tests {
     impl TypeLattice for SimpleType {}
 
     fn make_sig(params: Vec<SimpleType>, ret: SimpleType) -> Signature<SimpleType> {
-        Signature::new(params, ret, ())
+        Signature::new().takes(params).returns(ret)
     }
 
     #[test]
@@ -273,15 +273,15 @@ mod tests {
 
     #[test]
     fn exact_semantics_applicable_and_cmp() {
-        let sig1 = Signature::new(vec![1, 2], 3, ());
-        let sig2 = Signature::new(vec![1, 2], 3, ());
+        let sig1 = Signature::new().takes([1, 2]).returns(3);
+        let sig2 = Signature::new().takes([1, 2]).returns(3);
         assert!(ExactSemantics::applicable(&sig1, &sig2).is_some());
         assert_eq!(
             ExactSemantics::cmp_candidate(&sig1, &(), &sig2, &()),
             SignatureCmp::Equal
         );
 
-        let sig3 = Signature::new(vec![1, 99], 3, ());
+        let sig3 = Signature::new().takes([1, 99]).returns(3);
         assert!(ExactSemantics::applicable(&sig1, &sig3).is_none());
     }
 }

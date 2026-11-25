@@ -93,7 +93,7 @@ fn returns_types_results_from_callee_signature() {
     use kirin::ir::{BuilderStageInfo, SSAValue, Signature};
     use kirin_test_types::SimpleType;
 
-    let sig = Signature::with_rets(vec![], vec![SimpleType::I32, SimpleType::F64], ());
+    let sig = Signature::new().returns_each([SimpleType::I32, SimpleType::F64]);
     let mut stage = BuilderStageInfo::<Call<SimpleType>>::default();
     let call = Call::<SimpleType>::build(&mut stage)
         .named(Symbol::from(42usize))

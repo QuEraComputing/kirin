@@ -99,11 +99,11 @@ Add recognition in `parse_field`: detect `Signature<T>` type path, extract `T`, 
 
 ```
 (Type, Type, ...) -> Type
-(Type, ...) -> (Type, Type, ...)
-(Type, ...) -> None
+(Type, ...) -> Type, Type, ...
+(Type, ...)
 ```
 
-Params in parentheses, comma-separated, arrow, then the return types: one type, a non-empty parenthesized list, or `None` for no returns. A single return type that itself starts with `(` (e.g. unit `()`) prints wrapped, `(())`, so it parses back as one return.
+Params in parentheses, comma-separated, then an optional return clause: an arrow followed by a bare comma-separated list of one or more return types. A function with no returns has no arrow. The return list is never parenthesized, so a type that itself prints with parentheses (unit `()`, a tuple `(T, U)`) is always a single return: `-> (T, U)` returns one tuple, `-> T, U` returns two values, and neither converts into the other.
 
 ```rust
 impl<'t, T> HasParser<'t> for Signature<T>
@@ -117,9 +117,8 @@ where
             .separated_by(just(Token::Comma))
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
-            .then_ignore(just(Token::Arrow))
-            .then(return_type_list(T::parser()))
-            .map(|(params, rets)| Signature::with_rets(params, rets, ()))
+            .then(return_clause(T::parser()))
+            .map(|(params, rets)| Signature::new().takes(params).returns_each(rets))
     }
 }
 ```
@@ -128,7 +127,7 @@ where
 
 Note: This is the same logic currently in `fn_params_and_return` in `kirin-chumsky/src/function_text/syntax.rs`, but moved to a `HasParser` impl on the type itself.
 
-`PrettyPrint` (or `Display`) for `Signature<T>` outputs the same format: `(T, T) -> T`, `(T) -> (T, T)`, or `(T) -> None`.
+`PrettyPrint` (or `Display`) for `Signature<T>` outputs the same format: `(T, T) -> T`, `(T) -> T, T`, or `(T)`.
 
 ### Signature field projections
 
@@ -138,7 +137,7 @@ Like graph fields (`{body:ports}`, `{body:body}`), the Signature field supports 
 |------------|--------|--------|------|
 | `{sig}` | `(T, T) -> T` (whole) | `(T, T) -> T` | `Signature<T>` |
 | `{sig:inputs}` | `T, T` (comma-separated type list) | `T, T` | `Vec<T>` → `sig.params()` |
-| `{sig:return}` | `T`, `(T, T)`, or `None` | same | `Vec<T>` → `sig.rets()` |
+| `{sig:return}` | `T`, `T, T`, or nothing (bare list; the arrow belongs to the format string) | same | `Product<T>` → `sig.rets()` |
 
 **Constraint:** Either use `{sig}` as a whole, or use `{sig:inputs}` + `{sig:return}` together. The derive errors if only one projection appears without the other. This ensures the Signature field is always fully determined by the format string.
 
@@ -155,7 +154,7 @@ Invalid:
 
 - `{sig:inputs}` generates `T::parser().separated_by(just(Token::Comma)).collect::<Vec<_>>()`
 - `{sig:return}` generates `return_type_list(T::parser())`
-- After both are parsed, the codegen constructs `Signature::with_rets(inputs, rets, ())`
+- After both are parsed, the codegen constructs `Signature::new().takes(inputs).returns_each(rets)`
 
 **Printer codegen for projections:**
 
@@ -233,7 +232,7 @@ The parser parses `{sig}` from text `(T, T) -> T` via `Signature<T>::HasParser`.
 struct CircuitFunction { body: DiGraph, sig: Signature<QubitType> }
 ```
 
-The parser parses `{sig:inputs}` as a comma-separated type list and `{sig:return}` as a single type. The codegen constructs `Signature::new(inputs, ret, ())` from the two parsed values. This is for graph-based functions where the signature projections and body projections are separate concerns — `{sig:inputs}` / `{sig:return}` for the type interface, `{body:ports}` / `{body:captures}` for the IR structure. Types appear in both, mirroring MLIR's separation of function type from block argument declarations.
+The parser parses `{sig:inputs}` as a comma-separated type list and `{sig:return}` as a single type. The codegen constructs `Signature::new().takes(inputs).returns(ret)` from the two parsed values. This is for graph-based functions where the signature projections and body projections are separate concerns — `{sig:inputs}` / `{sig:return}` for the type interface, `{body:ports}` / `{body:captures}` for the IR structure. Types appear in both, mirroring MLIR's separation of function type from block argument declarations.
 
 **Validation:** The derive checks which Signature references appear in the format string and validates one of the two valid forms. A Signature field that has no corresponding `{sig}`, `{sig:inputs}`, or `{sig:return}` in the format string is a compile error.
 
@@ -246,7 +245,7 @@ The parser parses `{sig:inputs}` as a comma-separated type list and `{sig:return
 **Projected (`{sig:inputs}` + `{sig:return}`):** Each projection is an independent parser in the chain:
 - `{sig:inputs}` → `T::parser().separated_by(just(Token::Comma)).collect::<Vec<_>>()`
 - `{sig:return}` → `T::parser()`
-- After both are parsed, the AST constructor combines them: `Signature::new(inputs, ret, ())`
+- After both are parsed, the AST constructor combines them: `Signature::new().takes(inputs).returns(ret)`
 
 ### Printer codegen
 

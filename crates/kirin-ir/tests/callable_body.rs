@@ -41,7 +41,7 @@ fn unmarked_body_and_signature_do_not_imply_callability() {
     let mut stage = new_stage();
     let operation = UnmarkedBody {
         body: stage.cfg().new(),
-        sig: Signature::new(vec![], TestType::I32, ()),
+        sig: Signature::new().returns(TestType::I32),
     };
     assert_eq!(operation.callable_body(), None);
     assert!(operation.signature().is_some());

@@ -343,7 +343,7 @@ fn test_function_type_no_args() {
 
 #[test]
 fn test_function_type_multi_return() {
-    let result = test_parse!("( 1 ) -> ( 2 , 3 )", function_type::<_, i32>());
+    let result = test_parse!("( 1 ) -> 2 , 3", function_type::<_, i32>());
     assert!(result.is_ok());
     let ft = result.unwrap();
     assert_eq!(ft.value.input_types.len(), 1);
@@ -986,13 +986,26 @@ fn test_emit_context_multiple_distinct_names() {
 // === Function type edge cases ===
 
 #[test]
-fn test_function_type_no_args_no_return() {
-    // Just an arrow with no return type should give empty outputs
-    let result = test_parse!("->", function_type::<_, i32>());
+fn test_function_type_no_return_has_no_arrow() {
+    // No outputs is written with no arrow, as in a signature.
+    let result = test_parse!("( 1 )", function_type::<_, i32>());
     assert!(result.is_ok());
     let ft = result.unwrap();
-    assert!(ft.value.input_types.is_empty());
+    assert_eq!(ft.value.input_types.len(), 1);
     assert!(ft.value.output_types.is_empty());
+}
+
+#[test]
+fn test_function_type_arrow_without_return_fails() {
+    let result = test_parse!("->", function_type::<_, i32>());
+    assert!(result.is_err(), "an arrow must be followed by a type");
+}
+
+#[test]
+fn test_function_type_parenthesized_outputs_are_not_a_list() {
+    // `( 3 , 4 )` is not an `i32`, and the output list is never parenthesized.
+    let result = test_parse!("( 1 , 2 ) -> ( 3 , 4 )", function_type::<_, i32>());
+    assert!(result.is_err());
 }
 
 #[test]
@@ -1020,8 +1033,8 @@ fn test_function_type_trailing_comma_input() {
 }
 
 #[test]
-fn test_function_type_multi_return_parens() {
-    let result = test_parse!("( 1 , 2 ) -> ( 3 , 4 )", function_type::<_, i32>());
+fn test_function_type_multi_args_multi_return() {
+    let result = test_parse!("( 1 , 2 ) -> 3 , 4", function_type::<_, i32>());
     assert!(result.is_ok());
     let ft = result.unwrap();
     assert_eq!(ft.value.input_types.len(), 2);

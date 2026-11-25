@@ -1,7 +1,7 @@
-use crate::Statement;
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::language::Dialect;
 use crate::signature::Signature;
+use crate::{Product, Statement};
 
 use super::staged::StagedFunction;
 
@@ -86,7 +86,7 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         &mut self.definition
     }
 
-    pub fn return_types(&self) -> &[L::Type] {
+    pub fn return_types(&self) -> &Product<L::Type> {
         self.signature.rets()
     }
 
