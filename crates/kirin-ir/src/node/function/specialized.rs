@@ -86,8 +86,8 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         &mut self.definition
     }
 
-    pub fn return_type(&self) -> &L::Type {
-        self.signature.ret()
+    pub fn return_types(&self) -> &[L::Type] {
+        self.signature.rets()
     }
 
     pub fn signature(&self) -> &Signature<L::Type> {

@@ -1,22 +1,27 @@
 /// A function signature parameterized over the type `T` and optional constraints `C`.
 ///
 /// - `params`: the parameter types of the function.
-/// - `ret`: the return type.
+/// - `rets`: the return types.
 /// - `constraints`: optional constraint context (e.g., type-variable bindings). Defaults to `()`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signature<T, C = ()> {
     params: Vec<T>,
-    ret: T,
+    rets: Vec<T>,
     constraints: C,
 }
 
 impl<T, C> Signature<T, C> {
-    /// Creates a new signature with the given parameters, return type, and constraints.
+    /// Creates a new signature with a single return type.
     pub fn new(params: Vec<T>, ret: T, constraints: C) -> Self {
+        Self::with_rets(params, vec![ret], constraints)
+    }
+
+    /// Creates a new signature with the given return types (empty means no returns).
+    pub fn with_rets(params: Vec<T>, rets: Vec<T>, constraints: C) -> Self {
         Signature {
             params,
-            ret,
+            rets,
             constraints,
         }
     }
@@ -26,14 +31,33 @@ impl<T, C> Signature<T, C> {
         &self.params
     }
 
-    /// Returns the return type of the signature.
-    pub fn ret(&self) -> &T {
-        &self.ret
+    /// Returns the return types of the signature.
+    pub fn rets(&self) -> &[T] {
+        &self.rets
     }
 
     /// Returns the constraints of the signature.
     pub fn constraints(&self) -> &C {
         &self.constraints
+    }
+
+    /// Formats the return types as `T`, `(T, U)`, or `None`.
+    /// A lone type printing as `(...)` or `None` is wrapped so it parses back as one return.
+    pub fn rets_to_string(&self) -> String
+    where
+        T: std::fmt::Display,
+    {
+        match self.rets.as_slice() {
+            [] => "None".to_string(),
+            [ret] => match ret.to_string() {
+                ret if ret.starts_with('(') || ret == "None" => format!("({ret})"),
+                ret => ret,
+            },
+            rets => {
+                let rets: Vec<String> = rets.iter().map(ToString::to_string).collect();
+                format!("({})", rets.join(", "))
+            }
+        }
     }
 }
 
@@ -46,7 +70,7 @@ impl<T: std::fmt::Display, C> std::fmt::Display for Signature<T, C> {
             }
             write!(f, "{}", param)?;
         }
-        write!(f, ") -> {}", self.ret)
+        write!(f, ") -> {}", self.rets_to_string())
     }
 }
 
@@ -57,7 +81,7 @@ impl<T: crate::Placeholder> Signature<T> {
     pub fn placeholder() -> Self {
         Signature {
             params: Vec::new(),
-            ret: T::placeholder(),
+            rets: vec![T::placeholder()],
             constraints: (),
         }
     }

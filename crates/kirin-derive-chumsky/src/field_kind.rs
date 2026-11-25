@@ -209,8 +209,8 @@ pub fn parser_expr<L: Layout>(
                             #crate_path::chumsky::prelude::just(#crate_path::Token::RParen),
                         )
                         .then_ignore(#crate_path::chumsky::prelude::just(#crate_path::Token::Arrow))
-                        .then(<#ir_type as #crate_path::HasParser<'t>>::parser())
-                        .map(|(params, ret)| #crate_path::ir::Signature::new(params, ret, ()))
+                        .then(#crate_path::return_type_list(<#ir_type as #crate_path::HasParser<'t>>::parser()))
+                        .map(|(params, rets)| #crate_path::ir::Signature::with_rets(params, rets, ()))
                 }
             }
             FormatOption::Signature(crate::format::SignatureProjection::Inputs) => {
@@ -222,8 +222,8 @@ pub fn parser_expr<L: Layout>(
                 }
             }
             FormatOption::Signature(crate::format::SignatureProjection::Return) => {
-                // Single type: T::parser()
-                quote! { <#ir_type as #crate_path::HasParser<'t>>::parser() }
+                // Return types
+                quote! { #crate_path::return_type_list(<#ir_type as #crate_path::HasParser<'t>>::parser()) }
             }
             _ => unreachable!("validation prevents other options on Signature fields"),
         },
@@ -381,8 +381,8 @@ pub fn print_expr<L: Layout>(
                 }
             }
             FormatOption::Signature(crate::format::SignatureProjection::Return) => {
-                // Single return type
-                quote! { doc.text(::std::format!("{}", #field_ref.ret())) }
+                // Return types
+                quote! { doc.text(#field_ref.rets_to_string()) }
             }
             _ => unreachable!("validation prevents other options on Signature fields"),
         },

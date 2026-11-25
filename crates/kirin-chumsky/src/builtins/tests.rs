@@ -154,3 +154,16 @@ fn test_signature_display_empty_params() {
     let sig: Signature<i32> = Signature::new(vec![], 42, ());
     assert_eq!(format!("{}", sig), "() -> 42");
 }
+
+#[test]
+fn test_signature_returns_roundtrip() {
+    for (text, rets) in [
+        ("(1) -> 2", vec![2]),
+        ("(1) -> (2, 3)", vec![2, 3]),
+        ("(1) -> None", vec![]),
+    ] {
+        let sig = parse_with::<Signature<i32>>(text).unwrap();
+        assert_eq!(sig, Signature::with_rets(vec![1], rets, ()));
+        assert_eq!(sig.to_string(), text);
+    }
+}

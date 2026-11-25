@@ -99,9 +99,11 @@ Add recognition in `parse_field`: detect `Signature<T>` type path, extract `T`, 
 
 ```
 (Type, Type, ...) -> Type
+(Type, ...) -> (Type, Type, ...)
+(Type, ...) -> None
 ```
 
-Params in parentheses, comma-separated, arrow, single return type.
+Params in parentheses, comma-separated, arrow, then the return types: one type, a non-empty parenthesized list, or `None` for no returns. A single return type that itself starts with `(` (e.g. unit `()`) prints wrapped, `(())`, so it parses back as one return.
 
 ```rust
 impl<'t, T> HasParser<'t> for Signature<T>
@@ -116,8 +118,8 @@ where
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
             .then_ignore(just(Token::Arrow))
-            .then(T::parser())
-            .map(|(params, ret)| Signature::new(params, ret, ()))
+            .then(return_type_list(T::parser()))
+            .map(|(params, rets)| Signature::with_rets(params, rets, ()))
     }
 }
 ```
@@ -126,7 +128,7 @@ where
 
 Note: This is the same logic currently in `fn_params_and_return` in `kirin-chumsky/src/function_text/syntax.rs`, but moved to a `HasParser` impl on the type itself.
 
-`PrettyPrint` (or `Display`) for `Signature<T>` outputs the same format: `(T, T) -> T`.
+`PrettyPrint` (or `Display`) for `Signature<T>` outputs the same format: `(T, T) -> T`, `(T) -> (T, T)`, or `(T) -> None`.
 
 ### Signature field projections
 
@@ -136,7 +138,7 @@ Like graph fields (`{body:ports}`, `{body:body}`), the Signature field supports 
 |------------|--------|--------|------|
 | `{sig}` | `(T, T) -> T` (whole) | `(T, T) -> T` | `Signature<T>` |
 | `{sig:inputs}` | `T, T` (comma-separated type list) | `T, T` | `Vec<T>` → `sig.params()` |
-| `{sig:return}` | `T` (single type) | `T` | `T` → `sig.ret()` |
+| `{sig:return}` | `T`, `(T, T)`, or `None` | same | `Vec<T>` → `sig.rets()` |
 
 **Constraint:** Either use `{sig}` as a whole, or use `{sig:inputs}` + `{sig:return}` together. The derive errors if only one projection appears without the other. This ensures the Signature field is always fully determined by the format string.
 
@@ -152,13 +154,13 @@ Invalid:
 **Parser codegen for projections:**
 
 - `{sig:inputs}` generates `T::parser().separated_by(just(Token::Comma)).collect::<Vec<_>>()`
-- `{sig:return}` generates `T::parser()`
-- After both are parsed, the codegen constructs `Signature::new(inputs, ret, ())`
+- `{sig:return}` generates `return_type_list(T::parser())`
+- After both are parsed, the codegen constructs `Signature::with_rets(inputs, rets, ())`
 
 **Printer codegen for projections:**
 
 - `{sig:inputs}` generates a comma-separated rendering of `self.sig.params()`
-- `{sig:return}` generates `format!("{}", self.sig.ret())`
+- `{sig:return}` generates `self.sig.rets_to_string()`
 
 ### Eliminating `{:signature}` and `{:return}`
 

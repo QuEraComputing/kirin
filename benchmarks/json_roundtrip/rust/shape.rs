@@ -130,7 +130,7 @@ pub fn verify(stage: &Stage) {
                 let value: SSAValue = (*argument).into();
                 assert_eq!(value.expect_info(stage).ty(), ty);
             }
-            assert_eq!(*signature.ret(), kirin_test_languages::SimpleType::I64);
+            assert_eq!(signature.rets(), &[kirin_test_languages::SimpleType::I64]);
             for block in body.blocks(stage) {
                 for statement in block.statements(stage) {
                     assert!(!statement.expect_info(stage).definition().is_terminator());

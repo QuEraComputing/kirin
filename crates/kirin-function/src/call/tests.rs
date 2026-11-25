@@ -87,3 +87,22 @@ fn arguments_matches_args() {
     assert_eq!(args[0], TestSSAValue(0).into());
     assert_eq!(args[1], TestSSAValue(1).into());
 }
+
+#[test]
+fn returns_types_results_from_callee_signature() {
+    use kirin::ir::{BuilderStageInfo, SSAValue, Signature};
+    use kirin_test_types::SimpleType;
+
+    let sig = Signature::with_rets(vec![], vec![SimpleType::I32, SimpleType::F64], ());
+    let mut stage = BuilderStageInfo::<Call<SimpleType>>::default();
+    let call = Call::<SimpleType>::build(&mut stage)
+        .named(Symbol::from(42usize))
+        .returns(sig.rets().iter().cloned())
+        .insert();
+    let types: Vec<_> = call
+        .results
+        .iter()
+        .map(|&r| stage.ssa_arena()[SSAValue::from(r)].ty().cloned())
+        .collect();
+    assert_eq!(types, vec![Some(SimpleType::I32), Some(SimpleType::F64)]);
+}
