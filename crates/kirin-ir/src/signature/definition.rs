@@ -55,9 +55,9 @@ impl<T> Default for Signature<T> {
 }
 
 impl<T, C> Signature<T, C> {
-    /// Sets the parameter types, one per argument.
+    /// Adds one parameter type per item, in order. An empty iterator adds none.
     pub fn takes(mut self, params: impl IntoIterator<Item = T>) -> Self {
-        self.params = params.into_iter().collect();
+        self.params.0.extend(params);
         self
     }
 

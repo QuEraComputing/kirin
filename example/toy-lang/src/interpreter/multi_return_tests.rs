@@ -141,8 +141,39 @@ fn demand_flows_through_one_returned_slot_only() {
 
 #[test]
 fn classic_liveness_treats_the_call_as_two_definitions() {
+    use kirin::prelude::{GetInfo, HasResults, SSAValue};
+    use kirin_interpreter::ProgramPoint;
+    use kirin_liveness::LiveSet;
+
     let program = program();
-    analyze_classic_liveness(&program, "source", "main").unwrap();
+    let (stage, cfg, analyzed) = analyze_classic_liveness(&program, "source", "main").unwrap();
+    let root = analyzed.root();
+    let Stage::Source(info) = program.stage(stage).unwrap() else {
+        panic!("main is in the source stage");
+    };
+    let entry = cfg.blocks(info).next().unwrap();
+    let call = entry.statements(info).next().unwrap();
+    let params: LiveSet = entry
+        .expect_info(info)
+        .arguments()
+        .iter()
+        .copied()
+        .map(SSAValue::from)
+        .collect();
+    let results: LiveSet = call
+        .definition(info)
+        .results()
+        .copied()
+        .map(SSAValue::from)
+        .collect();
+    assert_eq!(
+        analyzed.fact(root, ProgramPoint::After(call)),
+        Some(&results)
+    );
+    assert_eq!(
+        analyzed.fact(root, ProgramPoint::Before(call)),
+        Some(&params)
+    );
 }
 
 #[test]

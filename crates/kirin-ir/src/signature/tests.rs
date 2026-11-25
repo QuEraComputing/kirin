@@ -1,6 +1,19 @@
 use super::definition::Signature;
 use super::semantics::{ExactSemantics, SignatureCmp, SignatureSemantics};
 
+#[test]
+fn chained_parameters_and_returns_append_in_order() {
+    let signature = Signature::new()
+        .takes(["A"])
+        .returns("A")
+        .takes(["B", "C"])
+        .returns_each(["B", "C"])
+        .takes([])
+        .returns_each([]);
+    assert_eq!(signature.params().as_slice(), &["A", "B", "C"]);
+    assert_eq!(signature.rets().as_slice(), &["A", "B", "C"]);
+}
+
 // A simple type for testing ExactSemantics
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum SimpleType {
