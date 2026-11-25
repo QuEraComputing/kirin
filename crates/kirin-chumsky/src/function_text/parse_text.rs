@@ -2,8 +2,9 @@
 //!
 //! This module parses a sequence of `stage` and `specialize` declarations into
 //! a [`Program`](kirin_ir::Program). A `stage @A mod @name { ... }`
-//! declaration places a module in stage `A`; it is parsed immediately in
-//! pass 1, using the stage's [`ParseModuleText`](crate::ParseModuleText) grammar. Each declaration starts with a symbolic
+//! declaration places a module in stage `A`; its members are parsed and
+//! emitted in pass 1 with the stage's dialect, and the module is created only
+//! once the whole parse has succeeded. Each declaration starts with a symbolic
 //! stage (for example `@A`), and the concrete dialect parser is chosen at
 //! runtime by dispatching on that stage's actual `StageInfo<L>` variant.
 //!
@@ -91,7 +92,7 @@ use kirin_ir::{
 use kirin_lexer::Token;
 use strsim::levenshtein;
 
-use crate::{EmitContext, HasParser, ParseEmit};
+use crate::{EmitContext, HasParser, ParseEmit, PendingModule};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
@@ -340,10 +341,14 @@ where
         // references like `specialize @A fn @foo ...` before `stage @A fn @foo`
         // are validated against the full header set.
         let mut pending_specializations: Vec<(usize, CompileStage, SymbolName<'_>)> = Vec::new();
+        // Created only after pass 2, so a failed parse leaves no module behind.
+        let mut pending_modules: Vec<(CompileStage, PendingModule)> = Vec::new();
 
         let mut index = 0;
         while index < tokens.len() {
-            if let Some(next) = parse_module_declaration(self, &tokens, src, index)? {
+            if let Some(next) =
+                parse_module_declaration(self, &tokens, src, index, &mut pending_modules)?
+            {
                 index = next;
                 continue;
             }
@@ -460,6 +465,12 @@ where
             )?;
         }
 
+        for (stage_id, pending) in pending_modules {
+            self.stage_mut(stage_id)
+                .expect("a module's stage stays available during parsing")
+                .dispatch_attach_module(pending);
+        }
+
         Ok(state.touched_functions)
     }
 }
@@ -476,6 +487,7 @@ fn parse_module_declaration<S>(
     tokens: &[(Token<'_>, SimpleSpan)],
     src: &str,
     start_index: usize,
+    pending_modules: &mut Vec<(CompileStage, PendingModule)>,
 ) -> Result<Option<usize>, FunctionParseError>
 where
     S: StageMeta + ParseDispatch,
@@ -544,7 +556,7 @@ where
         .ok_or_else(|| stage_missing_error(stage_name, status, Some(*stage_span)))?;
     let shift =
         |inner: SimpleSpan| SimpleSpan::from(inner.start + span.start..inner.end + span.start);
-    stage
+    let pending = stage
         .dispatch_module(&src[span.start..span.end])
         .map_err(|error| match error {
             crate::ChumskyError::Parse(errors) => FunctionParseError::new(
@@ -563,6 +575,20 @@ where
             ),
         })?
         .ok_or_else(|| stage_dialect_mismatch_error(stage_name, Some(*stage_span)))?;
+    // Earlier modules in this text are not in the stage yet.
+    if let (Some(name), Some(name_span)) = (pending.name, pending.name_span)
+        && pending_modules
+            .iter()
+            .any(|(stage, other)| *stage == stage_id && other.name == Some(name))
+    {
+        let name_span = shift(name_span);
+        return Err(FunctionParseError::new(
+            FunctionParseErrorKind::InvalidModule,
+            Some(name_span),
+            format!("duplicate module {}", &src[name_span.start..name_span.end]),
+        ));
+    }
+    pending_modules.push((stage_id, pending));
     Ok(Some(close_index + 1))
 }
 

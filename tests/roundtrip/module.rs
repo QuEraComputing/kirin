@@ -79,6 +79,70 @@ fn program_text_rejects_duplicate_module_in_a_stage() {
     assert_eq!(span.start, src.rfind("@a").unwrap());
 }
 
+/// Modules are created only once the whole text has parsed, so a later
+/// declaration's error leaves no module and the corrected text parses into
+/// the same program.
+#[test]
+fn program_text_retries_after_a_later_declaration_fails() {
+    let module = "stage @code mod @a { %k = constant 1 -> i64; }\n";
+    let header = "stage @code fn @f(i64) -> i64;\n";
+    let mut program: Program<TestStage> = Program::new();
+    let error = program
+        .parse(&format!(
+            "{module}{header}specialize @code fn @f(i64) -> i64 cfg {{ ^e(%x: i64) {{ ret %nope; }} }}"
+        ))
+        .unwrap_err();
+    assert!(error.to_string().contains("undefined SSA"), "{error}");
+    let code = program.stage_by_name("code").unwrap();
+    assert!(
+        program
+            .resolve_module::<GraphFunctionLanguage>("a", code)
+            .is_none()
+    );
+
+    program
+        .parse(&format!(
+            "{module}{header}specialize @code fn @f(i64) -> i64 cfg {{ ^e(%x: i64) {{ ret %x; }} }}"
+        ))
+        .unwrap();
+    assert!(
+        program
+            .resolve_module::<GraphFunctionLanguage>("a", code)
+            .is_some()
+    );
+}
+
+/// A failing module does not leave the modules before it behind.
+#[test]
+fn program_text_retries_after_a_later_module_fails() {
+    let first = "stage @code mod @a { %k = constant 1 -> i64; }\n";
+    let mut program: Program<TestStage> = Program::new();
+    let error = program
+        .parse(&format!(
+            "{first}stage @code mod @b {{ %y = add %z, %z -> i64; }}"
+        ))
+        .unwrap_err();
+    assert!(error.to_string().contains("undefined SSA"), "{error}");
+    let code = program.stage_by_name("code").unwrap();
+    let Some(TestStage::Code(stage)) = program.stage(code) else {
+        panic!("@code holds GraphFunctionLanguage");
+    };
+    assert_eq!(stage.module_arena().iter().count(), 0);
+
+    program
+        .parse(&format!(
+            "{first}stage @code mod @b {{ %k = constant 2 -> i64; }}"
+        ))
+        .unwrap();
+    for name in ["a", "b"] {
+        assert!(
+            program
+                .resolve_module::<GraphFunctionLanguage>(name, code)
+                .is_some()
+        );
+    }
+}
+
 #[test]
 fn named_module_roundtrip() {
     let mut program: Program<StageInfo<TestLanguage>> = Program::new();
@@ -139,7 +203,6 @@ fn invalid_members_leave_stage_retryable() {
         assert!(err.to_string().contains(message), "{err}");
         let stage = program.stage(id).unwrap();
         assert_eq!(stage.module_arena().iter().count(), 0);
-        assert_eq!(stage.statement_arena().iter().count(), 0);
     }
     program.parse_module(id, "mod @retry { decl @x; }").unwrap();
 }

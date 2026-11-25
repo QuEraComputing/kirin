@@ -52,6 +52,24 @@ impl<L: Dialect> BuilderStageInfo<L> {
             .ok_or_else(|| format!("module {module:?} is deleted or not in this stage"))?
             .members
             .tail;
+        self.check_module_member(member)?;
+        let info = &mut self.nodes.statements[member];
+        info.parent = Some(StatementParent::Module(module));
+        info.node.prev = tail;
+        if let Some(tail) = tail {
+            self.nodes.statements[tail].node.next = Some(member);
+        }
+        let members = &mut self.modules[module].members;
+        members.head.get_or_insert(member);
+        members.tail = Some(member);
+        members.len += 1;
+        Ok(())
+    }
+
+    /// Check that `member` could be appended to a module: it is live,
+    /// unattached, not a terminator, and has no successors. Lets a caller
+    /// check every member before it creates the module.
+    pub fn check_module_member(&self, member: Statement) -> Result<(), String> {
         let info = self
             .nodes
             .statements
@@ -66,16 +84,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
         if info.definition.successors().next().is_some() {
             return Err("a statement with successors cannot be a module member".into());
         }
-        let info = &mut self.nodes.statements[member];
-        info.parent = Some(StatementParent::Module(module));
-        info.node.prev = tail;
-        if let Some(tail) = tail {
-            self.nodes.statements[tail].node.next = Some(member);
-        }
-        let members = &mut self.modules[module].members;
-        members.head.get_or_insert(member);
-        members.tail = Some(member);
-        members.len += 1;
         Ok(())
     }
 }
