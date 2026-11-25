@@ -146,7 +146,8 @@ pub struct StagedFunctionError<L: Dialect> {
     /// The conflicting global symbol name.
     pub name: Option<GlobalSymbol>,
     /// The signature of the new staged function being created.
-    pub signature: Signature<L::Type>,
+    /// Boxed to keep the error compact as signatures contain two products.
+    pub signature: Box<Signature<L::Type>>,
     /// Existing non-invalidated staged functions with the same name.
     pub conflicting: Vec<StagedFunction>,
     /// Preserved specializations for the new staged function.
