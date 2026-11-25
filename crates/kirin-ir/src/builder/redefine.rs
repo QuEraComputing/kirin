@@ -67,7 +67,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let staged_function = StagedFunctionInfo {
             id,
             name: error.name,
-            signature: error.signature,
+            signature: *error.signature,
             specializations: error.specializations,
             backedges: error.backedges,
             invalidated: false,

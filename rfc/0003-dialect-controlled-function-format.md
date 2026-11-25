@@ -219,7 +219,7 @@ impl HasSignature<Circuit> for CircuitFunction {
         let info = self.body.expect_info(stage);
         let params: Vec<QubitType> = info.edge_ports().map(|p| p.expect_info(stage).ty().clone()).collect();
         let ret = QubitType::Qubit; // or derive from yields
-        Signature::new(params, ret, ())
+        Signature::new().takes(params).returns(ret)
     }
 }
 ```

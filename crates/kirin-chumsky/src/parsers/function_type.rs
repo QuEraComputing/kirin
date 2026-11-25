@@ -1,32 +1,19 @@
 use crate::ast::*;
-use crate::parsers::identifier;
 use crate::traits::*;
 use chumsky::prelude::*;
 use kirin_lexer::Token;
 
-/// Parses return types with `ty`: `None` (no returns), `(T, U)`, or a single `T`.
-pub fn return_type_list<'t, I, O>(
-    ty: impl Parser<'t, I, O, ParserError<'t>> + Clone,
-) -> impl Parser<'t, I, Vec<O>, ParserError<'t>>
-where
-    I: TokenInput<'t>,
-{
-    identifier("None")
-        .map(|_| Vec::new())
-        .or(ty
-            .clone()
-            .separated_by(just(Token::Comma))
-            .at_least(1)
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LParen), just(Token::RParen)))
-        .or(ty.map(|ty| vec![ty]))
-        .labelled("return types")
-}
-
 /// Parses a function type signature.
 ///
-/// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32` or `-> None`.
-/// `-> ()` is a single unit-typed output, not "no outputs".
+/// Matches: `(i32, f64) -> bool`, `(i32) -> bool, i32`, `-> i32`, or `(i32)`
+/// for a function with no outputs.
+///
+/// The outputs use the same grammar as a signature's return clause
+/// ([`return_clause`](super::return_clause)): a bare comma list that is never
+/// parenthesized, so `-> ()` is one output whose type prints as `()`, and no
+/// outputs means no arrow. Because the list is bare, a language that nests a
+/// function type inside another comma list must delimit it itself (for
+/// example `Fn[(A) -> B, C]`).
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `FunctionType<<T as HasParser>::Output>`.
@@ -48,16 +35,11 @@ where
         .or(empty().to(Vec::new()))
         .labelled("function input types");
 
-    let output_types = just(Token::Arrow)
-        .ignore_then(
-            return_type_list(T::parser().map_with(|ty, e| Spanned {
-                value: ty,
-                span: e.span(),
-            }))
-            .or(empty().to(Vec::new())),
-        )
-        .or(empty().to(Vec::new()))
-        .labelled("function output types");
+    let output_types = super::return_clause(T::parser().map_with(|ty, e| Spanned {
+        value: ty,
+        span: e.span(),
+    }))
+    .labelled("function output types");
 
     input_types
         .then(output_types)

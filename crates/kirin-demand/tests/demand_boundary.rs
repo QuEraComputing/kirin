@@ -7,21 +7,19 @@ use kirin_test_languages::GraphFunctionLanguage;
 
 type TestStage = StageInfo<GraphFunctionLanguage>;
 
-// This test language has scalar signature types; return-site rules determine
-// boundary arity independently, as with the graph multi-result fixtures.
 const PROGRAM: &str = r#"
-stage @test fn @triple(i64, i64, i64) -> i64;
-stage @test fn @main(i64, i64, i64) -> i64;
+stage @test fn @triple(i64, i64, i64) -> i64, i64, i64;
+stage @test fn @main(i64, i64, i64) -> i64, i64, i64;
 stage @test fn @branch(i64, i64) -> i64;
 stage @test fn @inner(i64, i64) -> i64;
-stage @test fn @swap(i64, i64) -> i64;
+stage @test fn @swap(i64, i64) -> i64, i64;
 
-specialize @test fn @triple(i64, i64, i64) -> i64 cfg {
+specialize @test fn @triple(i64, i64, i64) -> i64, i64, i64 cfg {
   ^entry(%a: i64, %b: i64, %c: i64) {
     ret %c, %a, %b;
   }
 }
-specialize @test fn @main(i64, i64, i64) -> i64 cfg {
+specialize @test fn @main(i64, i64, i64) -> i64, i64, i64 cfg {
   ^entry(%a: i64, %b: i64, %c: i64) {
     %x, %y, %z = call.named @triple(%a, %b, %c) -> i64, i64, i64;
     ret %x, %y, %z;
@@ -39,7 +37,7 @@ specialize @test fn @inner(i64, i64) -> i64 cfg {
     ret %b;
   }
 }
-specialize @test fn @swap(i64, i64) -> i64 cfg {
+specialize @test fn @swap(i64, i64) -> i64, i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %x = call.named @inner(%a, %b) -> i64;
     %y = call.named @inner(%b, %a) -> i64;

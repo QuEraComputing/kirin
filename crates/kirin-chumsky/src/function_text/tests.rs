@@ -134,7 +134,7 @@ enum MixedStage {
 const BODY: &str = "cfg { ^0() {} }";
 
 fn unit_sig() -> Signature<UnitType> {
-    Signature::new(vec![UnitType], UnitType, ())
+    Signature::new().takes([UnitType]).returns(UnitType)
 }
 
 fn function_name<S>(program: &Program<S>, function: Function) -> String {
@@ -287,7 +287,7 @@ fn test_program_roundtrip_print_parse_print() {
     program.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
         let cfg = b.cfg().add_block(block).new();
-        let definition = FunctionDefinition::new(b, cfg, Signature::new(vec![], UnitType, ()));
+        let definition = FunctionDefinition::new(b, cfg, Signature::new().returns(UnitType));
         b.specialize()
             .staged_func(staged_function)
             .signature(unit_sig())
@@ -345,7 +345,10 @@ fn test_program_parse_uses_stage_language_dispatch() {
         .next()
         .unwrap()
         .signature();
-    assert_eq!(stage_b_sig, &Signature::new(vec![I32Type], I32Type, ()));
+    assert_eq!(
+        stage_b_sig,
+        &Signature::new().takes([I32Type]).returns(I32Type)
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -616,24 +619,17 @@ fn test_unit_typed_signatures_roundtrip() {
     };
     for sig in [
         unit_sig(),
-        Signature::with_rets(vec![UnitType], vec![], ()),
-        Signature::with_rets(vec![UnitType], vec![UnitType, UnitType], ()),
+        Signature::new().takes([UnitType]),
+        Signature::new()
+            .takes([UnitType])
+            .returns_each([UnitType, UnitType]),
     ] {
         assert_eq!(parse(&format!("stage @A fn @foo{sig};")), sig);
     }
+    // A unit type is one return; no returns is the absence of the arrow.
     assert_eq!(parse("stage @A fn @foo(()) -> ();"), unit_sig());
-}
-
-#[test]
-fn test_function_type_unit_and_none_outputs() {
-    let outputs = |text| {
-        let parser = crate::function_type::<_, UnitType>();
-        kirin_test_utils::parse_tokens!(text, parser)
-            .unwrap()
-            .value
-            .output_types
-            .len()
-    };
-    assert_eq!(outputs("(()) -> ()"), 1);
-    assert_eq!(outputs("(()) -> None"), 0);
+    assert_eq!(
+        parse("stage @A fn @foo(());"),
+        Signature::new().takes([UnitType])
+    );
 }

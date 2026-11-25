@@ -285,7 +285,9 @@ fn build_cross_stage_specialized_program() -> Program<Stage> {
         let definition = Function::<ArithType>::new(
             builder,
             cfg,
-            Signature::new(vec![ArithType::I64], ArithType::I64, ()),
+            Signature::new()
+                .takes([ArithType::I64])
+                .returns(ArithType::I64),
         );
         builder
             .specialize()

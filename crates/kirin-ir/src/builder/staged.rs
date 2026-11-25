@@ -222,7 +222,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
                 return Err(StagedFunctionError {
                     conflict_kind: StagedFunctionConflictKind::DuplicateSignature,
                     name,
-                    signature: sig,
+                    signature: Box::new(sig),
                     conflicting: duplicate_signature,
                     specializations: specializations.unwrap_or_default(),
                     backedges: backedges.unwrap_or_default(),
@@ -240,7 +240,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
                         conflict_kind:
                             StagedFunctionConflictKind::SignatureMismatchUnderSingleInterface,
                         name,
-                        signature: sig,
+                        signature: Box::new(sig),
                         conflicting: signature_mismatch,
                         specializations: specializations.unwrap_or_default(),
                         backedges: backedges.unwrap_or_default(),

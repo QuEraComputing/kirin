@@ -691,7 +691,7 @@ impl GenerateHasDialectParser {
             .expect("validation ensures {sig:inputs} is present");
         let return_var = find_sig_var(SignatureProjection::Return)
             .expect("validation ensures {sig:return} is present");
-        quote! { #ir_path::Signature::with_rets(#inputs_var, #return_var, ()) }
+        quote! { #ir_path::Signature::new().takes(#inputs_var).returns_each(#return_var) }
     }
 
     pub(super) fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {

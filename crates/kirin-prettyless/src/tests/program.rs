@@ -13,11 +13,7 @@ fn test_program_function_print() {
         .staged_function()
         .func(func)
         .stage(stage0_id)
-        .signature(kirin_ir::Signature::new(
-            vec![SimpleType::I64],
-            SimpleType::I64,
-            (),
-        ))
+        .signature(kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -44,11 +40,7 @@ fn test_program_function_print() {
         .staged_function()
         .func(func)
         .stage(stage1_id)
-        .signature(kirin_ir::Signature::new(
-            vec![SimpleType::I64],
-            SimpleType::I64,
-            (),
-        ))
+        .signature(kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -86,11 +78,7 @@ fn test_program_unnamed_stage() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(
-            vec![SimpleType::I64, SimpleType::F64],
-            SimpleType::I64,
-            (),
-        ))
+        .signature(kirin_ir::Signature::new().takes([SimpleType::I64, SimpleType::F64]).returns(SimpleType::I64))
         .new()
         .unwrap();
 
@@ -127,11 +115,7 @@ fn test_program_staged_function_no_specialization() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(
-            vec![SimpleType::I64],
-            SimpleType::F64,
-            (),
-        ))
+        .signature(kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::F64))
         .new()
         .unwrap();
 
@@ -159,11 +143,7 @@ fn test_program_marks_a_poisoned_stage_instead_of_dropping_it() {
                 .staged_function()
                 .func(func)
                 .stage(stage_id)
-                .signature(kirin_ir::Signature::new(
-                    vec![SimpleType::I64],
-                    SimpleType::I64,
-                    (),
-                ))
+                .signature(kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64))
                 .new()
                 .unwrap();
             program.stage_mut(stage_id).unwrap().with_builder(|ctx| {

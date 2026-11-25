@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use kirin_ir::Signature;
 use kirin_lexer::Token;
 
-use crate::parsers::return_type_list;
+use crate::parsers::return_clause;
 use crate::traits::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
 
 impl<T> DirectlyParsable for Signature<T> where T: DirectlyParsable + Clone + PartialEq + 'static {}
@@ -21,9 +21,8 @@ where
             .separated_by(just(Token::Comma))
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
-            .then_ignore(just(Token::Arrow))
-            .then(return_type_list(T::parser()))
-            .map(|(params, rets)| Signature::with_rets(params, rets, ()))
+            .then(return_clause(T::parser()))
+            .map(|(params, rets)| Signature::new().takes(params).returns_each(rets))
             .labelled("signature")
             .boxed()
     }

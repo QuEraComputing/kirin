@@ -208,9 +208,8 @@ pub fn parser_expr<L: Layout>(
                             #crate_path::chumsky::prelude::just(#crate_path::Token::LParen),
                             #crate_path::chumsky::prelude::just(#crate_path::Token::RParen),
                         )
-                        .then_ignore(#crate_path::chumsky::prelude::just(#crate_path::Token::Arrow))
-                        .then(#crate_path::return_type_list(<#ir_type as #crate_path::HasParser<'t>>::parser()))
-                        .map(|(params, rets)| #crate_path::ir::Signature::with_rets(params, rets, ()))
+                        .then(#crate_path::return_clause(<#ir_type as #crate_path::HasParser<'t>>::parser()))
+                        .map(|(params, rets)| #crate_path::ir::Signature::new().takes(params).returns_each(rets))
                 }
             }
             FormatOption::Signature(crate::format::SignatureProjection::Inputs) => {
