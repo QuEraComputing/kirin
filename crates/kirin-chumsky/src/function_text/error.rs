@@ -10,6 +10,8 @@ pub enum FunctionParseErrorKind {
     InconsistentFunctionName,
     MissingStageDeclaration,
     DefinitionParseFailed,
+    /// A `stage @A mod [@name] { ... }` declaration failed to parse.
+    InvalidModule,
     EmitFailed,
 }
 
@@ -27,6 +29,7 @@ impl Display for FunctionParseErrorKind {
             FunctionParseErrorKind::DefinitionParseFailed => {
                 write!(f, "function definition parse failed")
             }
+            FunctionParseErrorKind::InvalidModule => write!(f, "invalid module declaration"),
             FunctionParseErrorKind::EmitFailed => write!(f, "IR emission failed"),
         }
     }

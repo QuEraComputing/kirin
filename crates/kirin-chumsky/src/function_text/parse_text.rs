@@ -95,7 +95,7 @@ use crate::{EmitContext, HasParser, ParseEmit};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
-use super::syntax::{Declaration, Header, RichError, braced_span, parse_one_declaration, tokenize};
+use super::syntax::{Declaration, Header, RichError, parse_one_declaration, tokenize};
 use crate::ast::SymbolName;
 
 /// Parse function text into a program using stage-driven dialect dispatch.
@@ -483,14 +483,55 @@ where
     let [
         (Token::Identifier("stage"), _),
         (Token::Symbol(stage_name), stage_span),
-        (Token::Identifier("mod"), _),
-        ..,
+        (Token::Identifier("mod"), mod_span),
+        rest @ ..,
     ] = &tokens[start_index..]
     else {
         return Ok(None);
     };
     // Only the extent is found here; the module parser checks the body.
-    let span = braced_span(&tokens[start_index + 2..]).map_err(parse_error_from_chumsky)?;
+    // `mod [@name]` must be followed directly by `{`, so a malformed header
+    // is reported here rather than at a later declaration.
+    let name_len = usize::from(matches!(rest.first(), Some((Token::Symbol(_), _))));
+    let header_end = rest[..name_len]
+        .last()
+        .map_or(mod_span.end, |(_, span)| span.end);
+    let header = SimpleSpan::from(mod_span.start..header_end);
+    let header_text = &src[header.start..header.end];
+    let body = &rest[name_len..];
+    let Some((Token::LBrace, open_span)) = body.first() else {
+        let found = body
+            .first()
+            .map_or("end of input".to_string(), |(token, _)| {
+                format!("`{token}`")
+            });
+        return Err(FunctionParseError::new(
+            FunctionParseErrorKind::InvalidModule,
+            Some(header),
+            format!("expected '{{' after `{header_text}`, found {found}"),
+        ));
+    };
+    // Walk only through the `}` that closes the module's `{`.
+    let mut depth = 0usize;
+    let close = body
+        .iter()
+        .position(|(token, _)| {
+            match token {
+                Token::LBrace => depth += 1,
+                Token::RBrace => depth -= 1,
+                _ => {}
+            }
+            depth == 0
+        })
+        .ok_or_else(|| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::InvalidModule,
+                Some(*open_span),
+                format!("unclosed '{{' in `{header_text}`"),
+            )
+        })?;
+    let close_index = start_index + 3 + name_len + close;
+    let span = SimpleSpan::from(mod_span.start..tokens[close_index].1.end);
 
     let stage_symbol = SymbolName {
         name: stage_name,
@@ -507,7 +548,7 @@ where
         .dispatch_module(&src[span.start..span.end])
         .map_err(|error| match error {
             crate::ChumskyError::Parse(errors) => FunctionParseError::new(
-                FunctionParseErrorKind::DefinitionParseFailed,
+                FunctionParseErrorKind::InvalidModule,
                 errors.first().map(|error| shift(error.span)),
                 errors
                     .iter()
@@ -522,7 +563,7 @@ where
             ),
         })?
         .ok_or_else(|| stage_dialect_mismatch_error(stage_name, Some(*stage_span)))?;
-    Ok(Some(advance_to_next_declaration(tokens, start_index, span)))
+    Ok(Some(close_index + 1))
 }
 
 fn parse_declaration_head<'src>(
