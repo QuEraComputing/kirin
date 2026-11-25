@@ -32,7 +32,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
 impl<L: Dialect> BuilderStageInfo<L> {
     /// Append `member` to `module`.
     ///
-    /// Panics if the statement is already attached or cannot be a member.
+    /// Panics where [`try_add_module_member`](Self::try_add_module_member)
+    /// returns `Err`.
     pub fn add_module_member(&mut self, module: Module, member: Statement) {
         self.try_add_module_member(module, member)
             .unwrap_or_else(|message| panic!("{message}"));
@@ -45,7 +46,17 @@ impl<L: Dialect> BuilderStageInfo<L> {
         module: Module,
         member: Statement,
     ) -> Result<(), String> {
-        let info = &self.nodes.statements[member];
+        let tail = self
+            .modules
+            .get(module)
+            .ok_or_else(|| format!("module {module:?} is deleted or not in this stage"))?
+            .members
+            .tail;
+        let info = self
+            .nodes
+            .statements
+            .get(member)
+            .ok_or_else(|| format!("statement {member:?} is deleted or not in this stage"))?;
         if info.parent.is_some() || info.node.prev.is_some() || info.node.next.is_some() {
             return Err(format!("statement {member:?} is already attached"));
         }
@@ -55,7 +66,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
         if info.definition.successors().next().is_some() {
             return Err("a statement with successors cannot be a module member".into());
         }
-        let tail = self.modules[module].members.tail;
         let info = &mut self.nodes.statements[member];
         info.parent = Some(StatementParent::Module(module));
         info.node.prev = tail;
