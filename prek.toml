@@ -1,4 +1,6 @@
 fail_fast = true
+default_install_hook_types = ["pre-commit"]
+default_stages = ["pre-commit"]
 
 # Built-in hooks (native Rust, fast)
 [[repos]]
@@ -21,9 +23,9 @@ repo = "local"
 id = "cargo-fmt"
 name = "cargo fmt"
 language = "system"
-entry = "cargo fmt --all -- --check"
+entry = "cargo +1.98.0 fmt --all -- --check"
 pass_filenames = false
-types = ["rust"]
+files = '(\.rs$|(^|/)Cargo\.toml$|^prek\.toml$)'
 
 # Rust: check (catches errors clippy might miss with different feature flags)
 [[repos]]
@@ -32,9 +34,9 @@ repo = "local"
 id = "cargo-check"
 name = "cargo check"
 language = "system"
-entry = "cargo check --workspace --all-targets"
+entry = "cargo +1.98.0 check --workspace --all-targets --locked"
 pass_filenames = false
-types = ["rust"]
+files = '(\.rs$|(^|/)Cargo\.(toml|lock)$|^\.cargo/|^prek\.toml$)'
 
 # Rust: clippy lint
 [[repos]]
@@ -43,6 +45,6 @@ repo = "local"
 id = "cargo-clippy"
 name = "cargo clippy"
 language = "system"
-entry = "cargo clippy --workspace -- -D warnings"
+entry = "cargo +1.98.0 clippy --workspace --locked -- -D warnings"
 pass_filenames = false
-types = ["rust"]
+files = '(\.rs$|(^|/)Cargo\.(toml|lock)$|^\.cargo/|^prek\.toml$)'
