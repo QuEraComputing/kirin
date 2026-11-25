@@ -1,3 +1,4 @@
+use kirin_ir::walk::WalkOrder;
 use kirin_ir::{
     Block, DiGraph, Dialect, GetInfo, Rewriter, SSAKind, SSAValue, StageInfo, Statement,
 };
@@ -5,7 +6,7 @@ use kirin_ir::{
 use super::rewrite_driver::owned_blocks;
 use super::{DriverError, RewriteDriver};
 
-impl<L: Dialect> RewriteDriver<'_, L> {
+impl<L: Dialect, O: WalkOrder> RewriteDriver<'_, L, O> {
     /// Erase the statements left dead under `root`, and return how many
     /// were erased.
     ///

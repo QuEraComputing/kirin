@@ -1,6 +1,5 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
-use crate::rewrite::walk::tree;
 use crate::{Block, BlockParent, CFG, Dialect, StatementParent};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
@@ -41,7 +40,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             {
                 return Err(RewriteError::CfgSplicedIntoItself { source, anchor });
             }
-            current = tree::parent(self.stage, stmt);
+            current = stmt.owner(self.stage);
         }
 
         let chain = match source.get_info_mut(self.stage) {

@@ -1,7 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, Side};
-use crate::rewrite::walk::tree;
 use crate::{Block, Dialect, SSAValue, Statement, StatementParent};
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -66,7 +65,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         // If `stmt` encloses `anchor`, the move would put `stmt` inside its
         // own body.
-        if self.encloses(stmt, tree::parent(self.stage, anchor)) {
+        if self.encloses(stmt, anchor.owner(self.stage)) {
             return Err(RewriteError::MovedIntoItself { stmt, anchor });
         }
 
@@ -151,7 +150,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             if *stmt.parent(self.stage) == Some(StatementParent::Block(source)) {
                 return Err(RewriteError::SplicedIntoItself { source, anchor });
             }
-            current = tree::parent(self.stage, stmt);
+            current = stmt.owner(self.stage);
         }
         if arg_replacements.len() != args.len() {
             return Err(RewriteError::BlockArgumentArityMismatch {

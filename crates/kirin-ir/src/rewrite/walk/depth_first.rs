@@ -1,7 +1,7 @@
 //! Depth-first orders, walked through the IR's own links in O(1) extra space.
 
 use super::order::{CursorOrder, Position, WalkCursor};
-use super::tree::{first_child, next_sibling, parent};
+use super::tree::{first_child, next_sibling};
 use super::{WalkError, WalkOrder};
 use crate::{Dialect, GetInfo, StageInfo, Statement};
 
@@ -98,7 +98,7 @@ impl WalkCursor for PostOrderCursor {
                 } else if let Some(sibling) = next_sibling(stage, visited) {
                     Some(deepest_first(stage, sibling))
                 } else {
-                    parent(stage, visited)
+                    visited.owner(stage)
                 }
             }
             Position::Done => None,
@@ -138,7 +138,7 @@ fn after_subtree<L: Dialect>(
         if let Some(sibling) = next_sibling(stage, current) {
             return Some(sibling);
         }
-        current = parent(stage, current)?;
+        current = current.owner(stage)?;
     }
     None
 }

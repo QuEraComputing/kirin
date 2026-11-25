@@ -10,16 +10,6 @@ pub(crate) enum Rule<L: Dialect> {
     Block(NativeRule<dyn BlockRule<L>>),
 }
 
-impl<L: Dialect> Rule<L> {
-    /// The checked pattern, if this is a declarative rule.
-    pub(crate) fn as_pattern(&self) -> Option<&CheckedRule<L>> {
-        match self {
-            Rule::Pattern(rule) => Some(rule),
-            Rule::Statement(_) | Rule::Block(_) => None,
-        }
-    }
-}
-
 /// The rules one driver run tries, in order, with the stage holding their
 /// patterns.
 ///
@@ -106,6 +96,13 @@ impl<L: Dialect> RuleSet<L> {
     /// The rules, in the order they are tried.
     pub(crate) fn rules(&self) -> &[Rule<L>] {
         &self.rules
+    }
+
+    /// Whether any rule is a native statement or block rule.
+    pub(crate) fn has_native_rules(&self) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| !matches!(rule, Rule::Pattern(_)))
     }
 
     /// The stage the rules' patterns live in.

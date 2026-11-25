@@ -7,7 +7,6 @@ use crate::{Block, BlockParent, DiGraph, Dialect, Statement, UnGraph};
 
 use crate::rewrite::bodies::bodies_of;
 use crate::rewrite::rewriter::{RewriteError, Rewriter};
-use crate::rewrite::walk::tree;
 
 /// Where [`Rewriter::create`] or [`Rewriter::insert`] places a statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -140,7 +139,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     fn insertion_pt_owner(&self, insertion_pt: InsertionPoint) -> Option<Statement> {
         match insertion_pt {
             InsertionPoint::Before(anchor) | InsertionPoint::After(anchor) => {
-                tree::parent(self.stage, anchor)
+                anchor.owner(self.stage)
             }
             InsertionPoint::Terminator(block) => match block.get_info(self.stage)?.parent()? {
                 BlockParent::CFG(cfg) => cfg.get_info(self.stage)?.parent,
