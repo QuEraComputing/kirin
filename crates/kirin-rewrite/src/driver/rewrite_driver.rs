@@ -39,14 +39,17 @@ impl std::ops::AddAssign for RewriteSummary {
 /// After each statement, the edits its rules recorded as
 /// [`MutationEvent`](kirin_ir::MutationEvent)s add to the worklist the
 /// statements they may have given a new match: for each statement changed,
-/// replaced or inserted, its owner, the producers of its operands, the
-/// statement itself and the users of its results. Only statements under the
-/// root are added, and a statement an edit moved out of the root's tree
-/// before its turn is not visited, so a run never leaves that tree. A
-/// statement still in the queue keeps its place, so it is visited once,
-/// after the edit; one already visited goes to the back. Other edits, such
-/// as erasing a statement or changing a `CFG`, add nothing: the next sweep,
-/// which starts from every statement again, sees them.
+/// replaced or inserted, the statement itself and the users of its results.
+/// If the rule set has a [`StatementRule`] or [`BlockRule`], which may read
+/// anything around a statement, also its owner, unless that is the root, and
+/// the producers of its operands; a pattern rule cannot gain a match there.
+/// Only statements under the root are added, and a statement an edit moved
+/// out of the root's tree before its turn is not visited, so a run never
+/// leaves that tree. A statement still in the queue keeps its place, so it
+/// is visited once, after the edit; one already visited goes to the back.
+/// Other edits, such as erasing a statement or changing a `CFG`, add
+/// nothing: the next sweep, which starts from every statement again, sees
+/// them.
 ///
 /// When the worklist is empty, the sweep erases the dead code under the
 /// root. The run ends after the first sweep that records no
@@ -206,12 +209,15 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
     /// An `interrupt` ends the sweep; a `skip` has no effect.
     fn sweep(&self, rewriter: &mut Rewriter<'_, L>, root: Statement) -> Result<usize, DriverError> {
         let mut applied = 0;
-        let mut worklist = Worklist::seeded::<O, L>(rewriter.stage(), root);
+        let mut worklist =
+            Worklist::seeded::<O, L>(rewriter.stage(), root, self.rules.has_native_rules());
         let mut sweep_rules: Vec<SweepRule<'_, L>> =
             self.rules.rules().iter().map(SweepRule::new).collect();
         while let Some(stmt) = worklist.pop() {
             // An earlier visit erased it, or moved it out of the root's tree.
-            if stmt.get_info(rewriter.stage()).is_none() || !stmt.is_within(rewriter.stage(), root)
+            // Without a move, every queued statement is still under the root.
+            if stmt.get_info(rewriter.stage()).is_none()
+                || (worklist.move_occurred() && !stmt.is_within(rewriter.stage(), root))
             {
                 continue;
             }

@@ -232,7 +232,7 @@ sequenceDiagram
   IR-->>RW: slots updated
   RW->>IR: update installed mirrors · record ReplacedUses
   RW-->>D: Ok(count)
-  D->>D: push owner, producers, users of each rewritten stmt
+  D->>D: push stmt, users (+ owner, producers with native rules)
   Note over D: pass reaches fixpoint
   D->>IR: derive expected mirrors from authoritative IR
   D->>IR: compare expected with installed mirrors
@@ -338,7 +338,7 @@ Concrete analyses may integrate through registered keys or traits. Do not make
 | **rewrite-pass contract** | A pass owns the stage exclusively, preserves operational coherence and mirrors after every successful action, and returns it only after derived verification succeeds. |
 | **rewrite pass** | One ownership-scoped mutation run. Success returns the same stage by value; any error or panic returns a diagnostic-only quarantined stage. |
 | **quarantined stage** | A non-`Clone`, non-`Default` owner of failed `StageInfo` plus cause and mutation events. It exposes diagnostic rendering but no `Deref`, `GetInfo`, or safe extraction. |
-| **worklist** | The queue of statements a driver sweep still has to visit. After every match and rewrite, the driver pushes the owner, the operand producers, and the result users of each statement the rewrite changed, replaced, or inserted, so a new match they now have is found in the same sweep. Example: folding `%y = arith.add %c1, %c2` into a constant pushes the users of `%y`, which may now fold too. |
+| **worklist** | The queue of statements a driver sweep still has to visit. After every match and rewrite, the driver pushes the statement itself and the result users of each statement the rewrite changed, replaced, or inserted (with native rules, also its owner, unless that is the root, and its operand producers), so a new match they now have is found in the same sweep. Example: folding `%y = arith.add %c1, %c2` into a constant pushes the users of `%y`, which may now fold too. |
 | **mutation event** | A structured summary of an edit, such as `ErasedStatement`, `ReplacedUses`, or `ChangedCfg`; the driver reads the events of each rewrite to decide what to push onto the worklist. |
 | **tombstone** | A deleted arena slot retained until a later compaction pass. |
 | **IdMap** | The old-id to new-id map returned by arena compaction/GC. |
@@ -1037,16 +1037,21 @@ run the rewrite body's steps in order through Rewriter,
 resolving each pattern value a step reads through the match's bindings
     each step records mutation events
 for each statement the events name as changed, replaced, or inserted:
-    push its parent statement (owner), the producers of its operands,
-    the statement itself, and the users of its results onto the worklist,
+    push the statement itself and the users of its results onto the
+    worklist, plus its owner (unless it is the root) and the producers of
+    its operands if the rule set has native rules,
     whichever of them are under the run's root
 ```
 
 Example: `add_zero` matches `%r = arith.add %x, %zero` and replaces `%r` with
 `%x`. Every user of `%r` now reads `%x`, so each records `ChangedOperands`.
-The driver pushes those users (they may now match another rule), the producer
-of `%x` (it has new users), and their parent statement. A statement already in
-the queue keeps its place; one visited earlier in the sweep is visited again.
+The driver pushes those users (they may now match another rule). With only
+pattern rules, it pushes neither their parent statement nor the producer of
+`%x`: a pattern matches down from its root into producers, never into users
+or bodies, so neither can gain a pattern match. A native rule may read
+anything, so with one in the set the driver pushes both, except a parent
+that is the run's root. A statement already in the queue keeps its place;
+one visited earlier in the sweep is visited again.
 Edits that push nothing, such as erasures and CFG edits, are seen by the next
 sweep, which starts from every statement again (see
 [Mutation-aware Worklist](#mutation-aware-worklist)).
@@ -1288,7 +1293,8 @@ repeat:                                    # a sweep; at most max_sweeps
                 apply rewrite in place through Rewriter
         fail after max_rewrites_per_sweep rewrites; stop the sweep on interrupt
         for each statement a mutation event names as changed/replaced/inserted:
-            enqueue its owner, its producers, it, and its users, whichever
+            enqueue it and its users, plus its owner (unless the root) and
+            its producers if there are native rules, whichever
             are under the root (ones already in the queue keep their place)
     erase dead code
 until a sweep records no mutation event

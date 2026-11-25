@@ -997,6 +997,7 @@ dependencies = [
  "kirin-scf",
  "kirin-test-languages",
  "kirin-wildcard",
+ "rustc-hash",
 ]
 
 [[package]]

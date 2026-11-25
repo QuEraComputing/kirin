@@ -194,7 +194,7 @@ fn a_chain_of_folds_finishes_in_one_sweep_in_every_order() {
 
 /// Folding `%b` changes `%c`, and folding `%d` changes `ret`, both before
 /// their turn: each stays in its place and is visited once. Their owner, the
-/// function, was visited first, so each edit adds it back, once.
+/// function, is the root, so no edit adds it back.
 #[test]
 fn a_statement_changed_before_its_turn_is_visited_once() {
     let visits: Visits = Rc::default();
@@ -208,7 +208,7 @@ fn a_statement_changed_before_its_turn_is_visited_once() {
         panic!("the function has five statements");
     };
     let first_sweep = &visits.borrow()[0];
-    assert_eq!(first_sweep[&function], 2);
+    assert_eq!(first_sweep[&function], 1);
     for stmt in [a, b, c, d, ret] {
         assert_eq!(first_sweep[&stmt], 1);
     }

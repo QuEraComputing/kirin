@@ -345,9 +345,9 @@ fn a_block_rule_is_fresh_for_each_block() {
     assert_eq!(output, printed(TWO_BLOCKS_MERGED));
     assert_eq!(summary.sweeps, 2);
     assert_eq!(summary.applied, 2);
-    // Two blocks in the first sweep, again when the merges add the
-    // function, their owner, back to the worklist, and two in the second sweep.
-    assert_eq!(built.get(), 6);
+    // Two blocks in each sweep. The merges do not add the function, their
+    // owner, back to the worklist, since it is the root.
+    assert_eq!(built.get(), 4);
 }
 
 /// `[S, B]`: pruning the arms first erases `%t0`, so dedup keeps `%t1`.
@@ -440,8 +440,8 @@ fn a_block_erased_by_an_earlier_copy_is_skipped() {
     let (output, summary) = run::<PreOrder>(&rules, TWO_BLOCKS).unwrap();
     assert_eq!(output, printed(ONE_BLOCK));
     assert_eq!(summary.sweeps, 2);
-    // `^entry` in the first sweep, again when the merge adds the function,
-    // its owner, back to the worklist, and in the second; `^next` is gone
-    // when its turn comes.
-    assert_eq!(built.get(), 3);
+    // `^entry` in each sweep; `^next` is gone when its turn comes. The
+    // merge does not add the function, its owner, back to the worklist,
+    // since it is the root.
+    assert_eq!(built.get(), 2);
 }

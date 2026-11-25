@@ -98,6 +98,13 @@ impl<L: Dialect> RuleSet<L> {
         &self.rules
     }
 
+    /// Whether any rule is a native statement or block rule.
+    pub(crate) fn has_native_rules(&self) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| !matches!(rule, Rule::Pattern(_)))
+    }
+
     /// The stage the rules' patterns live in.
     pub fn patterns(&self) -> &StageInfo<PatternLanguage<L>> {
         &self.patterns

@@ -1,7 +1,8 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use kirin_ir::walk::WalkOrder;
 use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, Use};
+use rustc_hash::FxHashMap;
 
 /// The statements a driver sweep still has to visit, in order.
 ///
@@ -12,7 +13,15 @@ use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, St
 pub(super) struct Worklist {
     queue: VecDeque<Statement>,
     /// The statements under the root, each with its status.
-    scope: HashMap<Statement, Status>,
+    scope: FxHashMap<Statement, Status>,
+    /// The sweep's root.
+    root: Statement,
+    /// Whether the sweep tries native rules, which may read anything around
+    /// a statement, so an edit also adds owners and producers.
+    native_rules_present: bool,
+    /// Whether an edit moved statements since the sweep began, so a queued
+    /// statement may have left the root's tree.
+    move_occurred: bool,
 }
 
 /// Whether a statement under the root is in the worklist's queue.
@@ -27,12 +36,30 @@ enum Status {
 
 impl Worklist {
     /// A worklist holding the statements of the walk under `root`, `root`
-    /// included, in `O`'s order. The walk is a snapshot: nothing is edited
+    /// included, in `O`'s order, for a sweep trying native rules if
+    /// `native_rules_present`. The walk is a snapshot: nothing is edited
     /// while it is taken.
-    pub(super) fn seeded<O: WalkOrder, L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self {
+    pub(super) fn seeded<O: WalkOrder, L: Dialect>(
+        stage: &StageInfo<L>,
+        root: Statement,
+        native_rules_present: bool,
+    ) -> Self {
         let queue: VecDeque<Statement> = O::schedule(stage, root).into();
-        let scope = queue.iter().map(|&stmt| (stmt, Status::InQueue)).collect();
-        Self { queue, scope }
+        let mut scope = FxHashMap::with_capacity_and_hasher(queue.len(), Default::default());
+        scope.extend(queue.iter().map(|&stmt| (stmt, Status::InQueue)));
+        Self {
+            queue,
+            scope,
+            root,
+            native_rules_present,
+            move_occurred: false,
+        }
+    }
+
+    /// Whether an edit since the sweep began moved statements, so a queued
+    /// statement may no longer be under the root.
+    pub(super) fn move_occurred(&self) -> bool {
+        self.move_occurred
     }
 
     /// The next statement to visit, or `None` once the worklist is empty.
@@ -54,9 +81,11 @@ impl Worklist {
     }
 
     /// Add the statements `events` may have given a new match: for each
-    /// statement an event names as changed, replaced or inserted, its owner,
-    /// the producers of its operands, the statement itself and the users of
-    /// its results, those of them under the root. Other events add nothing;
+    /// statement an event names as changed, replaced or inserted, the
+    /// statement itself and the users of its results, and with native rules
+    /// also its owner and the producers of its operands, those of them under
+    /// the root. A move or splice adds nothing, but is recorded (see
+    /// [`move_occurred`](Self::move_occurred)). Other events add nothing;
     /// the next sweep visits what they changed.
     pub(super) fn push_affected<L: Dialect>(
         &mut self,
@@ -71,6 +100,9 @@ impl Worklist {
                 }
                 MutationEvent::ChangedOperands { stmt }
                 | MutationEvent::ReplacedStatement { stmt } => self.push_neighbors(stage, stmt),
+                MutationEvent::MovedStatement { .. }
+                | MutationEvent::SplicedBlock { .. }
+                | MutationEvent::SplicedCfg { .. } => self.move_occurred = true,
                 _ => {}
             }
         }
@@ -88,17 +120,30 @@ impl Worklist {
     /// Add `stmt`'s owner, the producers of its operands, `stmt` itself and
     /// the users of its results, top-down, as the walk visits them. Nothing
     /// if `stmt` is not live.
+    ///
+    /// The owner and the producers are added only if native rules are
+    /// present. A pattern matches down from its root into producers, never
+    /// into users or bodies, so an edit gives neither a new pattern match.
+    /// The owner is never added if it is the root: visiting the root again
+    /// would run its block rules over its whole body again, and the next
+    /// sweep starts at the root anyway.
     fn push_neighbors<L: Dialect>(&mut self, stage: &StageInfo<L>, stmt: Statement) {
         let Some(info) = stmt.get_info(stage) else {
             return;
         };
-        if let Some(owner) = stmt.owner(stage) {
-            self.push(owner);
-        }
         let definition = info.definition();
-        for &operand in definition.arguments() {
-            if let Some(SSAKind::Result(producer, _)) = operand.get_info(stage).map(|v| *v.kind()) {
-                self.push(producer);
+        if self.native_rules_present {
+            if let Some(owner) = stmt.owner(stage)
+                && owner != self.root
+            {
+                self.push(owner);
+            }
+            for &operand in definition.arguments() {
+                if let Some(SSAKind::Result(producer, _)) =
+                    operand.get_info(stage).map(|v| *v.kind())
+                {
+                    self.push(producer);
+                }
             }
         }
         self.push(stmt);
