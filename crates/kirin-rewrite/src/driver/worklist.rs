@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 
 use kirin_ir::walk::WalkOrder;
 use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, Use};
-use rustc_hash::FxHashMap;
 
 /// The statements a driver sweep still has to visit, in order.
 ///
@@ -10,12 +9,26 @@ use rustc_hash::FxHashMap;
 /// it starts from, and those inserted under one of them. A statement is in
 /// the queue at most once: pushing one already in it does nothing, so it
 /// keeps its place. Once popped, it can be pushed again.
+///
+/// One worklist serves every sweep of a run, and every root of
+/// [`RewriteDriver::run`](super::RewriteDriver::run): each statement's
+/// status is kept at its arena index, allocated once, and seeding a sweep
+/// resets only the statuses the previous sweep set.
+#[derive(Default)]
 pub(super) struct Worklist {
+    /// The walk the sweep starts from, in order.
+    snapshot: Vec<Statement>,
+    /// The index in `snapshot` of the next statement to visit.
+    next: usize,
+    /// The statements added since the sweep began, after the rest of
+    /// `snapshot`.
     queue: VecDeque<Statement>,
-    /// The statements under the root, each with its status.
-    scope: FxHashMap<Statement, Status>,
+    /// The statements inserted under the root during the sweep.
+    inserted: Vec<Statement>,
+    /// Each statement's status.
+    status: Statuses,
     /// The sweep's root.
-    root: Statement,
+    root: Option<Statement>,
     /// Whether the sweep tries native rules, which may read anything around
     /// a statement, so an edit also adds owners and producers.
     native_rules_present: bool,
@@ -24,36 +37,65 @@ pub(super) struct Worklist {
     move_occurred: bool,
 }
 
-/// Whether a statement under the root is in the worklist's queue.
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// Where a statement stands in the worklist.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum Status {
+    /// Not under the root.
+    #[default]
+    Outside,
     /// In the queue, to be visited.
     InQueue,
-    /// Not in the queue: visited already, or inserted under the root and
-    /// not added yet.
+    /// Under the root but not in the queue: visited already, or inserted
+    /// and not added yet.
     VisitedOrInserted,
 }
 
+/// Each statement's [`Status`], at its arena index. A statement past the
+/// end is [`Status::Outside`].
+#[derive(Default)]
+struct Statuses(Vec<Status>);
+
+impl Statuses {
+    fn get(&self, stmt: Statement) -> Status {
+        self.0.get(stmt.id().raw()).copied().unwrap_or_default()
+    }
+
+    /// Set `stmt`'s status, growing the vector if `stmt` is past its end.
+    fn set(&mut self, stmt: Statement, status: Status) {
+        let index = stmt.id().raw();
+        if self.0.len() <= index {
+            self.0.resize(index + 1, Status::Outside);
+        }
+        self.0[index] = status;
+    }
+}
+
 impl Worklist {
-    /// A worklist holding the statements of the walk under `root`, `root`
-    /// included, in `O`'s order, for a sweep trying native rules if
+    /// Start a sweep from the statements of the walk under `root`, `root`
+    /// included, in `O`'s order, trying native rules if
     /// `native_rules_present`. The walk is a snapshot: nothing is edited
-    /// while it is taken.
-    pub(super) fn seeded<O: WalkOrder, L: Dialect>(
+    /// while it is taken. The statuses the previous sweep set go back to
+    /// [`Status::Outside`], and the statements it left in the queue, after
+    /// an `interrupt`, are dropped.
+    pub(super) fn seed<O: WalkOrder, L: Dialect>(
+        &mut self,
         stage: &StageInfo<L>,
         root: Statement,
         native_rules_present: bool,
-    ) -> Self {
-        let queue: VecDeque<Statement> = O::schedule(stage, root).into();
-        let mut scope = FxHashMap::with_capacity_and_hasher(queue.len(), Default::default());
-        scope.extend(queue.iter().map(|&stmt| (stmt, Status::InQueue)));
-        Self {
-            queue,
-            scope,
-            root,
-            native_rules_present,
-            move_occurred: false,
+    ) {
+        for &stmt in self.snapshot.iter().chain(&self.inserted) {
+            self.status.set(stmt, Status::Outside);
         }
+        self.snapshot = O::schedule(stage, root);
+        self.next = 0;
+        self.queue.clear();
+        self.inserted.clear();
+        for &stmt in &self.snapshot {
+            self.status.set(stmt, Status::InQueue);
+        }
+        self.root = Some(root);
+        self.native_rules_present = native_rules_present;
+        self.move_occurred = false;
     }
 
     /// Whether an edit since the sweep began moved statements, so a queued
@@ -64,18 +106,22 @@ impl Worklist {
 
     /// The next statement to visit, or `None` once the worklist is empty.
     pub(super) fn pop(&mut self) -> Option<Statement> {
-        let stmt = self.queue.pop_front()?;
-        self.scope.insert(stmt, Status::VisitedOrInserted);
+        let stmt = match self.snapshot.get(self.next) {
+            Some(&stmt) => {
+                self.next += 1;
+                stmt
+            }
+            None => self.queue.pop_front()?,
+        };
+        self.status.set(stmt, Status::VisitedOrInserted);
         Some(stmt)
     }
 
     /// Add `stmt` at the back of the queue, unless it is already in it or is
     /// not under the root.
     pub(super) fn push(&mut self, stmt: Statement) {
-        if let Some(status) = self.scope.get_mut(&stmt)
-            && *status == Status::VisitedOrInserted
-        {
-            *status = Status::InQueue;
+        if self.status.get(stmt) == Status::VisitedOrInserted {
+            self.status.set(stmt, Status::InQueue);
             self.queue.push_back(stmt);
         }
     }
@@ -111,9 +157,11 @@ impl Worklist {
     /// Count the inserted `stmt` under the root if its owner is.
     fn adopt<L: Dialect>(&mut self, stage: &StageInfo<L>, stmt: Statement) {
         if let Some(owner) = stmt.owner(stage)
-            && self.scope.contains_key(&owner)
+            && self.status.get(owner) != Status::Outside
+            && self.status.get(stmt) == Status::Outside
         {
-            self.scope.entry(stmt).or_insert(Status::VisitedOrInserted);
+            self.status.set(stmt, Status::VisitedOrInserted);
+            self.inserted.push(stmt);
         }
     }
 
@@ -134,7 +182,7 @@ impl Worklist {
         let definition = info.definition();
         if self.native_rules_present {
             if let Some(owner) = stmt.owner(stage)
-                && owner != self.root
+                && Some(owner) != self.root
             {
                 self.push(owner);
             }

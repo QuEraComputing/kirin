@@ -170,8 +170,9 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
             .map(|specialization| *specialization.definition())
             .collect();
         let mut summary = RewriteSummary::default();
+        let mut worklist = Worklist::default();
         for root in roots {
-            summary += self.run_at(rewriter, root)?;
+            summary += self.run_with(rewriter, root, &mut worklist)?;
         }
         Ok(summary)
     }
@@ -182,9 +183,20 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
+        self.run_with(rewriter, root, &mut Worklist::default())
+    }
+
+    /// [`run_at`](Self::run_at), sweeping from `worklist`, which may come
+    /// from an earlier run.
+    fn run_with(
+        &self,
+        rewriter: &mut Rewriter<'_, L>,
+        root: Statement,
+        worklist: &mut Worklist,
+    ) -> Result<RewriteSummary, DriverError> {
         let mut summary = RewriteSummary::default();
         while summary.sweeps < self.max_sweeps {
-            let applied = self.sweep(rewriter, root)?;
+            let applied = self.sweep(rewriter, root, worklist)?;
             let erased = Self::clean_up_dead_code(rewriter, root)?;
             summary += RewriteSummary {
                 sweeps: 1,
@@ -201,16 +213,20 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
         })
     }
 
-    /// Visit the statements under `root` from a worklist until it is empty,
+    /// Visit the statements under `root` from `worklist` until it is empty,
     /// applying every rule that matches and every native rule, and adding
     /// what each visit's edits may affect. Returns how many applications
     /// edited the IR.
     ///
     /// An `interrupt` ends the sweep; a `skip` has no effect.
-    fn sweep(&self, rewriter: &mut Rewriter<'_, L>, root: Statement) -> Result<usize, DriverError> {
+    fn sweep(
+        &self,
+        rewriter: &mut Rewriter<'_, L>,
+        root: Statement,
+        worklist: &mut Worklist,
+    ) -> Result<usize, DriverError> {
         let mut applied = 0;
-        let mut worklist =
-            Worklist::seeded::<O, L>(rewriter.stage(), root, self.rules.has_native_rules());
+        worklist.seed::<O, L>(rewriter.stage(), root, self.rules.has_native_rules());
         let mut sweep_rules: Vec<SweepRule<'_, L>> =
             self.rules.rules().iter().map(SweepRule::new).collect();
         while let Some(stmt) = worklist.pop() {
