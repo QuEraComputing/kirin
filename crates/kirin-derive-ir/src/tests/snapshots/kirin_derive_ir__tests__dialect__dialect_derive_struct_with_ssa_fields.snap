@@ -387,10 +387,11 @@ impl ::kirin::ir::IsEdge for BinaryOp {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for BinaryOp {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for BinaryOp {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         None
     }
 }

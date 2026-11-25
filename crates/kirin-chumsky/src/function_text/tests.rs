@@ -287,10 +287,9 @@ fn test_program_roundtrip_print_parse_print() {
     program.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
         let cfg = b.cfg().add_block(block).new();
-        let definition = FunctionDefinition::new(b, cfg, Signature::new().returns(UnitType));
+        let definition = FunctionDefinition::new(b, cfg, unit_sig());
         b.specialize()
             .staged_func(staged_function)
-            .signature(unit_sig())
             .definition(definition)
             .new()
             .unwrap();

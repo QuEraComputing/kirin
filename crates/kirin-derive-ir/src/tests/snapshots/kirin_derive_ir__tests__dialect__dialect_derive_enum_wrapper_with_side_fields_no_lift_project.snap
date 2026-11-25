@@ -556,10 +556,11 @@ impl From<InnerOp> for MixedWraps {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for MixedWraps {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for MixedWraps {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         match self {
             Self::Simple(field_0) => {
                 <SimpleOp as ::kirin::ir::HasSignature<SimpleOp>>::signature(field_0)

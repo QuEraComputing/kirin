@@ -629,10 +629,11 @@ impl ::kirin::ir::IsEdge for CallableLanguage {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for CallableLanguage {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for CallableLanguage {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         match self {
             Self::Function { body } => None,
             Self::Nop { value } => None,

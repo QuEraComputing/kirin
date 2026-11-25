@@ -1,12 +1,13 @@
 use super::error::{
-    DuplicateSpecialization, SpecializeError, StagedFunctionConflictKind, StagedFunctionError,
+    DuplicateSpecialization, InterfaceMismatch, SpecializeError, StagedFunctionConflictKind,
+    StagedFunctionError,
 };
 use super::stage_info::BuilderStageInfo;
 
 use crate::Dialect;
 use crate::node::symbol::GlobalSymbol;
 use crate::node::*;
-use crate::signature::Signature;
+use crate::signature::{HasSignature, Signature, SignatureSemantics};
 
 #[derive(Clone, Copy)]
 enum PlaceholderKind {
@@ -188,18 +189,19 @@ impl<L: Dialect> BuilderStageInfo<L> {
     }
 
     /// Create a new staged function.
+    ///
+    /// `signature` is the interface the function exposes at this stage. The
+    /// staged function owns it; each specialization added later declares its
+    /// own signature on its definition statement and must have the same
+    /// shape.
     #[builder(finish_fn = new)]
     pub fn staged_function(
         &mut self,
         name: Option<GlobalSymbol>,
-        signature: Option<Signature<L::Type>>,
-        specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
+        signature: Signature<L::Type>,
         backedges: Option<Vec<StagedFunction>>,
-    ) -> Result<StagedFunction, StagedFunctionError<L>>
-    where
-        L::Type: crate::Placeholder,
-    {
-        let sig = signature.unwrap_or_else(Signature::placeholder);
+    ) -> Result<StagedFunction, StagedFunctionError<L>> {
+        let sig = signature;
 
         if name.is_some() {
             let same_name: Vec<_> = self
@@ -224,7 +226,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
                     name,
                     signature: sig,
                     conflicting: duplicate_signature,
-                    specializations: specializations.unwrap_or_default(),
                     backedges: backedges.unwrap_or_default(),
                 });
             }
@@ -242,7 +243,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
                         name,
                         signature: sig,
                         conflicting: signature_mismatch,
-                        specializations: specializations.unwrap_or_default(),
                         backedges: backedges.unwrap_or_default(),
                     });
                 }
@@ -254,7 +254,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             id,
             name,
             signature: sig,
-            specializations: specializations.unwrap_or_default(),
+            specializations: Vec::new(),
             backedges: backedges.unwrap_or_default(),
             invalidated: false,
         };
@@ -262,43 +262,93 @@ impl<L: Dialect> BuilderStageInfo<L> {
         Ok(id)
     }
 
+    /// Add a specialization of `func` whose definition is `definition`.
+    ///
+    /// The definition statement owns the specialization's signature (see
+    /// [`HasSignature`]); nothing is passed separately and nothing is stored
+    /// on the specialization.
+    ///
+    /// # Errors
+    ///
+    /// - [`SpecializeError::UnknownDefinition`] if `definition` is not a
+    ///   statement of this stage.
+    /// - [`SpecializeError::MissingSignature`] if `definition` declares no
+    ///   signature.
+    /// - [`SpecializeError::InterfaceMismatch`] if its parameter or return
+    ///   count differs from the staged function's interface.
+    /// - [`SpecializeError::NotARefinement`] if the dialect's
+    ///   [`Signatures`](Dialect::Signatures) says the signature does not
+    ///   [refine](SignatureSemantics::refines) the interface.
+    /// - [`SpecializeError::Duplicate`] if a live specialization already has
+    ///   an equal signature.
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,
         #[builder(name = staged_func)] func: StagedFunction,
-        signature: Option<Signature<L::Type>>,
         #[builder(into)] definition: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
-    ) -> Result<SpecializedFunction, SpecializeError<L>> {
-        let staged_function_info = &mut self.staged_functions[func];
+    ) -> Result<SpecializedFunction, SpecializeError>
+    where
+        L: HasSignature<L>,
+    {
+        let staged_function_info = &self.staged_functions[func];
         if staged_function_info.is_invalidated() {
             return Err(SpecializeError::InvalidatedStagedFunction(func));
         }
 
-        let signature = signature.unwrap_or(staged_function_info.signature.clone());
+        let Some(definition_info) = self.statements.get(definition) else {
+            return Err(SpecializeError::UnknownDefinition(definition));
+        };
+        let Some(signature) = definition_info.definition.signature() else {
+            return Err(SpecializeError::MissingSignature(definition));
+        };
+
+        let interface = &staged_function_info.signature;
+        if signature.params().len() != interface.params().len()
+            || signature.rets().len() != interface.rets().len()
+        {
+            return Err(SpecializeError::InterfaceMismatch(InterfaceMismatch {
+                staged_function: func,
+                definition,
+                params: (interface.params().len(), signature.params().len()),
+                rets: (interface.rets().len(), signature.rets().len()),
+            }));
+        }
+
+        if !L::Signatures::refines(signature, interface) {
+            return Err(SpecializeError::NotARefinement {
+                staged_function: func,
+                definition,
+            });
+        }
 
         let conflicting: Vec<SpecializedFunction> = staged_function_info
             .specializations
             .iter()
-            .filter(|s| !s.is_invalidated() && s.signature() == &signature)
+            .filter(|s| !s.is_invalidated())
+            .filter(|s| {
+                self.statements
+                    .get(*s.definition())
+                    .and_then(|info| info.definition.signature())
+                    == Some(signature)
+            })
             .map(|s| s.id())
             .collect();
 
         if !conflicting.is_empty() {
             return Err(SpecializeError::Duplicate(DuplicateSpecialization {
                 staged_function: func,
-                signature,
                 conflicting,
                 definition,
                 backedges,
             }));
         }
 
+        let staged_function_info = &mut self.staged_functions[func];
         let id = SpecializedFunction(func, staged_function_info.specializations.len());
 
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)
-            .signature(signature)
             .definition(definition)
             .maybe_backedges(backedges)
             .new();

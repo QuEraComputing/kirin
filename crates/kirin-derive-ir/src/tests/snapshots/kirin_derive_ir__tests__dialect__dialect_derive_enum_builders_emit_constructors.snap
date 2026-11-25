@@ -739,10 +739,11 @@ pub mod arith_build_result {
 #[automatically_derived]
 impl<T: CompileTimeValue> ::kirin::ir::Dialect for Arith<T> {
     type Type = T;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl<T: CompileTimeValue> ::kirin::ir::HasSignature<Self> for Arith<T> {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         match self {
             Self::Add {
                 lhs,

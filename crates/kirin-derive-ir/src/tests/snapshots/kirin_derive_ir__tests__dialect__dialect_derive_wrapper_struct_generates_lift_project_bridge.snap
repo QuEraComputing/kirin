@@ -392,10 +392,11 @@ impl ::kirin::ir::IsEdge for WrapperOp {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for WrapperOp {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for WrapperOp {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         let Self(field_0) = self;
         <InnerOp as ::kirin::ir::HasSignature<InnerOp>>::signature(field_0)
     }

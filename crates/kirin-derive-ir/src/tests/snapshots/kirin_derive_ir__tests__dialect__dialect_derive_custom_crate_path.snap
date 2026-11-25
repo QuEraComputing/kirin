@@ -371,10 +371,11 @@ impl kirin_ir::IsEdge for Nop {
 #[automatically_derived]
 impl kirin_ir::Dialect for Nop {
     type Type = SimpleType;
+    type Signatures = kirin_ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl kirin_ir::HasSignature<Self> for Nop {
-    fn signature(&self) -> Option<kirin_ir::Signature<<Self as kirin_ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&kirin_ir::Signature<<Self as kirin_ir::Dialect>::Type>> {
         None
     }
 }

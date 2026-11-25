@@ -181,4 +181,13 @@ pub trait Dialect:
     + std::fmt::Debug
 {
     type Type: CompileTimeValue;
+
+    /// How this dialect's signatures relate: which specializations fit an
+    /// interface, which apply to a call, and which is more specific.
+    ///
+    /// `#[derive(Dialect)]` sets this from `#[kirin(signatures = ...)]` and
+    /// defaults to [`ShapeSemantics`](crate::ShapeSemantics), which declares no
+    /// order on types. A dialect whose types form a lattice opts in to
+    /// [`LatticeSemantics`](crate::LatticeSemantics).
+    type Signatures: crate::signature::SignatureSemantics<Self::Type>;
 }

@@ -67,6 +67,7 @@ pub enum PatternLanguage<L: Dialect> {
 
 impl<L: Dialect> Dialect for PatternLanguage<L> {
     type Type = L::Type;
+    type Signatures = L::Signatures;
 }
 
 impl<L: Dialect> IsTerminator for PatternLanguage<L> {

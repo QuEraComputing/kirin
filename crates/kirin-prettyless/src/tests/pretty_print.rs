@@ -3,7 +3,7 @@ fn test_constant_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function().name(test_sym).new().unwrap();
+    let _ = stage.staged_function().name(test_sym).signature(default_sig()).new().unwrap();
 
     let const_op = SimpleLanguage::op_constant(&mut stage, 42i64);
     let stage = stage.finalize().unwrap();
@@ -19,7 +19,7 @@ fn test_add_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function().name(test_sym).new().unwrap();
+    let _ = stage.staged_function().name(test_sym).signature(default_sig()).new().unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let b = SimpleLanguage::op_constant(&mut stage, 2i64);
@@ -42,7 +42,7 @@ fn test_abbreviated_statement_collapses_nested_bodies() {
     let ret = SimpleLanguage::op_return(&mut stage, one.result);
     let block = stage.block().stmt(one).terminator(ret).new();
     let body = stage.cfg().add_block(block).new();
-    let function = SimpleLanguage::op_function(&mut stage, body);
+    let function = SimpleLanguage::op_function(&mut stage, body, default_sig());
     let stage = stage.finalize().unwrap();
 
     let doc = Document::new(Default::default(), &stage);

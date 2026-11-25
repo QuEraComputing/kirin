@@ -46,7 +46,13 @@ fn test_block() {
         .new();
 
     let body = stage.cfg().add_block(block_a).add_block(block_b).new();
-    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(
+        &mut stage,
+        body,
+        kirin_ir::Signature::new()
+            .takes([SimpleType::I64])
+            .returns(SimpleType::I64),
+    );
     let f = stage
         .specialize()
         .staged_func(staged_function)
@@ -66,4 +72,110 @@ fn test_block() {
     assert!(buf.contains("constant"));
     assert!(buf.contains("add"));
     assert!(buf.contains("return"));
+}
+
+fn simple_sig(param: SimpleType, ret: SimpleType) -> kirin_ir::Signature<SimpleType> {
+    kirin_ir::Signature::new().takes([param]).returns(ret)
+}
+
+/// A `function` definition with an empty body declaring `sig`.
+fn simple_definition(
+    stage: &mut BuilderStageInfo<SimpleLanguage>,
+    sig: kirin_ir::Signature<SimpleType>,
+) -> kirin_ir::Statement {
+    let body = stage.cfg().new();
+    SimpleLanguage::op_function(stage, body, sig).into()
+}
+
+/// `SimpleLanguage` opts in to `LatticeSemantics`, so a specialization may
+/// narrow every position of its interface.
+#[test]
+fn lattice_dialect_accepts_a_specialization_narrower_than_its_interface() {
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
+    let sf = stage
+        .staged_function()
+        .signature(simple_sig(SimpleType::Any, SimpleType::Any))
+        .new()
+        .unwrap();
+
+    for sig in [
+        simple_sig(SimpleType::I64, SimpleType::I64),
+        simple_sig(SimpleType::F64, SimpleType::Any),
+        simple_sig(SimpleType::Any, SimpleType::Bool),
+    ] {
+        let definition = simple_definition(&mut stage, sig);
+        stage
+            .specialize()
+            .staged_func(sf)
+            .definition(definition)
+            .new()
+            .expect("a narrower signature refines the interface");
+    }
+}
+
+#[test]
+fn lattice_dialect_rejects_a_specialization_outside_its_interface() {
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
+    let sf = stage
+        .staged_function()
+        .signature(simple_sig(SimpleType::I64, SimpleType::I64))
+        .new()
+        .unwrap();
+
+    for sig in [
+        // A wider parameter, an unrelated parameter, and a wider return.
+        simple_sig(SimpleType::Any, SimpleType::I64),
+        simple_sig(SimpleType::F64, SimpleType::I64),
+        simple_sig(SimpleType::I64, SimpleType::Any),
+    ] {
+        let definition = simple_definition(&mut stage, sig);
+        let result = stage
+            .specialize()
+            .staged_func(sf)
+            .definition(definition)
+            .new();
+        assert!(matches!(
+            result,
+            Err(kirin_ir::SpecializeError::NotARefinement { staged_function, definition: rejected })
+                if staged_function == sf && rejected == definition
+        ));
+    }
+}
+
+/// Dispatch uses the dialect's semantics: the most specific applicable
+/// specialization wins.
+#[test]
+fn lattice_dialect_dispatches_to_the_most_specific_specialization() {
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
+    let sf = stage
+        .staged_function()
+        .signature(simple_sig(SimpleType::Any, SimpleType::F64))
+        .new()
+        .unwrap();
+
+    let general = simple_definition(&mut stage, simple_sig(SimpleType::Any, SimpleType::F64));
+    let general = stage
+        .specialize()
+        .staged_func(sf)
+        .definition(general)
+        .new()
+        .unwrap();
+    let specific = simple_definition(&mut stage, simple_sig(SimpleType::I64, SimpleType::F64));
+    let specific = stage
+        .specialize()
+        .staged_func(sf)
+        .definition(specific)
+        .new()
+        .unwrap();
+
+    let stage = stage.finalize().unwrap();
+    let info = sf.get_info(&stage).unwrap();
+    let matched = |param| -> Vec<_> {
+        info.all_matching(&stage, &simple_sig(param, SimpleType::F64))
+            .into_iter()
+            .map(|(spec, ())| spec.id())
+            .collect()
+    };
+    assert_eq!(matched(SimpleType::I64), vec![specific]);
+    assert_eq!(matched(SimpleType::Bool), vec![general]);
 }

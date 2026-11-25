@@ -621,10 +621,11 @@ impl ::kirin::ir::IsEdge for CompositeOps {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for CompositeOps {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for CompositeOps {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         match self {
             Self::Alpha(field_0) => {
                 <AlphaOp as ::kirin::ir::HasSignature<AlphaOp>>::signature(field_0)

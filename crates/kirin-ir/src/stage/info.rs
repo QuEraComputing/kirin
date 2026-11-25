@@ -50,13 +50,15 @@ use super::arenas::Arenas;
 /// let stage: &mut StageInfo<MyDialect> = program.stage_mut(stage_id).unwrap();
 /// stage.with_builder(|b| {
 ///     // b is &mut BuilderStageInfo<MyDialect>
-///     let sf = b.staged_function().name(func_name).new().unwrap();
+///     let sig = Signature::new().takes([MyType::I64]).returns(MyType::I64);
+///     let sf = b.staged_function().name(func_name).signature(sig.clone()).new().unwrap();
 ///
 ///     let arg = b.block_argument().index(0);
 ///     let ret = b.statement().definition(MyDialect::Return(arg)).new();
 ///     let block = b.block().argument(MyType::I64).terminator(ret).new();
 ///     let cfg = b.cfg().add_block(block).new();
-///     let definition = b.statement().definition(MyDialect::Function(cfg)).new();
+///     // The definition statement owns the specialization's signature.
+///     let definition = b.statement().definition(MyDialect::Function(cfg, sig)).new();
 ///
 ///     b.specialize()
 ///         .staged_func(sf)

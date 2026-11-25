@@ -1,7 +1,5 @@
 use crate::language::Dialect;
-use crate::node::function::{
-    Function, SpecializedFunction, SpecializedFunctionInfo, StagedFunction,
-};
+use crate::node::function::{Function, SpecializedFunction, StagedFunction};
 use crate::node::stmt::Statement;
 use crate::node::symbol::GlobalSymbol;
 use crate::signature::Signature;
@@ -38,6 +36,8 @@ pub enum ProgramStagedError<L: Dialect> {
     Program(ProgramError),
     /// A stage-level conflict when creating the staged function.
     StagedFunction(StagedFunctionError<L>),
+    /// The definition cannot specialize the staged function.
+    Specialize(SpecializeError),
 }
 
 impl<L: Dialect> std::fmt::Display for ProgramStagedError<L> {
@@ -45,6 +45,7 @@ impl<L: Dialect> std::fmt::Display for ProgramStagedError<L> {
         match self {
             ProgramStagedError::Program(e) => e.fmt(f),
             ProgramStagedError::StagedFunction(e) => e.fmt(f),
+            ProgramStagedError::Specialize(e) => e.fmt(f),
         }
     }
 }
@@ -54,6 +55,12 @@ impl<L: Dialect> std::error::Error for ProgramStagedError<L> {}
 impl<L: Dialect> From<ProgramError> for ProgramStagedError<L> {
     fn from(e: ProgramError) -> Self {
         ProgramStagedError::Program(e)
+    }
+}
+
+impl<L: Dialect> From<SpecializeError> for ProgramStagedError<L> {
+    fn from(e: SpecializeError) -> Self {
+        ProgramStagedError::Specialize(e)
     }
 }
 
@@ -74,27 +81,96 @@ pub enum StagedFunctionConflictKind {
 
 /// Error returned by [`crate::StageInfo::specialize`].
 #[derive(Debug)]
-pub enum SpecializeError<L: Dialect> {
+pub enum SpecializeError {
     /// A non-invalidated specialization already has the signature. It can be
     /// replaced through [`crate::StageInfo::redefine_specialization`].
-    Duplicate(DuplicateSpecialization<L>),
+    Duplicate(DuplicateSpecialization),
     /// The staged function has been invalidated by a redefinition, so it
     /// takes no new specializations.
     InvalidatedStagedFunction(StagedFunction),
+    /// The definition is not a statement of this stage.
+    UnknownDefinition(Statement),
+    /// The definition statement declares no signature. The definition is the
+    /// single owner of a specialization's signature, so a statement without
+    /// one cannot define a specialization.
+    MissingSignature(Statement),
+    /// The definition's signature has a different parameter or return count
+    /// than the staged function's interface.
+    InterfaceMismatch(InterfaceMismatch),
+    /// The definition's signature has the interface's shape but does not
+    /// refine it under the dialect's
+    /// [`Signatures`](crate::Dialect::Signatures) (see
+    /// [`SignatureSemantics::refines`](crate::SignatureSemantics::refines)).
+    NotARefinement {
+        /// The staged function being specialized.
+        staged_function: StagedFunction,
+        /// The rejected definition statement.
+        definition: Statement,
+    },
 }
 
-impl<L: Dialect> std::fmt::Display for SpecializeError<L> {
+/// A specialization whose signature does not have the shape of its staged
+/// function's interface. Each pair is `(interface, specialization)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InterfaceMismatch {
+    /// The staged function being specialized.
+    pub staged_function: StagedFunction,
+    /// The rejected definition statement.
+    pub definition: Statement,
+    /// Parameter counts.
+    pub params: (usize, usize),
+    /// Return counts.
+    pub rets: (usize, usize),
+}
+
+impl std::fmt::Display for InterfaceMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "specialization does not fit its interface: the interface takes {} parameter(s) and returns {} value(s), the definition takes {} and returns {}",
+            self.params.0, self.rets.0, self.params.1, self.rets.1
+        )
+    }
+}
+
+impl std::fmt::Display for SpecializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SpecializeError::Duplicate(e) => e.fmt(f),
             SpecializeError::InvalidatedStagedFunction(func) => {
                 write!(f, "cannot specialize invalidated staged function: {func:?}")
             }
+            SpecializeError::UnknownDefinition(stmt) => {
+                write!(f, "definition is not a statement of this stage: {stmt:?}")
+            }
+            SpecializeError::MissingSignature(_) => write!(
+                f,
+                "definition declares no signature: a function definition must carry a `Signature` field"
+            ),
+            SpecializeError::InterfaceMismatch(e) => e.fmt(f),
+            SpecializeError::NotARefinement { .. } => write!(
+                f,
+                "specialization does not fit its interface: its signature does not refine the staged function's signature"
+            ),
         }
     }
 }
 
-impl<L: Dialect> std::error::Error for SpecializeError<L> {}
+impl std::error::Error for SpecializeError {}
+
+/// Error returned by [`crate::BuilderStageInfo::invalidate_specialization`]
+/// and [`crate::BuilderStageInfo::add_specialization_backedge`]: the
+/// specialization does not exist in this stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnknownSpecialization(pub SpecializedFunction);
+
+impl std::fmt::Display for UnknownSpecialization {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown specialization: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for UnknownSpecialization {}
 
 /// An existing non-invalidated specialization with the same signature, found
 /// by [`crate::StageInfo::specialize`].
@@ -103,11 +179,9 @@ impl<L: Dialect> std::error::Error for SpecializeError<L> {}
 /// [`crate::StageInfo::redefine_specialization`] to intentionally invalidate the old
 /// specialization and register the new one.
 #[derive(Debug)]
-pub struct DuplicateSpecialization<L: Dialect> {
+pub struct DuplicateSpecialization {
     /// The staged function being specialized.
     pub staged_function: StagedFunction,
-    /// The signature that conflicted.
-    pub signature: Signature<L::Type>,
     /// Existing non-invalidated specializations with matching signatures.
     pub conflicting: Vec<SpecializedFunction>,
     /// Preserved definition statement for the new specialization.
@@ -116,7 +190,7 @@ pub struct DuplicateSpecialization<L: Dialect> {
     pub backedges: Option<Vec<SpecializedFunction>>,
 }
 
-impl<L: Dialect> std::fmt::Display for DuplicateSpecialization<L> {
+impl std::fmt::Display for DuplicateSpecialization {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -126,7 +200,7 @@ impl<L: Dialect> std::fmt::Display for DuplicateSpecialization<L> {
     }
 }
 
-impl<L: Dialect> std::error::Error for DuplicateSpecialization<L> {}
+impl std::error::Error for DuplicateSpecialization {}
 
 /// Error returned when [`crate::StageInfo::staged_function`] detects an existing
 /// non-invalidated staged function with the same name.
@@ -149,8 +223,6 @@ pub struct StagedFunctionError<L: Dialect> {
     pub signature: Signature<L::Type>,
     /// Existing non-invalidated staged functions with the same name.
     pub conflicting: Vec<StagedFunction>,
-    /// Preserved specializations for the new staged function.
-    pub specializations: Vec<SpecializedFunctionInfo<L>>,
     /// Preserved backedges for the new staged function.
     pub backedges: Vec<StagedFunction>,
 }

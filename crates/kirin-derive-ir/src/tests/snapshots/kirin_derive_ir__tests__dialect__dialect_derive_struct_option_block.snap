@@ -457,10 +457,11 @@ impl ::kirin::ir::IsEdge for ConditionalOp {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for ConditionalOp {
     type Type = SimpleType;
+    type Signatures = ::kirin::ir::ShapeSemantics;
 }
 #[automatically_derived]
 impl ::kirin::ir::HasSignature<Self> for ConditionalOp {
-    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+    fn signature(&self) -> Option<&::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         None
     }
 }

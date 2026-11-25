@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::language::Dialect;
-use crate::signature::Signature;
+use crate::signature::{HasSignature, Signature};
 use crate::{Product, Statement};
 
 use super::staged::StagedFunction;
@@ -18,23 +18,18 @@ impl SpecializedFunction {
 
 /// A concrete instantiation of a staged function for a specific signature.
 ///
-/// The specialized signature is a subset of the parent [`StagedFunctionInfo`](super::staged::StagedFunctionInfo)'s
-/// generic signature. This is the level that owns the IR
-/// [`definition`](Self::definition).
+/// This is the level that owns the IR [`definition`](Self::definition). It
+/// stores no signature of its own: the definition statement declares it (see
+/// [`HasSignature`]), and [`signature`](Self::signature) reads it from there.
+/// That signature has the shape of the parent
+/// [`StagedFunctionInfo`](super::staged::StagedFunctionInfo)'s interface and
+/// is expected to refine it type by type.
 /// Like staged functions, specializations can be invalidated and are then
 /// excluded from dispatch while remaining available for backedge tracking.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    feature = "serde",
-    serde(bound(
-        serialize = "L::Type: serde::Serialize",
-        deserialize = "L::Type: serde::Deserialize<'de>"
-    ))
-)]
-pub struct SpecializedFunctionInfo<L: Dialect> {
+pub struct SpecializedFunctionInfo {
     id: SpecializedFunction,
-    signature: Signature<L::Type>,
     definition: Statement,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
@@ -45,13 +40,11 @@ pub struct SpecializedFunctionInfo<L: Dialect> {
 }
 
 #[bon::bon]
-impl<L: Dialect> SpecializedFunctionInfo<L> {
+impl SpecializedFunctionInfo {
     #[builder(finish_fn = new)]
     pub fn new(
         /// The unique identifier for this specialized function.
         id: SpecializedFunction,
-        /// The signature of this specialized function.
-        signature: Signature<L::Type>,
         /// The definition statement of this specialized function.
         definition: Statement,
         /// The functions that call this specialized function.
@@ -59,7 +52,6 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
     ) -> Self {
         Self {
             id,
-            signature,
             definition,
             backedges: backedges.unwrap_or_default(),
             invalidated: false,
@@ -67,13 +59,13 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
     }
 }
 
-impl<L: Dialect> From<SpecializedFunctionInfo<L>> for SpecializedFunction {
-    fn from(sfi: SpecializedFunctionInfo<L>) -> Self {
+impl From<SpecializedFunctionInfo> for SpecializedFunction {
+    fn from(sfi: SpecializedFunctionInfo) -> Self {
         sfi.id
     }
 }
 
-impl<L: Dialect> SpecializedFunctionInfo<L> {
+impl SpecializedFunctionInfo {
     pub fn id(&self) -> SpecializedFunction {
         self.id
     }
@@ -82,16 +74,28 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         &self.definition
     }
 
-    pub fn definition_mut(&mut self) -> &mut Statement {
-        &mut self.definition
+    /// The signature of this specialization, read from its definition
+    /// statement, which is its single owner.
+    ///
+    /// A specialization is only created from a definition that declares a
+    /// signature, so this is `None` only if that statement has since been
+    /// removed from `stage`.
+    pub fn signature<'a, L>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Signature<L::Type>>
+    where
+        L: Dialect + HasSignature<L>,
+    {
+        self.definition.get_info(stage)?.definition().signature()
     }
 
-    pub fn return_types(&self) -> &Product<L::Type> {
-        self.signature.rets()
-    }
-
-    pub fn signature(&self) -> &Signature<L::Type> {
-        &self.signature
+    /// The return types of [`signature`](Self::signature).
+    pub fn return_types<'a, L>(
+        &self,
+        stage: &'a crate::StageInfo<L>,
+    ) -> Option<&'a Product<L::Type>>
+    where
+        L: Dialect + HasSignature<L>,
+    {
+        self.signature(stage).map(Signature::rets)
     }
 
     pub fn backedges(&self) -> &[SpecializedFunction] {
@@ -107,10 +111,16 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
     pub fn invalidate(&mut self) {
         self.invalidated = true;
     }
+
+    pub(crate) fn add_backedge(&mut self, caller: SpecializedFunction) {
+        if !self.backedges.contains(&caller) {
+            self.backedges.push(caller);
+        }
+    }
 }
 
 impl<L: Dialect> GetInfo<L> for SpecializedFunction {
-    type Info = SpecializedFunctionInfo<L>;
+    type Info = SpecializedFunctionInfo;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         let (staged_func, idx) = self.id();

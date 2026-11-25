@@ -1,7 +1,8 @@
 # Multiple-return signatures, signature ownership, and product sequences in the type system
 
-Status: **design agreed; piece 1 implemented on `roger/mult-ret-product`
-(uncommitted), pieces 2 and 3 not started.** Tracks
+Status: **design agreed; piece 1 is
+[#887](https://github.com/QuEraComputing/kirin/pull/887); piece 2 implemented on
+`roger/signature-ownership`; piece 3 not started.** Tracks
 [#885](https://github.com/QuEraComputing/kirin/issues/885). Piece 1 builds on
 [#886](https://github.com/QuEraComputing/kirin/pull/886); piece 3 changes
 [#855](https://github.com/QuEraComputing/kirin/pull/855).
@@ -57,8 +58,10 @@ Two further problems surfaced while fixing that:
 6. **A specialization must fit its interface, not equal it.**
    - Checked when the specialization is created: the parameter count and the
      return count equal the interface's.
-   - Checked by the signature semantics / type checker: every parameter and
-     return type is a subset of or equal to the interface's.
+   - Also checked at creation, by the dialect's signature semantics
+     (`Dialect::Signatures`): every parameter and return type is a subset of
+     or equal to the interface's. A dialect that declares no order on its
+     types gets `ShapeSemantics`, which checks the counts only.
 7. **Type system (#855): a `types` sort with sequence variables.** The list of
    types at a boundary is a term of a new sort `types`, distinct from `type`.
    Variables of sort `types` give polymorphism over parameter and return
@@ -114,31 +117,67 @@ Breaking changes to announce in the PR:
 
 ## 5. Piece 2: signature ownership
 
-One PR after piece 1.
+One PR after piece 1. Implemented on `roger/signature-ownership`.
 
 1. `HasSignature::signature` returns `Option<&Signature<L::Type>>` instead of a
-   clone; update the `Dialect` derive.
-2. `SpecializedFunctionInfo` drops its `signature` field. `signature(stage)`
-   reads the definition statement. Update serde, `all_matching`, the printer
-   and the duplicate-specialization check.
+   clone; the `Dialect` derive is updated.
+2. `SpecializedFunctionInfo` drops its `signature` field. With it gone the
+   record no longer mentions the dialect, so its type parameter is removed
+   (`SpecializedFunctionInfo`, `SpecializeError` and `DuplicateSpecialization`
+   are no longer generic). `signature(stage)` and `return_types(stage)` read
+   the definition statement and return `None` if it has been removed.
+   `all_matching` takes the stage.
 3. The `specialize()` builder loses its `signature` argument. It reads the
-   definition's signature and returns a new `MissingSignature` error when there
-   is none.
+   definition's signature and returns `UnknownDefinition` when the statement
+   is not in the stage, or `MissingSignature` when it declares none.
 4. The builder checks shape against the staged interface (decision 6, first
-   half) and returns an `InterfaceMismatch` error otherwise.
-5. `staged_function()` takes a required signature. The parser's fallback and
-   `Signature::placeholder()` are deleted, which also removes the
-   `L::Type: Placeholder` bound from those paths.
-6. Relax `LatticeSemantics::applicable` so return types may be a subset of the
-   candidate's, not only equal (decision 6, second half).
-7. Tests: the `kirin-ir` builder tests use plain statements as definitions and
-   pass signatures separately; give them a test definition with a signature
-   field (in `kirin-test-languages`).
+   half) and returns `InterfaceMismatch` otherwise.
+5. `staged_function()` takes a required signature and no longer accepts
+   pre-built specialization records. `Program::define_function` takes no
+   signature: the interface starts as the definition's. The parser's fallback
+   and `Signature::placeholder()` are deleted, which removes the
+   `L::Type: Placeholder` bound from those paths. Unchecked mutators
+   (`definition_mut`, `specializations_mut`, `add_specialization`) are removed.
+6. `SignatureSemantics::refines(spec, interface)` is the type-fit relation
+   (decision 6, second half). It is separate from `applicable`, which matches
+   a call site against a candidate and keeps return types equal.
+   `LatticeSemantics` overrides it to allow every parameter and return type to
+   be a subset; `ExactSemantics` requires equality.
+7. The dialect names its semantics: `Dialect` gains
+   `type Signatures: SignatureSemantics<Self::Type>`. The derive sets it from
+   `#[kirin(signatures = ...)]` and defaults to the new `ShapeSemantics`
+   (counts only for `refines`, exact dispatch), because no production type
+   implements `TypeLattice` yet and equality would allow one specialization
+   per interface. `specialize()` calls `L::Signatures::refines` and returns
+   `NotARefinement`; `all_matching` uses `L::Signatures` and loses its type
+   parameter. Hand-written `impl Dialect` blocks must name `Signatures`.
+8. Two validated builder operations fill gaps that existed before:
+   `invalidate_specialization` (retire a specialization whose replacement has
+   a different signature, which is not a `Duplicate`) and
+   `add_specialization_backedge` (record a caller found after creation).
+9. `signature(stage)` stays an `Option`. `specialize()` accepts an in-block
+   definition, which the `Rewriter` can erase or replace; a top-level
+   definition it cannot. Keeping a rewritten program valid is left to the
+   validator.
+10. Tests: `kirin-ir`'s `BuilderDialect` gains a `Define(Signature)` variant;
+   `kirin-test-languages`' `SimpleLanguage::Function` gains a signature field
+   (text `function (f64) -> f64 cfg { … }`) and opts in to
+   `LatticeSemantics`, as the first user of the derive attribute.
 
-Open within this piece: where the type-fit half of decision 6 runs. Nothing
-fixes which `SignatureSemantics` a stage uses, and `all_matching` has no caller
-outside tests. Either the stage records its semantics, or the check stays with
-the type checker from piece 3.
+Consequences for existing tests:
+
+- A parser test built a definition declaring `() -> ()` and registered it
+  under `(()) -> ()`. The two copies could disagree before; now there is one.
+- `kirin-liveness`'s callable-root tests built specialization records pointing
+  at a non-callable statement and at an unallocated statement to exercise the
+  engines' `NotCallable` and `MissingStatement` paths. The builder now rejects
+  both, so those tests assert the rejection instead. The engine paths remain
+  as defensive checks but are no longer reachable through the builder.
+- One fixture declared a two-parameter interface with a one-parameter
+  specialization; it now uses two parameters of a different type.
+
+Left for later: a validator pass that re-checks, after rewrites, that every
+live specialization's definition still exists and still refines its interface.
 
 ## 6. Piece 3: `types` sort and sequence variables in #855
 

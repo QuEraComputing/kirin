@@ -22,7 +22,7 @@ fn test_program_function_print() {
         let ret = SimpleLanguage::op_return(ctx0, a.result);
         let block = ctx0.block().stmt(a).terminator(ret).new();
         let body = ctx0.cfg().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(ctx0, body);
+        let fdef = SimpleLanguage::op_function(ctx0, body, kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64));
         ctx0.specialize()
             .staged_func(sf0)
             .definition(fdef)
@@ -51,7 +51,7 @@ fn test_program_function_print() {
         let ret = SimpleLanguage::op_return(ctx1, c.result);
         let block = ctx1.block().stmt(a).stmt(b).stmt(c).terminator(ret).new();
         let body = ctx1.cfg().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(ctx1, body);
+        let fdef = SimpleLanguage::op_function(ctx1, body, kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64));
         ctx1.specialize()
             .staged_func(sf1)
             .definition(fdef)
@@ -87,7 +87,7 @@ fn test_program_unnamed_stage() {
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(ctx, body);
+        let fdef = SimpleLanguage::op_function(ctx, body, kirin_ir::Signature::new().takes([SimpleType::I64, SimpleType::F64]).returns(SimpleType::I64));
         ctx.specialize()
             .staged_func(sf)
             .definition(fdef)
@@ -151,7 +151,7 @@ fn test_program_marks_a_poisoned_stage_instead_of_dropping_it() {
                 let ret = SimpleLanguage::op_return(ctx, a.result);
                 let block = ctx.block().stmt(a).terminator(ret).new();
                 let body = ctx.cfg().add_block(block).new();
-                let fdef = SimpleLanguage::op_function(ctx, body);
+                let fdef = SimpleLanguage::op_function(ctx, body, kirin_ir::Signature::new().takes([SimpleType::I64]).returns(SimpleType::I64));
                 ctx.specialize().staged_func(sf).definition(fdef).new().unwrap();
             });
             stage_id

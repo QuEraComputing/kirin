@@ -216,7 +216,7 @@ pub fn first_pass_concrete<'t, L>(
 ) -> Result<FirstPassDispatchResult, FunctionParseError>
 where
     L: Dialect + HasParser<'t>,
-    L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
+    L::Type: HasParser<'t, Output = L::Type>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
         .map_err(parse_error_from_chumsky)?;
@@ -267,7 +267,7 @@ pub fn second_pass_concrete<'t, L>(
 ) -> Result<usize, FunctionParseError>
 where
     L: Dialect + ParseEmit<L> + HasParser<'t> + kirin_ir::HasSignature<L>,
-    L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
+    L::Type: HasParser<'t, Output = L::Type>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
         .map_err(parse_error_from_chumsky)?;
@@ -571,7 +571,6 @@ fn apply_stage_declaration<'src, L>(
 ) -> Result<Option<StagedFunction>, FunctionParseError>
 where
     L: Dialect,
-    L::Type: kirin_ir::Placeholder,
 {
     state.record(function);
 
@@ -617,7 +616,6 @@ fn apply_specialize_declaration<L>(
 ) -> Result<(Function, StagedFunction), FunctionParseError>
 where
     L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L>,
-    L::Type: kirin_ir::Placeholder,
 {
     // Parse and emit the definition first — we need it to extract the signature.
     let definition = stage
@@ -647,14 +645,24 @@ where
             )
         })?;
 
-    // Get the signature from HasSignature on the definition statement.
-    // The Signature field is populated by the statement parser from format string elements.
-    let definition_value = definition.expect_info(stage).definition();
-    let signature = definition_value.signature().unwrap_or_else(|| {
-        // Fallback: create a placeholder signature if the definition type
-        // doesn't carry one (e.g., no Signature field).
-        kirin_ir::Signature::placeholder()
-    });
+    // The definition statement owns the specialization's signature; its
+    // Signature field is populated by the statement parser from the format
+    // string. A definition that declares none cannot be specialized.
+    let signature = definition
+        .expect_info(stage)
+        .definition()
+        .signature()
+        .cloned()
+        .ok_or_else(|| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::MissingSignature,
+                Some(span),
+                format!(
+                    "definition of function '@{}' declares no signature: its statement type needs a `Signature` field in its format",
+                    function_name.name
+                ),
+            )
+        })?;
 
     // Resolve or auto-create the staged function
     let (function, staged_function) = resolve_or_create_specialize_target::<L>(
@@ -674,7 +682,6 @@ where
             builder
                 .specialize()
                 .staged_func(staged_function)
-                .signature(signature.clone())
                 .definition(definition)
                 .new()
                 .map_err(|err| {
@@ -709,7 +716,6 @@ fn resolve_or_create_specialize_target<L>(
 ) -> Result<(Function, StagedFunction), FunctionParseError>
 where
     L: Dialect,
-    L::Type: kirin_ir::Placeholder,
 {
     // Look up existing function
     let function = function_lookup

@@ -1,17 +1,16 @@
 use rustc_hash::FxHashMap;
 
 use crate::arena::{Arena, Id, Item};
-use crate::builder::error::{ProgramError, ProgramStagedError};
+use crate::builder::error::{ProgramError, ProgramStagedError, SpecializeError};
 use crate::intern::InternTable;
 use crate::language::Dialect;
 use crate::node::function::{
-    CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
-    StagedFunction,
+    CompileStage, Function, FunctionInfo, SpecializedFunction, StagedFunction,
 };
 use crate::node::stmt::Statement;
 use crate::node::symbol::{GlobalSymbol, Symbol};
 use crate::rewrite::Quarantined;
-use crate::signature::Signature;
+use crate::signature::{HasSignature, Signature};
 use crate::stage::{HasStageInfo, StageDispatchMiss, StageInfo, StageMeta, StageSlot, StageStatus};
 
 /// The root IR database: every stage of a program, its cross-stage functions,
@@ -415,13 +414,11 @@ impl<S> Program<S> {
         &mut self,
         func: Function,
         stage: CompileStage,
-        signature: Option<Signature<L::Type>>,
-        specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
+        signature: Signature<L::Type>,
         backedges: Option<Vec<StagedFunction>>,
     ) -> Result<StagedFunction, ProgramStagedError<L>>
     where
         S: HasStageInfo<L>,
-        L::Type: crate::Placeholder,
     {
         // Read name from FunctionInfo (GlobalSymbol is Copy, borrow ends immediately).
         let name = self
@@ -442,8 +439,7 @@ impl<S> Program<S> {
         let sf = stage_info.with_builder(|b| {
             b.staged_function()
                 .maybe_name(name)
-                .maybe_signature(signature)
-                .maybe_specializations(specializations)
+                .signature(signature)
                 .maybe_backedges(backedges)
                 .new()
         })?;
@@ -476,29 +472,40 @@ impl<S> Program<S> {
     ///     .stage(stage_id)
     ///     .definition(definition)
     ///     .name("my_func")
-    ///     .signature(sig)
     ///     .new()
     ///     .unwrap();
     /// ```
     #[builder(finish_fn = new)]
-    pub fn define_function<L: Dialect>(
+    pub fn define_function<L>(
         &mut self,
         #[builder(into)] name: Option<String>,
         stage: CompileStage,
-        signature: Option<Signature<L::Type>>,
         #[builder(into)] definition: Statement,
     ) -> Result<(Function, StagedFunction, SpecializedFunction), ProgramStagedError<L>>
     where
         S: HasStageInfo<L>,
-        L::Type: crate::Placeholder,
+        L: Dialect + HasSignature<L>,
     {
+        // The definition statement owns the signature. With a single
+        // specialization, the interface the function exposes at this stage
+        // starts out as that signature.
+        let signature = self
+            .stages
+            .get(Id::from(stage).raw())
+            .and_then(StageSlot::stage)
+            .and_then(|s| HasStageInfo::<L>::try_stage_info(s))
+            .and_then(|info| crate::arena::GetInfo::get_info(&definition, info))
+            .and_then(|info| info.definition().signature())
+            .cloned()
+            .ok_or(SpecializeError::MissingSignature(definition))?;
+
         let func = self.function().maybe_name(name).new()?;
 
         let sf = self
             .staged_function::<L>()
             .func(func)
             .stage(stage)
-            .maybe_signature(signature)
+            .signature(signature)
             .new()?;
 
         let stage_info = self
@@ -508,10 +515,8 @@ impl<S> Program<S> {
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
             .ok_or(ProgramError::UnknownFunction(func))?;
 
-        // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
-            .with_builder(|b| b.specialize().staged_func(sf).definition(definition).new())
-            .expect("specialization conflict on newly created staged function");
+            .with_builder(|b| b.specialize().staged_func(sf).definition(definition).new())?;
 
         Ok((func, sf, spec))
     }

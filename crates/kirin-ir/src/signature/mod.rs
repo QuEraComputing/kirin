@@ -7,4 +7,6 @@ mod tests;
 
 pub use definition::Signature;
 pub use has_signature::HasSignature;
-pub use semantics::{ExactSemantics, LatticeSemantics, SignatureCmp, SignatureSemantics};
+pub use semantics::{
+    ExactSemantics, LatticeSemantics, ShapeSemantics, SignatureCmp, SignatureSemantics,
+};

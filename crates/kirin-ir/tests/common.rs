@@ -59,6 +59,8 @@ impl Placeholder for TestType {
 /// - `OwnBlocks(a, b)`: structurally owns two blocks
 /// - `OwnCFG(cfg)`: structurally owns one CFG
 /// - `OwnGraphs(dg, ug)`: structurally owns one directed and one undirected graph
+/// - `Define(sig)`: a function definition that declares `sig`; the only
+///   variant usable as a specialization's definition
 /// - `OwnDiGraph(dg)` / `OwnUnGraph(ug)`: structurally owns one graph of a kind
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -84,6 +86,7 @@ pub enum BuilderDialect {
     OwnGraphs(DiGraph, UnGraph),
     OwnDiGraph(DiGraph),
     OwnUnGraph(UnGraph),
+    Define(Signature<TestType>),
 }
 
 impl<'a> HasArguments<'a> for BuilderDialect {
@@ -330,8 +333,18 @@ impl BranchOp for BuilderDialect {
     }
 }
 
+impl HasSignature<BuilderDialect> for BuilderDialect {
+    fn signature(&self) -> Option<&Signature<TestType>> {
+        match self {
+            BuilderDialect::Define(sig) => Some(sig),
+            _ => None,
+        }
+    }
+}
+
 impl Dialect for BuilderDialect {
     type Type = TestType;
+    type Signatures = ShapeSemantics;
 }
 
 /// Create a Wire edge statement that produces a ResultValue.
@@ -400,6 +413,23 @@ pub fn make_compute(
 #[allow(dead_code)]
 pub fn new_stage() -> BuilderStageInfo<BuilderDialect> {
     BuilderStageInfo::default()
+}
+
+/// The interface signature `(any) -> any`.
+#[allow(dead_code)]
+pub fn any_sig() -> Signature<TestType> {
+    Signature::new()
+        .takes([TestType::Any])
+        .returns(TestType::Any)
+}
+
+/// A definition statement declaring `sig`.
+#[allow(dead_code)]
+pub fn define(stage: &mut BuilderStageInfo<BuilderDialect>, sig: Signature<TestType>) -> Statement {
+    stage
+        .statement()
+        .definition(BuilderDialect::Define(sig))
+        .new()
 }
 
 /// A position in a [`Rewriter`]'s event log, for checking each edit's events

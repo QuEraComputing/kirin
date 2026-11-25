@@ -6,6 +6,12 @@ use prettyless::DocAllocator;
 
 use crate::{ArenaDoc, Config, Document, PrettyPrint, PrettyPrintExt, PrintExt};
 
+/// The interface used by tests that do not care about the signature.
+fn default_sig() -> kirin_ir::Signature<SimpleType> {
+    use kirin_ir::Placeholder;
+    kirin_ir::Signature::new().returns(SimpleType::placeholder())
+}
+
 impl PrettyPrint for SimpleLanguage {
     fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
         &self,
@@ -21,7 +27,7 @@ impl PrettyPrint for SimpleLanguage {
             }
             SimpleLanguage::Constant(value, _res) => doc.text(format!("constant {}", value)),
             SimpleLanguage::Return(retval) => doc.text("return ") + retval.pretty_print(doc),
-            SimpleLanguage::Function(cfg, _) => doc.print_cfg(cfg),
+            SimpleLanguage::Function(cfg, _, _) => doc.print_cfg(cfg),
         }
     }
 }
@@ -73,7 +79,13 @@ fn create_test_function() -> (
         .new();
 
     let body = stage.cfg().add_block(block_a).add_block(block_b).new();
-    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(
+        &mut stage,
+        body,
+        kirin_ir::Signature::new()
+            .takes([SimpleType::I64])
+            .returns(SimpleType::I64),
+    );
     let f = stage
         .specialize()
         .staged_func(staged_function)
