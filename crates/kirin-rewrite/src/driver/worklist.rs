@@ -45,7 +45,7 @@ pub(super) struct Worklist {
 enum Status {
     /// Not under the root.
     #[default]
-    Outside,
+    OutsideRoot,
     /// In the queue, to be visited.
     InQueue,
     /// Under the root but not in the queue: visited already, or inserted
@@ -54,7 +54,7 @@ enum Status {
 }
 
 /// Each statement's [`Status`], at its arena index. A statement past the
-/// end is [`Status::Outside`].
+/// end is [`Status::OutsideRoot`].
 #[derive(Default)]
 struct Statuses(Vec<Status>);
 
@@ -67,7 +67,7 @@ impl Statuses {
     fn set(&mut self, stmt: Statement, status: Status) {
         let index = stmt.id().raw();
         if self.0.len() <= index {
-            self.0.resize(index + 1, Status::Outside);
+            self.0.resize(index + 1, Status::OutsideRoot);
         }
         self.0[index] = status;
     }
@@ -78,7 +78,7 @@ impl Worklist {
     /// included, in `O`'s order, trying native rules if
     /// `native_rules_present`. The walk is a snapshot: nothing is edited
     /// while it is taken. The statuses the previous sweep set go back to
-    /// [`Status::Outside`], and the statements it left in the queue, after
+    /// [`Status::OutsideRoot`], and the statements it left in the queue, after
     /// an `interrupt`, are dropped.
     pub(super) fn seed<O: WalkOrder, L: Dialect>(
         &mut self,
@@ -87,7 +87,7 @@ impl Worklist {
         native_rules_present: bool,
     ) {
         for &stmt in self.snapshot.iter().chain(&self.inserted) {
-            self.status.set(stmt, Status::Outside);
+            self.status.set(stmt, Status::OutsideRoot);
         }
         self.snapshot = O::schedule(stage, root);
         self.next = 0;
@@ -160,7 +160,7 @@ impl Worklist {
                     self.push_neighbors(stage, stmt);
                 }
                 MutationEvent::PlacedStatement { stmt }
-                    if self.status.get(stmt) == Status::Outside =>
+                    if self.status.get(stmt) == Status::OutsideRoot =>
                 {
                     self.adopt(stage, stmt);
                     self.push_neighbors(stage, stmt);
@@ -210,8 +210,8 @@ impl Worklist {
     /// Count the inserted `stmt` under the root if its owner is.
     fn adopt<L: Dialect>(&mut self, stage: &StageInfo<L>, stmt: Statement) {
         if let Some(owner) = stmt.owner(stage)
-            && self.status.get(owner) != Status::Outside
-            && self.status.get(stmt) == Status::Outside
+            && self.status.get(owner) != Status::OutsideRoot
+            && self.status.get(stmt) == Status::OutsideRoot
         {
             self.status.set(stmt, Status::VisitedOrInserted);
             self.inserted.push(stmt);

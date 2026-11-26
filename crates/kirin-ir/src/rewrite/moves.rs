@@ -100,11 +100,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Records the [`Rewriter::replace_all_uses`] events for the argument
     /// redirection, then one [`MutationEvent::PlacedStatement`] per moved
-    /// statement, in order, then [`MutationEvent::SplicedBlock`]. A walk visiting a
-    /// statement of `source` reports the splice (see [`crate::walk`]). If
-    /// `source` has no statements besides its terminator, nothing moves and
-    /// only the redirection events are recorded; splicing it again with the
-    /// same replacements records no event.
+    /// statement, in order, then [`MutationEvent::SplicedBlock`]. A walk
+    /// visiting a statement of `source` reports the splice (see
+    /// [`crate::walk`]). If `source` has no statements besides its terminator,
+    /// nothing moves and only the redirection events are recorded; splicing it
+    /// again with the same replacements records no event.
     pub fn splice_block_before(
         &mut self,
         source: Block,
