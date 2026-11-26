@@ -57,17 +57,17 @@ fn tokens_to_string_with_spacing(
         }
     }
 
-    if add_trailing_space && !tokens.is_empty() {
-        let needs_trailing_space = !matches!(
-            tokens.last(),
-            Some(Token::LBrace) | Some(Token::LParen) | Some(Token::LBracket)
-        );
-        if needs_trailing_space {
-            result.push(' ');
-        }
+    if add_trailing_space && tokens_need_trailing_space(tokens) {
+        result.push(' ');
     }
 
     result
+}
+
+fn tokens_need_trailing_space(tokens: &[Token]) -> bool {
+    tokens
+        .last()
+        .is_some_and(|token| !matches!(token, Token::LBrace | Token::LParen | Token::LBracket))
 }
 
 impl GeneratePrettyPrint {
@@ -223,7 +223,7 @@ impl GeneratePrettyPrint {
         )
         .expect("ir_path validation failed");
         let print_expr =
-            self.generate_format_print(&format, &field_map, &collected, fields, &ir_path);
+            self.generate_format_print(format.elements(), &field_map, fields, &ir_path, false);
 
         let pattern = if bindings.is_empty() {
             match variant_name {
@@ -300,38 +300,34 @@ impl GeneratePrettyPrint {
         }
     }
 
-    pub(super) fn generate_format_print(
+    fn generate_format_print(
         &self,
-        format: &Format<'_>,
+        elements: &[FormatElement<'_>],
         field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
-        _collected: &[FieldInfo<PrettyPrintLayout>],
         field_vars: &[syn::Ident],
         ir_path: &syn::Path,
+        space_before_first: bool,
     ) -> TokenStream {
         let prettyless_path = &self.prettyless_path;
-        let elements = format.elements();
 
         let mut parts: Vec<TokenStream> = Vec::new();
 
         for (i, elem) in elements.iter().enumerate() {
-            let is_first = i == 0;
-            let is_last = i == elements.len() - 1;
-            let prev_is_field_like = i > 0
-                && matches!(
-                    elements[i - 1],
+            let previous = i.checked_sub(1).map(|index| &elements[index]);
+            let prev_is_field_like = match previous {
+                Some(FormatElement::Token(_)) => false,
+                Some(_) => true,
+                None => space_before_first,
+            };
+            // An optional section adds its own spacing when printed.
+            let next_is_field_like = matches!(
+                elements.get(i + 1),
+                Some(
                     FormatElement::Field(_, _)
                         | FormatElement::Keyword(_)
                         | FormatElement::Context(_)
-                        | FormatElement::Optional(_)
-                );
-            let next_is_field_like = !is_last
-                && matches!(
-                    elements[i + 1],
-                    FormatElement::Field(_, _)
-                        | FormatElement::Keyword(_)
-                        | FormatElement::Context(_)
-                        | FormatElement::Optional(_)
-                );
+                )
+            );
 
             match elem {
                 FormatElement::Token(tokens) => {
@@ -355,7 +351,7 @@ impl GeneratePrettyPrint {
                     };
 
                     // Add spacing like fields do
-                    if !is_first && prev_is_field_like {
+                    if prev_is_field_like {
                         parts.push(quote! { doc.text(" ") });
                     }
 
@@ -375,7 +371,7 @@ impl GeneratePrettyPrint {
                             Some(ir_path),
                         );
 
-                        if !is_first && prev_is_field_like {
+                        if prev_is_field_like {
                             parts.push(quote! { doc.text(" ") });
                         }
 
@@ -383,7 +379,7 @@ impl GeneratePrettyPrint {
                     }
                 }
                 FormatElement::Context(proj) => {
-                    if !is_first && prev_is_field_like {
+                    if prev_is_field_like {
                         parts.push(quote! { doc.text(" ") });
                     }
                     match proj {
@@ -393,15 +389,16 @@ impl GeneratePrettyPrint {
                     }
                 }
                 FormatElement::Optional(inner_elements) => {
-                    // For optional sections, generate conditional printing.
-                    // Find the first field reference in the section to use as the condition.
+                    let space_before_section = match previous {
+                        Some(FormatElement::Token(tokens)) => tokens_need_trailing_space(tokens),
+                        _ => prev_is_field_like,
+                    };
                     let inner_print = self.generate_optional_section_print(
                         inner_elements,
                         field_map,
-                        _collected,
                         field_vars,
                         ir_path,
-                        prev_is_field_like,
+                        space_before_section,
                     );
                     if let Some(inner_print) = inner_print {
                         parts.push(inner_print);
@@ -429,10 +426,9 @@ impl GeneratePrettyPrint {
         &self,
         inner_elements: &[FormatElement<'_>],
         field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
-        collected: &[FieldInfo<PrettyPrintLayout>],
         field_vars: &[syn::Ident],
         ir_path: &syn::Path,
-        needs_leading_space: bool,
+        space_before_section: bool,
     ) -> Option<TokenStream> {
         use kirin_derive_toolkit::ir::fields::Collection;
 
@@ -457,22 +453,17 @@ impl GeneratePrettyPrint {
             Collection::Single => quote! { true }, // shouldn't happen after validation
         };
 
-        // Build the inner print expression using the same format_print logic
-        let inner_format = crate::format::Format::new(inner_elements.to_vec());
-        let inner_print =
-            self.generate_format_print(&inner_format, field_map, collected, field_vars, ir_path);
-
-        // When the optional section follows a field-like element, add a leading
-        // space before the section content to maintain proper formatting.
-        let print_expr = if needs_leading_space {
-            quote! { doc.text(" ") + #inner_print }
-        } else {
-            inner_print
-        };
+        let inner_print = self.generate_format_print(
+            inner_elements,
+            field_map,
+            field_vars,
+            ir_path,
+            space_before_section,
+        );
 
         Some(quote! {
             (if #condition {
-                #print_expr
+                #inner_print
             } else {
                 doc.nil()
             })
