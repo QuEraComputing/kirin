@@ -17,6 +17,10 @@ enum Sample {
         duration: Vec<SSAValue>,
         result_type: ArithType,
     },
+    #[chumsky(format = "$close_before }[} {values}]")]
+    CloseBefore { values: Vec<SSAValue> },
+    #[chumsky(format = "$close_after }[ {values}] }")]
+    CloseAfter { values: Vec<SSAValue> },
 }
 
 #[test]
@@ -28,6 +32,16 @@ fn prints_optional_comma_without_a_leading_space() {
         "grouped (%a) -> f64",
         "grouped (%a), %d -> f64",
     ] {
+        let (stage, statement) = roundtrip::emit_statement::<Sample>(input, operands);
+        let rendered = roundtrip::render_statement(&stage, statement);
+        assert_eq!(rendered.trim(), input);
+    }
+}
+
+#[test]
+fn keeps_adjacent_closing_braces_separate() {
+    let operands = &[("a", ArithType::F64)];
+    for input in ["close_before} } %a", "close_after} }"] {
         let (stage, statement) = roundtrip::emit_statement::<Sample>(input, operands);
         let rendered = roundtrip::render_statement(&stage, statement);
         assert_eq!(rendered.trim(), input);

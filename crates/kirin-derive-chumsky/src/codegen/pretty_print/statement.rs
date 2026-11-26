@@ -389,16 +389,13 @@ impl GeneratePrettyPrint {
                     }
                 }
                 FormatElement::Optional(inner_elements) => {
-                    let space_before_section = match previous {
-                        Some(FormatElement::Token(tokens)) => tokens_need_trailing_space(tokens),
-                        _ => prev_is_field_like,
-                    };
                     let inner_print = self.generate_optional_section_print(
                         inner_elements,
                         field_map,
                         field_vars,
                         ir_path,
-                        space_before_section,
+                        previous,
+                        &elements[i + 1..],
                     );
                     if let Some(inner_print) = inner_print {
                         parts.push(inner_print);
@@ -428,7 +425,8 @@ impl GeneratePrettyPrint {
         field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
         field_vars: &[syn::Ident],
         ir_path: &syn::Path,
-        space_before_section: bool,
+        previous: Option<&FormatElement<'_>>,
+        following: &[FormatElement<'_>],
     ) -> Option<TokenStream> {
         use kirin_derive_toolkit::ir::fields::Collection;
 
@@ -453,6 +451,22 @@ impl GeneratePrettyPrint {
             Collection::Single => quote! { true }, // shouldn't happen after validation
         };
 
+        let space_before_section = match previous {
+            Some(FormatElement::Token(tokens)) => tokens_need_trailing_space(tokens),
+            _ => previous.is_some(),
+        };
+        let starts_with_closing_brace = |element: Option<&FormatElement<'_>>| {
+            matches!(
+                element,
+                Some(FormatElement::Token(tokens)) if matches!(tokens.first(), Some(Token::RBrace))
+            )
+        };
+        let previous_is_closing_brace = matches!(
+            previous,
+            Some(FormatElement::Token(tokens))
+                if matches!(tokens.last(), Some(Token::RBrace | Token::EscapedRBrace))
+        );
+
         let inner_print = self.generate_format_print(
             inner_elements,
             field_map,
@@ -460,12 +474,30 @@ impl GeneratePrettyPrint {
             ir_path,
             space_before_section,
         );
+        // Keep consecutive braces separate because the lexer recognizes `}}` as one token.
+        let inner_print = if starts_with_closing_brace(inner_elements.first())
+            && (previous_is_closing_brace
+                || previous.is_some_and(|element| !matches!(element, FormatElement::Token(_))))
+        {
+            quote! { doc.text(" ") + #inner_print }
+        } else {
+            inner_print
+        };
+        let next_required = following
+            .iter()
+            .find(|element| !matches!(element, FormatElement::Optional(_)));
+        let absent_print = if previous_is_closing_brace && starts_with_closing_brace(next_required)
+        {
+            quote! { doc.text(" ") }
+        } else {
+            quote! { doc.nil() }
+        };
 
         Some(quote! {
             (if #condition {
                 #inner_print
             } else {
-                doc.nil()
+                #absent_print
             })
         })
     }
