@@ -415,18 +415,11 @@ impl GeneratePrettyPrint {
         }
     }
 
-    /// Generates conditional printing code for an optional section `[...]`.
-    ///
-    /// The section is printed only if the first `Option` field inside it is `Some`,
-    /// or if the first `Vec` field is non-empty.
-    fn generate_optional_section_print(
-        &self,
+    /// An optional section is printed when its first field is present.
+    fn optional_section_condition(
         inner_elements: &[FormatElement<'_>],
         field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
         field_vars: &[syn::Ident],
-        ir_path: &syn::Path,
-        previous: Option<&FormatElement<'_>>,
-        following: &[FormatElement<'_>],
     ) -> Option<TokenStream> {
         use kirin_derive_toolkit::ir::fields::Collection;
 
@@ -445,12 +438,23 @@ impl GeneratePrettyPrint {
         let cond_var = &field_vars[cond_idx];
 
         // Build the condition: Option fields check .is_some(), Vec fields check !.is_empty()
-        let condition = match cond_field.collection {
+        Some(match cond_field.collection {
             Collection::Option => quote! { #cond_var.is_some() },
             Collection::Vec => quote! { !#cond_var.is_empty() },
             Collection::Single => quote! { true }, // shouldn't happen after validation
-        };
+        })
+    }
 
+    fn generate_optional_section_print(
+        &self,
+        inner_elements: &[FormatElement<'_>],
+        field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
+        field_vars: &[syn::Ident],
+        ir_path: &syn::Path,
+        previous: Option<&FormatElement<'_>>,
+        following: &[FormatElement<'_>],
+    ) -> Option<TokenStream> {
+        let condition = Self::optional_section_condition(inner_elements, field_map, field_vars)?;
         let space_before_section = match previous {
             Some(FormatElement::Token(tokens)) => tokens_need_trailing_space(tokens),
             _ => previous.is_some(),
@@ -483,15 +487,30 @@ impl GeneratePrettyPrint {
         } else {
             inner_print
         };
-        let next_required = following
-            .iter()
-            .find(|element| !matches!(element, FormatElement::Optional(_)));
-        let absent_print = if previous_is_closing_brace && starts_with_closing_brace(next_required)
+        // Omitting every section between two literal braces still needs a separator.
+        let mut absent_print = quote! { doc.nil() };
+        if previous_is_closing_brace
+            && let Some(next_required) = following
+                .iter()
+                .position(|element| !matches!(element, FormatElement::Optional(_)))
+            && starts_with_closing_brace(following.get(next_required))
         {
-            quote! { doc.text(" ") }
-        } else {
-            quote! { doc.nil() }
-        };
+            absent_print = quote! { doc.text(" ") };
+            let later_sections_print = following[..next_required]
+                .iter()
+                .filter_map(|element| match element {
+                    FormatElement::Optional(inner) => {
+                        Self::optional_section_condition(inner, field_map, field_vars)
+                    }
+                    _ => None,
+                })
+                .reduce(|any, condition| quote! { #any || #condition });
+            if let Some(later_sections_print) = later_sections_print {
+                absent_print = quote! {
+                    (if #later_sections_print { doc.nil() } else { #absent_print })
+                };
+            }
+        }
 
         Some(quote! {
             (if #condition {

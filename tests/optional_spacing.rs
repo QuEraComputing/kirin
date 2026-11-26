@@ -21,6 +21,11 @@ enum Sample {
     CloseBefore { values: Vec<SSAValue> },
     #[chumsky(format = "$close_after }[ {values}] }")]
     CloseAfter { values: Vec<SSAValue> },
+    #[chumsky(format = "$close_chain }[ {first}][, {second}] }")]
+    CloseChain {
+        first: Vec<SSAValue>,
+        second: Vec<SSAValue>,
+    },
 }
 
 #[test]
@@ -40,8 +45,13 @@ fn prints_optional_comma_without_a_leading_space() {
 
 #[test]
 fn keeps_adjacent_closing_braces_separate() {
-    let operands = &[("a", ArithType::F64)];
-    for input in ["close_before} } %a", "close_after} }"] {
+    let operands = &[("a", ArithType::F64), ("b", ArithType::F64)];
+    for input in [
+        "close_before} } %a",
+        "close_after} }",
+        "close_chain} }",
+        "close_chain}, %b}",
+    ] {
         let (stage, statement) = roundtrip::emit_statement::<Sample>(input, operands);
         let rendered = roundtrip::render_statement(&stage, statement);
         assert_eq!(rendered.trim(), input);
