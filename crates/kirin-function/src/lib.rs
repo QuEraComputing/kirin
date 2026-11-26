@@ -20,6 +20,7 @@ use kirin_interpreter::Interpretable;
 pub mod bind;
 pub mod call;
 pub mod function;
+pub mod inline;
 pub mod lambda;
 pub mod ret;
 
