@@ -1863,9 +1863,7 @@ inlines one level of calls in a CFG to specialized functions in the same stage,
 leaving the calls the inlined code brings in for another run. A single-block
 callee is copied in front of the call; any other callee is copied between the
 halves of the call's split block. Its walk order moves each statement at most
-once, a split reads only the statements it moves and the terminator, and the
-calls' results are redirected once all are inlined, each straight to the value
-it ends up as, so a run is linear in the size of its result.
+once, so a run is linear in the size of its result.
 
 Deferred to later slices (each is rejected, not silently mishandled):
 `UnGraph`-body surgery; single dead-result trimming (`remove_result`, below); the owning pass driver and quarantine boundary; and the pure derive/install/verify split described under

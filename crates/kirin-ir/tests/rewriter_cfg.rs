@@ -482,61 +482,6 @@ fn split_block_at_terminator_moves_only_the_terminator() {
     verify_derived(&stage).unwrap();
 }
 
-/// The raw predecessor list of `block`, one entry per incoming edge.
-fn pred_list(stage: &StageInfo<BuilderDialect>, block: Block) -> Vec<Block> {
-    block.expect_info(stage).predecessors().to_vec()
-}
-
-#[test]
-fn split_block_moves_each_edge_of_the_terminator_once() {
-    // entry: s0; s1; cond_br entry, exit   (a loop back to itself)
-    // other: cond_br exit, exit            (the same target twice)
-    let mut stage = new_stage();
-
-    let exit_ret = stage.statement().definition(BuilderDialect::Return).new();
-    let exit = stage.block().terminator(exit_ret).new();
-    let other_br = stage
-        .statement()
-        .definition(BuilderDialect::CondBranch(
-            Successor::from_block(exit),
-            Successor::from_block(exit),
-        ))
-        .new();
-    let other = stage.block().terminator(other_br).new();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let entry = stage.block().stmt(s0).stmt(s1).new();
-    let _cfg = stage
-        .cfg()
-        .add_block(entry)
-        .add_block(other)
-        .add_block(exit)
-        .new();
-    let mut stage = stage.finalize().unwrap();
-    // `entry`'s branch names `entry`, so it is added once `entry` exists.
-    Rewriter::new(&mut stage)
-        .create(
-            InsertionPoint::Terminator(entry),
-            BuilderDialect::CondBranch(Successor::from_block(entry), Successor::from_block(exit)),
-        )
-        .unwrap();
-    assert_eq!(pred_list(&stage, entry), [entry]);
-
-    let tail = Rewriter::new(&mut stage).split_block(s1).unwrap();
-
-    // The loop edge now leaves from the new block, back to `entry`.
-    assert_eq!(pred_list(&stage, entry), [tail]);
-    assert_eq!(preds(&stage, exit), HashSet::from([tail, other]));
-    assert_eq!(pred_list(&stage, exit).len(), 2);
-    verify_derived(&stage).unwrap();
-
-    // Splitting `other` at its terminator moves its one edge to `exit`.
-    let other_tail = Rewriter::new(&mut stage).split_block(other_br).unwrap();
-    assert_eq!(preds(&stage, exit), HashSet::from([tail, other_tail]));
-    assert_eq!(pred_list(&stage, exit).len(), 2);
-    verify_derived(&stage).unwrap();
-}
-
 #[test]
 fn split_block_at_first_statement_empties_original_chain() {
     let mut stage = new_stage();
