@@ -13,6 +13,8 @@ mod effect_language;
 mod graph_function_language;
 #[cfg(feature = "namespaced-language")]
 mod namespaced_language;
+#[cfg(feature = "optional-spacing-language")]
+mod optional_spacing_language;
 #[cfg(feature = "arith-function-language")]
 mod scalar_function_language;
 #[cfg(feature = "scf-function-language")]
@@ -36,6 +38,8 @@ pub use effect_language::EffectLanguage;
 pub use graph_function_language::GraphFunctionLanguage;
 #[cfg(feature = "namespaced-language")]
 pub use namespaced_language::NamespacedLanguage;
+#[cfg(feature = "optional-spacing-language")]
+pub use optional_spacing_language::OptionalSpacingLanguage;
 #[cfg(feature = "arith-function-language")]
 pub use scalar_function_language::ScalarFunctionLanguage;
 #[cfg(feature = "scf-function-language")]

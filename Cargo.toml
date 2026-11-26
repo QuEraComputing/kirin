@@ -139,6 +139,7 @@ kirin-test-languages = { workspace = true, features = [
   "bitwise-function-language",
   "callable-language",
   "namespaced-language",
+  "optional-spacing-language",
   "parser",
   "pretty",
   "simple-language",
