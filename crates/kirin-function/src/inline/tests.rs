@@ -130,10 +130,10 @@ fn choose(b: &mut Builder) -> SpecializedFunction {
     define(b, body, 2)
 }
 
-/// The report of a run that inlined `count` calls and skipped none.
-fn inlined(count: usize) -> Result<InlineReport, InlineError> {
+/// The report of a run that inlined calls to `callees` and skipped none.
+fn inlined<const N: usize>(callees: [SpecializedFunction; N]) -> Result<InlineReport, InlineError> {
     Ok(InlineReport {
-        inlined: count,
+        inlined: HashSet::from(callees),
         skipped: vec![],
     })
 }
@@ -141,7 +141,7 @@ fn inlined(count: usize) -> Result<InlineReport, InlineError> {
 /// The report of a run that inlined nothing and skipped one call, for `reason`.
 fn skipped(reason: NotInlined) -> Result<InlineReport, InlineError> {
     Ok(InlineReport {
-        inlined: 0,
+        inlined: HashSet::new(),
         skipped: vec![reason],
     })
 }
@@ -195,7 +195,7 @@ fn a_single_block_callee_is_inlined_in_place() {
     let d = d_id;
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([f]));
     drop(rw);
 
     // ^g(%x): %s = add %x, %x; %d = add %s, %s; ret %d
@@ -262,7 +262,7 @@ fn a_chain_of_calls_rewrites_each_use_once() {
     let x = arg(&stage, g, 0);
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(N));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([id]));
     // Each use is rewritten once, straight to `%x`, not once per call.
     for &stmt in &use_ids {
         let rewrites = rw
@@ -323,7 +323,7 @@ fn an_id_call_on_a_multi_block_calls_result_reads_the_second_half() {
     let mut stage = b.finalize().unwrap();
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([id, h]));
     drop(rw);
 
     // `%d` is replaced by `%c`, and `%c` by the second half's argument.
@@ -377,7 +377,7 @@ fn a_call_reading_an_earlier_blocks_inlined_call_reads_the_inlined_value() {
     let x = arg(&stage, g, 0);
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([f]));
     drop(rw);
 
     // ^g(%x): %s = add %x, %x; br ^b
@@ -439,7 +439,7 @@ fn a_multi_block_callee_is_inlined_between_the_halves_of_the_block() {
     let d = d_id;
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([h]));
     drop(rw);
 
     // ^g(%x, %y): br ^e'(%x, %y)
@@ -543,7 +543,7 @@ fn a_callee_whose_entry_is_a_loop_header_keeps_its_entry_arguments() {
     let k = arg(rw.stage(), back, 0);
     rw.create(InsertionPoint::Terminator(back), branch(entry, vec![k]))
         .unwrap();
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([l]));
     drop(rw);
 
     // ^g(%x): br ^e'(%x)
@@ -620,7 +620,7 @@ fn calls_the_inlined_code_brings_in_are_left_for_another_run() {
     let mut rw = Rewriter::new(&mut stage);
     // One level: `@k` and `@h` are inlined, the call to `@f` `@k` brings in is
     // left.
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([h, k]));
     let left = calls(rw.stage(), body);
     assert_eq!(left.len(), 1);
     assert!(matches!(
@@ -628,8 +628,8 @@ fn calls_the_inlined_code_brings_in_are_left_for_another_run() {
         Some(Call::Specialized(call)) if call.target() == f
     ));
     // A second run inlines it, and a third finds nothing left.
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(0));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([f]));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([]));
     drop(rw);
 
     assert!(calls(&stage, body).is_empty());
@@ -682,7 +682,7 @@ fn several_multi_block_calls_in_one_block_are_all_inlined() {
     let mut stage = b.finalize().unwrap();
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([h]));
     drop(rw);
 
     assert!(calls(&stage, body).is_empty());
@@ -734,7 +734,7 @@ fn a_call_with_several_results_takes_every_returned_value() {
     let d = d_id;
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, body, branch), inlined(1));
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined([m]));
     drop(rw);
 
     let s = result(&stage, g.statements(&stage).next().unwrap());
@@ -937,7 +937,7 @@ fn a_return_nested_in_a_lambda_of_the_callee_is_copied_as_is() {
     let mut stage = b.finalize().unwrap();
 
     let mut rw = Rewriter::new(&mut stage);
-    assert_eq!(inline_calls(&mut rw, caller, branch), inlined(1));
+    assert_eq!(inline_calls(&mut rw, caller, branch), inlined([f]));
     drop(rw);
 
     // ^g(%x): %l = lambda { ^b(%y): %z = add %y, %y; nest { ret %z }; ret %y }; ret
@@ -1016,7 +1016,7 @@ fn a_call_left_as_a_call_does_not_stop_the_others_being_inlined() {
     assert_eq!(
         inline_calls(&mut rw, body, branch),
         Ok(InlineReport {
-            inlined: 1,
+            inlined: HashSet::from([f]),
             skipped: vec![NotInlined::NestedReturn {
                 call: call_n,
                 ret: nested_ret

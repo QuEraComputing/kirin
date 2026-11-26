@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use kirin::prelude::*;
 
 use super::check::{Callee, Checked, check_call};
@@ -8,17 +10,18 @@ use super::{FunctionOps, InlineError, NotInlined};
 /// What a run of [`inline_calls`] did.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct InlineReport {
-    /// How many calls were inlined.
-    pub inlined: usize,
+    /// The functions whose calls were inlined, each once: the callees whose
+    /// bodies this run copied, so the caller's result depends on them.
+    pub inlined: HashSet<SpecializedFunction>,
     /// The calls to a function in this stage left as calls, and why, in the
     /// order they were met. Calls of another kind, to another stage, or nested
     /// in statements' bodies are not listed.
     pub skipped: Vec<NotInlined>,
 }
 
-/// Inline every specialized function call in `cfg`'s blocks, and report how
-/// many were inlined and which were left as calls. Only calls to a function
-/// in this stage whose body is a CFG are inlined.
+/// Inline every specialized function call in `cfg`'s blocks, and report the
+/// functions whose calls were inlined and the calls left as calls. Only calls
+/// to a function in this stage whose body is a CFG are inlined.
 ///
 /// A callee that is a single block ending in a return has its statements
 /// copied in front of the call, and the call's results are replaced by the
@@ -89,9 +92,10 @@ where
     // still holds: each call's arguments and results are still live.
     let mut redirects = Redirects::default();
     for (stmt, call, callee) in accepted {
+        let target = call.target;
         inline_call(rewriter, stmt, call, callee, &branch, &mut redirects)
             .expect("`check_call` accepted the call, so inlining it cannot fail");
-        report.inlined += 1;
+        report.inlined.insert(target);
     }
     redirects
         .apply(rewriter)
