@@ -29,6 +29,7 @@ bitwise-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-bitwise", 
 scf-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-function", "kirin-scf", "parser", "pretty"]
 callable-language = ["kirin-ir/derive", "kirin-arith", "kirin-function", "parser", "pretty"]
 namespaced-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-function", "parser", "pretty"]
+optional-spacing-language = ["kirin-ir/derive", "kirin-arith", "parser", "pretty"]
 ungraph-language = ["kirin-ir/derive"]
 effect-language = ["kirin-ir/derive", "kirin-arith", "pretty"]
 parser = ["kirin-chumsky/derive", "kirin-lexer"]
