@@ -207,14 +207,15 @@ impl GenerateHasDialectParser {
     ) -> TokenStream {
         let base = field_kind::parser_expr(field, crate_path, opt, ast_name, ir_type, type_params);
         match field.collection {
-            Collection::Single => base,
+            // Validation requires Option fields to be inside an optional section.
+            // The section parser supplies the Option for the entire group.
+            Collection::Single | Collection::Option => base,
             Collection::Vec => quote! {
                 #base
                     .separated_by(#crate_path::chumsky::prelude::just(#crate_path::Token::Comma))
                     .allow_trailing()
                     .collect::<::std::vec::Vec<_>>()
             },
-            Collection::Option => quote! { #base.or_not() },
         }
     }
 
