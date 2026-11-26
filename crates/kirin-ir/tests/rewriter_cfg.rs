@@ -6,7 +6,9 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, EventCursor, TestType, cannot_insert, make_split, new_stage};
+use common::{
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased_in, make_split, new_stage,
+};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -167,8 +169,9 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: use_x },
-            MutationEvent::ErasedStatement { stmt: dead_br },
+            // `dead` dies too; the live container is `cfg`, named next.
+            erased_in(use_x, dead),
+            erased_in(dead_br, dead),
             MutationEvent::ChangedBlockList { cfg },
             MutationEvent::ChangedCfg { cfg },
         ]
@@ -388,10 +391,10 @@ fn erase_block_tombstones_nested_bodies() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: inner_nop },
-            MutationEvent::ErasedStatement { stmt: inner_ret },
-            MutationEvent::ErasedStatement { stmt: owner },
-            MutationEvent::ErasedStatement { stmt: host_ret },
+            erased_in(inner_nop, inner_block),
+            erased_in(inner_ret, inner_block),
+            erased_in(owner, host),
+            erased_in(host_ret, host),
             MutationEvent::ChangedBlockList { cfg },
             MutationEvent::ChangedCfg { cfg },
         ]
@@ -744,7 +747,7 @@ fn merge_blocks_splices_successor_and_redirects_arguments() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: jump },
+            erased_in(jump, entry),
             MutationEvent::ChangedTerminator { block: entry },
             MutationEvent::ChangedOperands { stmt: use_x },
             MutationEvent::ReplacedUses {

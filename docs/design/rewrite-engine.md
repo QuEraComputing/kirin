@@ -1116,7 +1116,7 @@ The `Rewriter` may record immediate events such as:
 ```rust
 pub enum MutationEvent {
     CreatedStatement { stmt: Statement },
-    ErasedStatement { stmt: Statement },
+    ErasedStatement { stmt: Statement, parent: Option<StatementParent> },
     ReplacedStatement { stmt: Statement },
     ReplacedUses { old: SSAValue, new: SSAValue },
     ChangedOperands { stmt: Statement },
@@ -2073,16 +2073,17 @@ The immediate `MutationEvent` vocabulary recorded by these methods is
 that dies, including each one nested in an erased statement, in an erased block,
 or in a body `replace_statement` drops, with nested statements before the
 statement that holds them; the bodies record no CFG or graph events of their
-own. Edits to detached code, such as a `new_block` block no statement owns yet
-or a detached statement, record events like any other edit, and the statement
-that attaches it records its usual event. Creating a `new_block` block records
-nothing. `clone_statement` and `clone_cfg` record `CreatedStatement` for each
-statement they copy, outer statements first, so every statement the
-`Rewriter` makes records one `CreatedStatement` when it is made and one
-`ErasedStatement` when it dies. Cloning is therefore an edit even if the copy
-is abandoned. Placing an existing statement somewhere new, by a move or by
-inserting a detached statement, records `PlacedStatement`. Detached code
-nothing placed is tombstoned when `into_events` is called, recording
+own. It names the block or graph the statement was in when it died, or `None` if
+it had none, such as detached code never placed. Edits to detached code, such as
+a `new_block` block no statement owns yet or a detached statement, record events
+like any other edit, and the statement that attaches it records its usual event.
+Creating a `new_block` block records nothing. `clone_statement` and `clone_cfg`
+record `CreatedStatement` for each statement they copy, outer statements first,
+so every statement the `Rewriter` makes records one `CreatedStatement` when it
+is made and one `ErasedStatement` when it dies. Cloning is therefore an edit
+even if the copy is abandoned. Placing an existing statement somewhere new, by a
+move or by inserting a detached statement, records `PlacedStatement`. Detached
+code nothing placed is tombstoned when `into_events` is called, recording
 `ErasedStatement` for each of its statements; after a panic it is left for
 inspection instead. A `Rewriter` dropped without `into_events` tombstones that
 code too, but its log is dropped with it, so the pairing of `CreatedStatement`

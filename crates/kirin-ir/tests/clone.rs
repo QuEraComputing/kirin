@@ -4,7 +4,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use common::{BuilderDialect, TestType, make_compute, make_split, make_wire, new_stage};
+use common::{BuilderDialect, TestType, erased_in, make_compute, make_split, make_wire, new_stage};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -185,23 +185,33 @@ fn a_clone_never_inserted_is_tombstoned_with_the_rewriter() {
         let mut map = IRMap::default();
         let copy = rw.clone_statement(owner, &mut map).unwrap();
         let compute_copy = map.statement(compute).unwrap();
-        // The statements copied into `copy`'s blocks, read while they live.
+        // `copy` owns two blocks, its then and else arms. Each statement
+        // copied into them, paired with its block, read while they live.
         let BuilderDialect::OwnBlocks(then_arm, else_arm) = *definition(rw.stage(), copy) else {
             panic!("the copy keeps the original's definition");
         };
-        let inner = with_terminators(rw.stage(), &[then_arm, else_arm]);
+        let inner: Vec<(Statement, Block)> = [then_arm, else_arm]
+            .into_iter()
+            .flat_map(|arm| {
+                with_terminators(rw.stage(), &[arm])
+                    .into_iter()
+                    .map(move |stmt| (stmt, arm))
+            })
+            .collect();
         (copy, compute_copy, inner, rw.into_events())
     };
     // The clone records `copy` and then its contents. Ending the rewrite
     // erases them in the opposite nesting order: the contents, then `copy`.
     let mut expected = vec![MutationEvent::CreatedStatement { stmt: copy }];
-    expected.extend(created(inner.clone()));
-    expected.extend(
-        inner
-            .iter()
-            .map(|&stmt| MutationEvent::ErasedStatement { stmt }),
-    );
-    expected.push(MutationEvent::ErasedStatement { stmt: copy });
+    expected.extend(created(inner.iter().map(|&(stmt, _)| stmt).collect()));
+    // Each statement inside the copy records the block it was in, here one of
+    // the two arms. `copy` itself was never inserted anywhere, so its parent
+    // is `None`.
+    expected.extend(inner.iter().map(|&(stmt, arm)| erased_in(stmt, arm)));
+    expected.push(MutationEvent::ErasedStatement {
+        stmt: copy,
+        parent: None,
+    });
     assert_eq!(events, expected);
     assert!(copy.get_info(&stage).is_none());
     assert!(compute_copy.get_info(&stage).is_none());

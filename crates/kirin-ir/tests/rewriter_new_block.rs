@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{BuilderDialect, EventCursor, TestType, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, erased_in, new_stage};
 use kirin_ir::*;
 
 /// `owner = own_blocks { } { }` in `outer`, whose argument `x` the new blocks
@@ -323,8 +323,8 @@ fn an_unowned_new_block_records_its_erasure_when_the_rewrite_ends() {
             MutationEvent::CreatedStatement { stmt: ret },
             MutationEvent::ChangedTerminator { block },
             MutationEvent::CreatedStatement { stmt: used },
-            MutationEvent::ErasedStatement { stmt: used },
-            MutationEvent::ErasedStatement { stmt: ret },
+            erased_in(used, block),
+            erased_in(ret, block),
         ]
     );
     assert!(block.get_info(&f.stage).is_none());
@@ -348,13 +348,7 @@ fn erase_block_discards_an_unowned_new_block() {
 
     // Filling the block recorded its statements' insertion, so their erasure
     // is recorded too; the block was in no CFG, so no CFG event.
-    assert_eq!(
-        events,
-        [
-            MutationEvent::ErasedStatement { stmt: used },
-            MutationEvent::ErasedStatement { stmt: ret },
-        ]
-    );
+    assert_eq!(events, [erased_in(used, block), erased_in(ret, block),]);
     assert!(block.get_info(&f.stage).is_none());
     assert!(used.get_info(&f.stage).is_none());
     assert!(

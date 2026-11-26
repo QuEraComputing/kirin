@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::{BuilderDialect, new_stage};
+use common::{BuilderDialect, erased_in, new_stage};
 use kirin_ir::*;
 
 /// The statements and blocks of a small stage, by name.
@@ -108,7 +108,7 @@ fn a_dropped_body_is_erased_and_a_gained_one_adopted() {
     assert_eq!(
         events,
         [
-            MutationEvent::ErasedStatement { stmt: f.else_nop },
+            erased_in(f.else_nop, f.else_block),
             MutationEvent::ReplacedStatement { stmt: f.owner },
             MutationEvent::ChangedBodyNesting { owner: f.owner },
         ]

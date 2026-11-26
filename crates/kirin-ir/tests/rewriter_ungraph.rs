@@ -7,7 +7,8 @@ mod common;
 use std::collections::HashMap;
 
 use common::{
-    BuilderDialect, EventCursor, TestType, cannot_insert, make_split, make_wire, new_stage,
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased, erased_in, make_split, make_wire,
+    new_stage,
 };
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
@@ -187,7 +188,7 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
             topology,
             MutationEvent::CreatedStatement { stmt: c },
             topology,
-            MutationEvent::ErasedStatement { stmt: c },
+            erased(c, StatementParent::UnGraph(ug)),
             topology,
             MutationEvent::CreatedStatement { stmt: d },
             topology,
@@ -393,7 +394,7 @@ fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
     assert_eq!(
         log.read_and_advance(&rw),
         vec![
-            MutationEvent::ErasedStatement { stmt: a },
+            erased(a, StatementParent::UnGraph(ug)),
             MutationEvent::ChangedUnGraphTopology { graph: ug },
         ]
     );
@@ -476,7 +477,7 @@ fn erase_edge_statement_once_no_node_reads_its_wire() {
     assert_eq!(
         log.read_and_advance(&rw),
         vec![
-            MutationEvent::ErasedStatement { stmt: w_stmt },
+            erased(w_stmt, StatementParent::UnGraph(ug)),
             MutationEvent::ChangedUnGraphTopology { graph: ug },
         ]
     );
@@ -532,10 +533,10 @@ fn erase_statement_tombstones_owned_ungraph() {
         assert_eq!(
             rw.events().to_vec(),
             vec![
-                MutationEvent::ErasedStatement { stmt: wire_stmt },
-                MutationEvent::ErasedStatement { stmt: n0 },
-                MutationEvent::ErasedStatement { stmt: n1 },
-                MutationEvent::ErasedStatement { stmt: owner },
+                erased(wire_stmt, StatementParent::UnGraph(ug)),
+                erased(n0, StatementParent::UnGraph(ug)),
+                erased(n1, StatementParent::UnGraph(ug)),
+                erased_in(owner, outer),
             ]
         );
     }

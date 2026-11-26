@@ -6,7 +6,8 @@ mod common;
 use std::collections::HashSet;
 
 use common::{
-    BuilderDialect, EventCursor, TestType, cannot_insert, make_split, make_wire, new_stage,
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased_in, make_split, make_wire,
+    new_stage,
 };
 use kirin_ir::*;
 
@@ -313,10 +314,7 @@ fn erase_statement_unlinks_and_maintains_index() {
     {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(s1).unwrap();
-        assert_eq!(
-            rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: s1 }]
-        );
+        assert_eq!(rw.events().to_vec(), vec![erased_in(s1, block)]);
     }
 
     // s1 is tombstoned; the block now reads [s0, s2]; x lost the {s1,0} use.
@@ -356,9 +354,11 @@ fn erase_statement_tombstones_nested_bodies() {
         assert_eq!(
             rw.events().to_vec(),
             vec![
-                MutationEvent::ErasedStatement { stmt: inner_use },
-                MutationEvent::ErasedStatement { stmt: inner_ret },
-                MutationEvent::ErasedStatement { stmt: owner },
+                // The nested ones name the block dying with them; `owner`
+                // names the live block it was in.
+                erased_in(inner_use, inner_block),
+                erased_in(inner_ret, inner_block),
+                erased_in(owner, outer),
             ]
         );
     }
@@ -411,7 +411,7 @@ fn erase_statement_erases_a_terminator_and_its_edges() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: jump },
+            erased_in(jump, entry),
             MutationEvent::ChangedTerminator { block: entry },
         ]
     );
@@ -1092,7 +1092,7 @@ fn replace_results_rejects_bad_arity_and_dead_ids() {
     let (split, a, b) = make_split(&mut stage);
     let nop = stage.statement().definition(BuilderDialect::Nop).new();
     let consumer = stage.statement().definition(BuilderDialect::Use(a)).new();
-    let _block = stage.block().stmt(split).stmt(nop).stmt(consumer).new();
+    let block = stage.block().stmt(split).stmt(nop).stmt(consumer).new();
 
     let mut stage = stage.finalize().unwrap();
     let before = (uses_set(&stage, a), uses_set(&stage, b));
@@ -1143,7 +1143,7 @@ fn replace_results_rejects_bad_arity_and_dead_ids() {
     };
 
     // Only the erase recorded anything; no rejected call moved a use list.
-    assert_eq!(events, vec![MutationEvent::ErasedStatement { stmt: nop }]);
+    assert_eq!(events, vec![erased_in(nop, block)]);
     assert_eq!((uses_set(&stage, a), uses_set(&stage, b)), before);
 }
 

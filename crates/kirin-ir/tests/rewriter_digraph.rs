@@ -7,7 +7,8 @@ mod common;
 use std::collections::{HashMap, HashSet};
 
 use common::{
-    BuilderDialect, EventCursor, TestType, cannot_insert, make_compute, make_split, new_stage,
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased, erased_in, make_compute,
+    make_split, new_stage,
 };
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
@@ -243,9 +244,9 @@ fn erase_statement_removes_digraph_member_and_its_edges() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: u },
+            erased(u, StatementParent::DiGraph(dg)),
             topology,
-            MutationEvent::ErasedStatement { stmt: q },
+            erased(q, StatementParent::DiGraph(dg)),
             topology,
         ]
     );
@@ -337,8 +338,8 @@ fn erase_statement_tombstones_owned_digraph() {
         assert_eq!(
             rw.events().to_vec(),
             vec![
-                MutationEvent::ErasedStatement { stmt: p },
-                MutationEvent::ErasedStatement { stmt: owner },
+                erased(p, StatementParent::DiGraph(dg)),
+                erased_in(owner, outer),
             ]
         );
     }

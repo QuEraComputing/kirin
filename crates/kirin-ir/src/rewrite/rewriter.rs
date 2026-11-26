@@ -157,7 +157,13 @@ pub enum MutationEvent {
     /// with them record no [`MutationEvent::ChangedBlockList`],
     /// [`MutationEvent::ChangedCfg`], [`MutationEvent::ChangedDiGraphTopology`],
     /// or [`MutationEvent::ChangedUnGraphTopology`] of their own.
-    ErasedStatement { stmt: Statement },
+    ///
+    /// `parent` is where `stmt` was when it died: the block or graph that
+    /// held it, or `None` if it had none, such as detached code never placed.
+    ErasedStatement {
+        stmt: Statement,
+        parent: Option<StatementParent>,
+    },
     /// A statement's definition was swapped in place (same id and results).
     ReplacedStatement { stmt: Statement },
     /// Blocks were added to, removed from, or moved within `cfg`'s block list.
@@ -1118,7 +1124,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         let _ = self.stage.statement_arena_mut().delete(stmt);
 
-        self.events.push(MutationEvent::ErasedStatement { stmt });
+        self.events.push(MutationEvent::ErasedStatement {
+            stmt,
+            parent: Some(StatementParent::Block(block)),
+        });
         if is_terminator {
             self.events.push(MutationEvent::ChangedTerminator { block });
         }
@@ -1181,9 +1190,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// edges from `block`; erase its nested bodies; then tombstone its results
     /// and itself, and record [`MutationEvent::ErasedStatement`].
     pub(super) fn tombstone_statement(&mut self, stmt: Statement, block: Option<Block>) {
-        let (operands, results, successors) = {
-            let definition = &stmt.expect_info(self.stage).definition;
+        let (parent, operands, results, successors) = {
+            let item = stmt.expect_info(self.stage);
+            let definition = &item.definition;
             (
+                item.parent,
                 definition
                     .arguments()
                     .copied()
@@ -1211,7 +1222,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let _ = self.stage.ssas.delete(result);
         }
         let _ = self.stage.statement_arena_mut().delete(stmt);
-        self.events.push(MutationEvent::ErasedStatement { stmt });
+        self.events
+            .push(MutationEvent::ErasedStatement { stmt, parent });
     }
 
     /// Tombstone the statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s
