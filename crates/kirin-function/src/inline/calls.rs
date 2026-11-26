@@ -45,14 +45,15 @@ pub struct InlineReport {
 /// mutual, among the calls inlined.
 ///
 /// Each block's calls are inlined from its last to its first, so a split only
-/// moves statements after the call, which no earlier split moved. The calls'
-/// results are redirected once every call is inlined, each straight to the
-/// value it ends up as, so a use is rewritten once even when one call's result
-/// is replaced by another's, as along a chain of calls to a function that
-/// returns its parameter. So a run is linear in `cfg`'s size plus the size of
-/// the callees it copies. Running this on each callee's body earlier than on
-/// its callers' bodies inlines everything with one run per function, since a
-/// callee with no calls left brings none in.
+/// moves statements after the call, which no earlier split moved, and reads
+/// none of the statements before it. The calls' results are redirected once
+/// every call is inlined, each straight to the value it ends up as, so a use
+/// is rewritten once even when one call's result is replaced by another's, as
+/// along a chain of calls to a function that returns its parameter. So a run
+/// is linear in `cfg`'s size plus the size of the callees it copies. Running
+/// this on each callee's body earlier than on its callers' bodies inlines
+/// everything with one run per function, since a callee with no calls left
+/// brings none in.
 ///
 /// Rejects, leaving the stage untouched, if a call's callee is not a live
 /// specialization, or the call's argument or result count does not match the

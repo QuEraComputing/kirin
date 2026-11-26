@@ -1,7 +1,9 @@
 use crate::node::linked_list::LinkedList;
 use crate::{Block, Dialect, Statement, StatementParent};
 
-use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, add_predecessor};
+use crate::rewrite::rewriter::{
+    MutationEvent, RewriteError, Rewriter, add_predecessor, remove_predecessor,
+};
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Split the block containing `at` in two: `at`, everything after it, and
@@ -16,6 +18,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `at` is unknown or not in a
     /// CFG block.
+    ///
+    /// Costs the number of statements moved plus the terminator's successors:
+    /// the statements left in the original block are not read.
     ///
     /// Records [`MutationEvent::ChangedBlockList`] then
     /// [`MutationEvent::ChangedCfg`].
@@ -33,7 +38,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             (info.node.next, info.terminator)
         };
 
-        let successors_before = self.block_successors(block);
+        // The edges leaving `block` are its terminator's, and they leave from
+        // the new block once the terminator moves.
+        let targets = self.block_successors(block);
         // Cut `at` and the statements after it off the original block's
         // chain. Splitting at the terminator cuts nothing: it is not in the
         // chain.
@@ -50,11 +57,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.set_terminator(new_block, terminator);
         self.set_terminator(block, None);
 
-        // The moved edges now leave from the new block; whatever stays in the
-        // original block keeps its edges.
-        let successors_after = self.block_successors(block);
-        self.update_predecessors(block, &successors_before, &successors_after);
-        for target in self.block_successors(new_block) {
+        for target in targets {
+            remove_predecessor(self.stage, target, block);
             add_predecessor(self.stage, target, new_block);
         }
 
