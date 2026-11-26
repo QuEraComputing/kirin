@@ -190,11 +190,15 @@ pub enum MutationEvent {
     /// `stmt`, a statement that already existed, was put at a new place,
     /// keeping its id, results, uses and nested bodies:
     /// [`Rewriter::move_before`] or [`Rewriter::move_after`] moved it within
-    /// block bodies, or [`Rewriter::insert`] placed it, detached until then,
-    /// in a block or graph.
+    /// block bodies; [`Rewriter::splice_block_before`],
+    /// [`Rewriter::splice_block_after`], [`Rewriter::split_block`] or
+    /// [`Rewriter::merge_blocks`] moved it to another block, recording one
+    /// per moved statement; or [`Rewriter::insert`] placed it, detached until
+    /// then, in a block or graph.
     PlacedStatement { stmt: Statement },
     /// Every statement of `source`, except its terminator, was moved into
-    /// `dest`, keeping their ids, results, uses and nested bodies.
+    /// `dest`, keeping their ids, results, uses and nested bodies. Recorded
+    /// after one [`MutationEvent::PlacedStatement`] per moved statement.
     SplicedBlock { source: Block, dest: Block },
     /// Every block of `source` was moved into `dest`, keeping their ids,
     /// arguments, statements and edges. Recorded after the

@@ -1795,6 +1795,8 @@ fn splice_block_before_moves_statements_and_redirects_arguments() {
         vec![
             MutationEvent::ChangedOperands { stmt: u },
             MutationEvent::ReplacedUses { old: t, new: x },
+            MutationEvent::PlacedStatement { stmt: u },
+            MutationEvent::PlacedStatement { stmt: w },
             MutationEvent::SplicedBlock {
                 source: arm,
                 dest: entry,
@@ -1863,10 +1865,14 @@ fn splice_block_may_keep_its_own_arguments() {
     assert_eq!(uses_set(rewriter.stage(), t), HashSet::from([so(u, 0)]));
     assert_eq!(
         rewriter.events().to_vec(),
-        vec![MutationEvent::SplicedBlock {
-            source: arm,
-            dest: entry,
-        }],
+        vec![
+            MutationEvent::PlacedStatement { stmt: u },
+            MutationEvent::PlacedStatement { stmt: w },
+            MutationEvent::SplicedBlock {
+                source: arm,
+                dest: entry,
+            },
+        ],
         "nothing to redirect"
     );
 }

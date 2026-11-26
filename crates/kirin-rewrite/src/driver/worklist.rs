@@ -1,7 +1,9 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use kirin_ir::walk::WalkOrder;
-use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, Use};
+use kirin_ir::{
+    Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, StatementParent, Use,
+};
 
 /// The statements a driver sweep still has to visit, in order.
 ///
@@ -33,8 +35,8 @@ pub(super) struct Worklist {
     /// Whether the sweep tries native rules, which may read anything around
     /// a statement, so an edit also adds owners and producers.
     native_rules_present: bool,
-    /// Whether an edit moved statements since the sweep began, so a queued
-    /// statement may have left the root's tree.
+    /// Whether an edit since the sweep began moved statements somewhere not
+    /// under the root, so a queued statement may have left the root's tree.
     move_occurred: bool,
 }
 
@@ -99,8 +101,8 @@ impl Worklist {
         self.move_occurred = false;
     }
 
-    /// Whether an edit since the sweep began moved statements, so a queued
-    /// statement may no longer be under the root.
+    /// Whether an edit since the sweep began moved statements somewhere not
+    /// under the root, so a queued statement may no longer be under it.
     pub(super) fn move_occurred(&self) -> bool {
         self.move_occurred
     }
@@ -135,14 +137,22 @@ impl Worklist {
     /// statement not under the root yet (a detached statement `insert`
     /// placed, or one moved in from outside the root) counts as newly placed,
     /// as a created one does; for one already under the root it is a move. A
-    /// move or splice adds
-    /// nothing, but is recorded (see [`move_occurred`](Self::move_occurred)).
+    /// move or splice adds nothing. It is recorded (see
+    /// [`move_occurred`](Self::move_occurred)) only if it took statements out
+    /// of the root's tree, checked once per destination: a splice, split or
+    /// merge costs one walk up from the block it moved statements into, not
+    /// one per statement.
     /// Other events add nothing; the next sweep visits what they changed.
     pub(super) fn push_affected<L: Dialect>(
         &mut self,
         stage: &StageInfo<L>,
         events: &[MutationEvent],
     ) {
+        // Move destinations found to stay under the root, so there is one
+        // ancestor walk per destination. An entry never goes stale: a
+        // destination can only leave the root if an ancestor moves out, and
+        // that move's own check sets `move_occurred`.
+        let mut inside_root: HashSet<StatementParent> = HashSet::new();
         for event in events {
             match *event {
                 MutationEvent::CreatedStatement { stmt } => {
@@ -157,9 +167,41 @@ impl Worklist {
                 }
                 MutationEvent::ChangedOperands { stmt }
                 | MutationEvent::ReplacedStatement { stmt } => self.push_neighbors(stage, stmt),
-                MutationEvent::PlacedStatement { .. }
-                | MutationEvent::SplicedBlock { .. }
-                | MutationEvent::SplicedCfg { .. } => self.move_occurred = true,
+                MutationEvent::PlacedStatement { stmt } => {
+                    // Already set: the sweep checks each statement it takes off the
+                    // worklist against the root.
+                    if self.move_occurred {
+                        continue;
+                    }
+                    // Erased since it moved: the sweep skips it when it comes up.
+                    if stmt.get_info(stage).is_none() {
+                        continue;
+                    }
+                    // The block or graph it was moved into.
+                    let Some(dest) = *stmt.parent(stage) else {
+                        continue;
+                    };
+                    // Checked already in this call, and is under the root.
+                    if inside_root.contains(&dest) {
+                        continue;
+                    }
+                    // One ancestor walk: remember the destination if it is under
+                    // the root, otherwise statements may have left the root.
+                    if self.root.is_some_and(|root| stmt.is_within(stage, root)) {
+                        inside_root.insert(dest);
+                    } else {
+                        self.move_occurred = true;
+                    }
+                }
+                MutationEvent::SplicedCfg { dest, .. } => {
+                    let owner = dest.get_info(stage).and_then(|info| info.parent());
+                    let inside = owner
+                        .zip(self.root)
+                        .is_some_and(|(owner, root)| owner.is_within(stage, root));
+                    if !inside {
+                        self.move_occurred = true;
+                    }
+                }
                 _ => {}
             }
         }

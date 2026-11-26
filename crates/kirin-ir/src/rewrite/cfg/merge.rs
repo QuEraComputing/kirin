@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
-use crate::{Block, Dialect, SSAValue};
+use crate::{Block, Dialect, SSAValue, Statement};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, remove_predecessor};
 
@@ -23,8 +23,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Records the [`Rewriter::erase_statement`] events for `pred`'s terminator
     /// (if any), the [`Rewriter::replace_all_uses`] events for the argument
-    /// redirection, then [`MutationEvent::ChangedBlockList`] and
-    /// [`MutationEvent::ChangedCfg`].
+    /// redirection, then one [`MutationEvent::PlacedStatement`] per statement
+    /// moved from `succ`, in order and the terminator last, then
+    /// [`MutationEvent::ChangedBlockList`] and [`MutationEvent::ChangedCfg`].
     pub fn merge_blocks(
         &mut self,
         pred: Block,
@@ -89,6 +90,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             Some(info) => (std::mem::take(&mut info.statements), info.terminator.take()),
             None => (LinkedList::new(), None),
         };
+        let placed: Vec<Statement> = self
+            .chain_from(succ_chain.head)
+            .into_iter()
+            .chain(succ_terminator)
+            .collect();
         let pred_tail = pred.expect_info(self.stage).statements.tail;
         self.link(succ_chain, pred, pred_tail, None);
         self.set_terminator(pred, succ_terminator);
@@ -104,6 +110,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             remove_predecessor(self.stage, target, succ);
         }
 
+        self.events.extend(
+            placed
+                .into_iter()
+                .map(|stmt| MutationEvent::PlacedStatement { stmt }),
+        );
         self.events.push(MutationEvent::ChangedBlockList { cfg });
         self.events.push(MutationEvent::ChangedCfg { cfg });
         Ok(())

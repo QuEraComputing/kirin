@@ -445,6 +445,10 @@ fn split_block_moves_suffix_and_leaves_original_unterminated() {
         events,
         vec![
             MutationEvent::ChangedBlockList { cfg },
+            // The cut chain, then the terminator, now in the new block.
+            MutationEvent::PlacedStatement { stmt: s1 },
+            MutationEvent::PlacedStatement { stmt: s2 },
+            MutationEvent::PlacedStatement { stmt: entry_br },
             MutationEvent::ChangedCfg { cfg },
         ]
     );
@@ -754,6 +758,9 @@ fn merge_blocks_splices_successor_and_redirects_arguments() {
                 old: real_x,
                 new: real_a,
             },
+            // `succ`'s chain, then its terminator, now in `entry`.
+            MutationEvent::PlacedStatement { stmt: use_x },
+            MutationEvent::PlacedStatement { stmt: succ_br },
             MutationEvent::ChangedBlockList { cfg },
             MutationEvent::ChangedCfg { cfg },
         ]

@@ -99,7 +99,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// not live ([`RewriteError::UnknownValue`]).
     ///
     /// Records the [`Rewriter::replace_all_uses`] events for the argument
-    /// redirection, then [`MutationEvent::SplicedBlock`]. A walk visiting a
+    /// redirection, then one [`MutationEvent::PlacedStatement`] per moved
+    /// statement, in order, then [`MutationEvent::SplicedBlock`]. A walk visiting a
     /// statement of `source` reports the splice (see [`crate::walk`]). If
     /// `source` has no statements besides its terminator, nothing moves and
     /// only the redirection events are recorded; splicing it again with the
@@ -181,7 +182,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if chain.is_empty() {
             return Ok(());
         }
+        // Read before linking, which joins the chain's last statement to
+        // what follows it in `dest`.
+        let moved = self.chain_from(chain.head);
         self.link(chain, dest, prev, next);
+        self.events.extend(
+            moved
+                .into_iter()
+                .map(|stmt| MutationEvent::PlacedStatement { stmt }),
+        );
         self.events
             .push(MutationEvent::SplicedBlock { source, dest });
         Ok(())
