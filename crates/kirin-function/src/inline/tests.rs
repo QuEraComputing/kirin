@@ -215,6 +215,134 @@ fn a_single_block_callee_is_inlined_in_place() {
     verify_derived(&stage).unwrap();
 }
 
+/// `fn @id(%p) { ^e(%p): ret %p }`
+fn identity(b: &mut Builder) -> SpecializedFunction {
+    let p = b.block_argument().index(0);
+    let ret = Return::<ArithType>::new(b, vec![p]);
+    let entry = b.block().argument(ArithType::I64).terminator(ret).new();
+    let body = b.cfg().add_block(entry).new();
+    define(b, body, 1)
+}
+
+#[test]
+fn a_chain_of_calls_rewrites_each_use_once() {
+    // ^g(%x): %c1 = call @id(%x); ...; %c4 = call @id(%c3);
+    //         %u1 = add %c4, %c4; ...; %u4 = add %c4, %c4; ret
+    const N: usize = 4;
+    let mut b = Builder::default();
+    let id = identity(&mut b);
+    let x = b.block_argument().index(0);
+    let mut calls = Vec::new();
+    let mut last = x;
+    for _ in 0..N {
+        let call = Call::<ArithType>::build(&mut b)
+            .specialized(id)
+            .args(vec![last])
+            .results(1)
+            .insert();
+        last = call.results[0].into();
+        calls.push(call);
+    }
+    let uses: Vec<_> = (0..N)
+        .map(|_| Arith::<ArithType>::op_add(&mut b, last, last))
+        .collect();
+    let use_ids: Vec<Statement> = uses.iter().map(|add| add.id).collect();
+    let ret = Return::<ArithType>::new(&mut b, vec![]);
+    let mut g = b.block().argument(ArithType::I64);
+    for call in calls {
+        g = g.stmt(call);
+    }
+    for add in uses {
+        g = g.stmt(add);
+    }
+    let g = g.terminator(ret).new();
+    let body = b.cfg().add_block(g).new();
+    define(&mut b, body, 1);
+    let mut stage = b.finalize().unwrap();
+    let x = arg(&stage, g, 0);
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(N));
+    // Each use is rewritten once, straight to `%x`, not once per call.
+    for &stmt in &use_ids {
+        let rewrites = rw
+            .events()
+            .iter()
+            .filter(|event| **event == MutationEvent::ChangedOperands { stmt })
+            .count();
+        assert_eq!(rewrites, 1, "{stmt:?} was rewritten {rewrites} times");
+    }
+    drop(rw);
+
+    // ^g(%x): %u1 = add %x, %x; ...; %u4 = add %x, %x; ret
+    assert_eq!(g.statements(&stage).collect::<Vec<_>>(), use_ids);
+    for stmt in use_ids {
+        assert!(matches!(
+            definition(&stage, stmt),
+            TestLang::Arith(Arith::Add { lhs, rhs, .. }) if *lhs == x && *rhs == x
+        ));
+    }
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn an_id_call_on_a_multi_block_calls_result_reads_the_second_half() {
+    // ^g(%x, %y): %c = call @h(%x, %y); %d = call @id(%c); %e = add %d, %d;
+    //             ret %e
+    let mut b = Builder::default();
+    let h = choose(&mut b);
+    let id = identity(&mut b);
+    let x = b.block_argument().index(0);
+    let y = b.block_argument().index(1);
+    let first = Call::<ArithType>::build(&mut b)
+        .specialized(h)
+        .args(vec![x, y])
+        .results(1)
+        .insert();
+    let c: SSAValue = first.results[0].into();
+    let second = Call::<ArithType>::build(&mut b)
+        .specialized(id)
+        .args(vec![c])
+        .results(1)
+        .insert();
+    let d: SSAValue = second.results[0].into();
+    let e = Arith::<ArithType>::op_add(&mut b, d, d);
+    let e_id = e.id;
+    let ret = Return::<ArithType>::new(&mut b, vec![e.result.into()]);
+    let g = b
+        .block()
+        .argument(ArithType::I64)
+        .argument(ArithType::I64)
+        .stmt(first)
+        .stmt(second)
+        .stmt(e)
+        .terminator(ret)
+        .new();
+    let body = b.cfg().add_block(g).new();
+    define(&mut b, body, 2);
+    let mut stage = b.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(inline_calls(&mut rw, body, branch), inlined(2));
+    drop(rw);
+
+    // `%d` is replaced by `%c`, and `%c` by the second half's argument.
+    // ^g(%x, %y): br ^e'(%x, %y)   ... copies of @h's blocks ...
+    // ^c(%r): %e = add %r, %r; ret %e
+    let blocks: Vec<Block> = body.blocks(&stage).collect();
+    let &[.., cont] = blocks.as_slice() else {
+        unreachable!()
+    };
+    let r = arg(&stage, cont, 0);
+    assert_eq!(cont.statements(&stage).collect::<Vec<_>>(), [e_id]);
+    assert!(matches!(
+        definition(&stage, e_id),
+        TestLang::Arith(Arith::Add { lhs, rhs, .. }) if *lhs == r && *rhs == r
+    ));
+    assert!(calls(&stage, body).is_empty());
+    verify_derived(&stage).unwrap();
+}
+
 #[test]
 fn a_call_reading_an_earlier_blocks_inlined_call_reads_the_inlined_value() {
     // ^g(%x): %c = call @f(%x); br ^b

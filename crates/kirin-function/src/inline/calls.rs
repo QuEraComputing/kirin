@@ -2,6 +2,7 @@ use kirin::prelude::*;
 
 use super::check::{Callee, Checked, check_call};
 use super::ops::{InlinableCall, inlinable_call};
+use super::redirects::Redirects;
 use super::{FunctionOps, InlineError, NotInlined};
 
 /// What a run of [`inline_calls`] did.
@@ -44,10 +45,14 @@ pub struct InlineReport {
 /// mutual, among the calls inlined.
 ///
 /// Each block's calls are inlined from its last to its first, so a split only
-/// moves statements after the call, which no earlier split moved: a run is
-/// linear in `cfg`'s size plus the size of the callees it copies. Running this
-/// on each callee's body earlier than on its callers' bodies inlines everything
-/// with one run per function, since a callee with no calls left brings none in.
+/// moves statements after the call, which no earlier split moved. The calls'
+/// results are redirected once every call is inlined, each straight to the
+/// value it ends up as, so a use is rewritten once even when one call's result
+/// is replaced by another's, as along a chain of calls to a function that
+/// returns its parameter. So a run is linear in `cfg`'s size plus the size of
+/// the callees it copies. Running this on each callee's body earlier than on
+/// its callers' bodies inlines everything with one run per function, since a
+/// callee with no calls left brings none in.
 ///
 /// Rejects, leaving the stage untouched, if a call's callee is not a live
 /// specialization, or the call's argument or result count does not match the
@@ -73,34 +78,36 @@ where
                 continue;
             };
             match check_call::<L, T>(stage, stmt, &call)? {
-                Checked::Inline(callee) => accepted.push((stmt, callee)),
+                Checked::Inline(callee) => accepted.push((stmt, call, callee)),
                 Checked::Skip(reason) => report.skipped.push(reason),
             }
         }
     }
-    // Inlining a call copies its callee and never edits one, so each saved
-    // `callee` still describes its callee. It can change what a later call
-    // reads, though: it redirects uses of its results, which a call in a later
-    // block may take as arguments. So each call's operands are read again here,
-    // which costs only its argument and result lists; the callee is not checked
-    // again.
-    for (stmt, callee) in accepted {
-        let call = inlinable_call::<L, T>(rewriter.stage(), stmt)
-            .expect("inlining other calls only redirects this call's arguments");
-        inline_call(rewriter, stmt, call, callee, &branch)
+    // Inlining a call copies its callee and never edits one, and redirects
+    // and erases nothing until every call is inlined, so what was read above
+    // still holds: each call's arguments and results are still live.
+    let mut redirects = Redirects::default();
+    for (stmt, call, callee) in accepted {
+        inline_call(rewriter, stmt, call, callee, &branch, &mut redirects)
             .expect("`check_call` accepted the call, so inlining it cannot fail");
         report.inlined += 1;
     }
+    redirects
+        .apply(rewriter)
+        .expect("the inlined calls' results and replacements are live");
     Ok(report)
 }
 
-/// Inline `stmt`, the call `call` to `callee`, which [`check_call`] accepted.
+/// Inline `stmt`, the call `call` to `callee`, which [`check_call`] accepted,
+/// leaving the call in place and recording in `redirects` what replaces its
+/// results.
 fn inline_call<L>(
     rewriter: &mut Rewriter<'_, L>,
     stmt: Statement,
     call: InlinableCall,
     callee: Callee,
     branch: &impl Fn(Block, Vec<SSAValue>) -> L,
+    redirects: &mut Redirects,
 ) -> Result<(), RewriteError>
 where
     L: Dialect,
@@ -118,8 +125,8 @@ where
 
     // A callee that is one block ending in a return needs no new blocks: copy
     // its statements in front of the call, reading the call's arguments where
-    // they read the callee's, replace the call's results with the returned
-    // values, mapped like the copied operands, and erase the call.
+    // they read the callee's; the call's results are replaced by the returned
+    // values, mapped like the copied operands.
     if in_place {
         for (&arg, &value) in entry_args.iter().zip(&call.args) {
             map.map_value(arg, value);
@@ -135,10 +142,13 @@ where
             let copy = rewriter.clone_statement(original, &mut map)?;
             rewriter.insert(InsertionPoint::Before(stmt), copy)?;
         }
-        for (result, value) in call.results.into_iter().zip(returned) {
-            rewriter.replace_all_uses(result, map.lookup_or_original(value))?;
-        }
-        rewriter.erase_statement(stmt)?;
+        redirects.record(
+            stmt,
+            &call.results,
+            returned
+                .into_iter()
+                .map(|value| map.lookup_or_original(value)),
+        );
         return Ok(());
     }
 
@@ -152,13 +162,14 @@ where
         Some(at) => rewriter.split_block(at)?,
         None => rewriter.insert_block_after(caller_block, [])?,
     };
+    let mut args = Vec::with_capacity(call.results.len());
     for (index, &result) in call.results.iter().enumerate() {
         let ty = result.expect_info(rewriter.stage()).ty().clone();
-        let arg = rewriter.insert_block_arg(continuation, index, ty, |_, _| {
+        args.push(rewriter.insert_block_arg(continuation, index, ty, |_, _| {
             unreachable!("the second half has no predecessors yet")
-        })?;
-        rewriter.replace_all_uses(result, arg)?;
+        })?);
     }
+    redirects.record(stmt, &call.results, args.into_iter().map(SSAValue::from));
 
     // Copy the callee's blocks between the call's block and its second half,
     // branch from the call's block to the copied entry with the call's
@@ -184,6 +195,5 @@ where
             .collect();
         rewriter.replace_statement(ret_copy, branch(continuation, values))?;
     }
-    rewriter.erase_statement(stmt)?;
     Ok(())
 }

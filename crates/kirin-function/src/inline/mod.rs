@@ -5,6 +5,7 @@ mod check;
 mod error;
 mod not_inlined;
 mod ops;
+mod redirects;
 #[cfg(test)]
 mod tests;
 
