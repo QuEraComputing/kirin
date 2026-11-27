@@ -19,8 +19,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects, leaving the stage untouched, if `at` is unknown or not in a
     /// CFG block.
     ///
-    /// Costs the number of statements moved plus the terminator's successors:
-    /// the statements left in the original block are not read.
+    /// Costs the number of statements moved plus, for each of the
+    /// terminator's successors, a scan of its predecessor list; the statements
+    /// left in the original block are not read.
     ///
     /// Records [`MutationEvent::ChangedBlockList`], then one
     /// [`MutationEvent::PlacedStatement`] per moved statement, in order and
