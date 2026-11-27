@@ -1,6 +1,6 @@
 use crate::SortError;
 
-use super::{IndexSort, Sort, StaticSig, StaticTerm, StaticTermId, Statics};
+use super::{BaseSort, IndexSort, Sort, StaticSig, StaticTerm, StaticTermId, Statics};
 
 impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
     /// The sort of the locally closed `term`.
@@ -30,7 +30,7 @@ impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
                 Ok(context[index])
             }
             StaticTerm::Free(var) => Ok(self.vars[*var].sort),
-            StaticTerm::Lit(v) => Ok(v.sort()),
+            StaticTerm::Lit(v) => Ok(v.sort().into()),
             StaticTerm::Constructor(constructor, args) => {
                 let sig = constructor.signature();
 
@@ -46,39 +46,32 @@ impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
                 for (arg, expected) in args.iter().zip(sig.args.iter()) {
                     self.expect(*arg, *expected, context)?;
                 }
-                Ok(sig.result)
+                Ok(sig.result.into())
             }
-            StaticTerm::Unit => Ok(Sort::Type),
-            StaticTerm::Product(components) => {
-                if components.len() < 2 {
-                    return Err(SortError::ShortProduct {
-                        term,
-                        shown: self.display(term, context.len()).to_string(),
-                        found: components.len(),
-                    });
+            StaticTerm::Unit => Ok(BaseSort::Type.into()),
+            StaticTerm::Seq(element, items) => {
+                for item in items {
+                    self.expect(*item, Sort::Base(*element), context)?;
                 }
-                for component in components {
-                    self.expect(*component, Sort::Type, context)?;
-                }
-                Ok(Sort::Type)
+                Ok(Sort::Seq(*element))
             }
             StaticTerm::Function(args, result) => {
                 for arg in args.iter().chain([result]) {
-                    self.expect(*arg, Sort::Type, context)?;
+                    self.expect(*arg, BaseSort::Type.into(), context)?;
                 }
-                Ok(Sort::Type)
+                Ok(BaseSort::Type.into())
             }
             StaticTerm::Guard(prop, ty) | StaticTerm::Assert(prop, ty) => {
-                self.expect(*prop, Sort::Bool, context)?;
-                self.expect(*ty, Sort::Type, context)?;
-                Ok(Sort::Type)
+                self.expect(*prop, BaseSort::Bool.into(), context)?;
+                self.expect(*ty, BaseSort::Type.into(), context)?;
+                Ok(BaseSort::Type.into())
             }
             StaticTerm::Forall(sort, body) | StaticTerm::Exists(sort, body) => {
                 context.push(*sort);
-                let checked = self.expect(*body, Sort::Type, context);
+                let checked = self.expect(*body, BaseSort::Type.into(), context);
                 context.pop();
                 checked?;
-                Ok(Sort::Type)
+                Ok(BaseSort::Type.into())
             }
         }
     }

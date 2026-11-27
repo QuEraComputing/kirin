@@ -6,6 +6,6 @@ mod subst;
 mod term;
 
 pub use term::{
-    IndexSort, Project, Sort, SortValue, StaticCon, StaticSig, StaticTerm, StaticTermId, StaticVar,
-    StaticVarId, Statics,
+    BaseSort, IndexSort, Project, Sort, SortValue, StaticCon, StaticSig, StaticTerm, StaticTermId,
+    StaticVar, StaticVarId, Statics,
 };

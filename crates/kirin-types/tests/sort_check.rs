@@ -1,7 +1,7 @@
 mod common;
 
-use common::{Fixture, boolean, int, ty};
-use kirin_types::{IntStaticCon, SortError, StaticTerm};
+use common::{Fixture, TestCon, boolean, int, ty, types};
+use kirin_types::{BaseSort, IntSort, IntStaticCon, Sort, SortError, StaticTerm};
 
 #[test]
 fn free_variables_have_their_recorded_sort() {
@@ -184,12 +184,15 @@ fn guard_and_assert_need_a_bool_then_a_type() {
 }
 
 #[test]
-fn product_and_function_types_take_types() {
+fn tuple_and_function_types_take_types() {
     let mut f = Fixture::new();
     let token = f.token();
-    let triple = f.term(StaticTerm::Product(vec![token, token, token]));
-    assert_eq!(f.check(triple), Ok(ty()));
-    let fun_ty = f.term(StaticTerm::Function(vec![token, triple], token));
+    let triple = f.types(vec![token, token, token]);
+    assert_eq!(f.check(triple), Ok(types()));
+    // a language's tuple type is a constructor over a list of types
+    let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![triple]));
+    assert_eq!(f.check(tuple), Ok(ty()));
+    let fun_ty = f.term(StaticTerm::Function(vec![token, tuple], token));
     assert_eq!(f.check(fun_ty), Ok(ty()));
 }
 
@@ -213,18 +216,25 @@ fn function_type_result_must_be_a_type() {
 #[test]
 fn terms_render_with_variables_named_by_level() {
     let mut f = Fixture::new();
-    // ∀a0: int. ∃a1: bool. a1 ⊃ ((≥(a0, 0) ∧ token) * (token) → token)
+    // ∀a0: int. ∃a1: bool. a1 ⊃ Tuple([≥(a0, 0) ∧ token, (token) → token])
     let (b, n, zero, token) = (f.bound(0), f.bound(1), f.lit(0), f.token());
     let nonneg = f.int_con(IntStaticCon::Geq, vec![n, zero]);
     let asserted = f.term(StaticTerm::Assert(nonneg, token));
     let thunk = f.term(StaticTerm::Function(vec![token], token));
-    let pair = f.term(StaticTerm::Product(vec![asserted, thunk]));
-    let guarded = f.term(StaticTerm::Guard(b, pair));
+    let pair = f.types(vec![asserted, thunk]);
+    let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![pair]));
+    let guarded = f.term(StaticTerm::Guard(b, tuple));
     let exists = f.term(StaticTerm::Exists(boolean(), guarded));
     let forall = f.term(StaticTerm::Forall(int(), exists));
     assert_eq!(
         f.statics.display(forall, 0).to_string(),
-        "∀a0: int. (∃a1: bool. (a1 ⊃ ((≥(a0, Index(IntSortT(0))) ∧ token) * ((token) → token))))"
+        "∀a0: int. (∃a1: bool. (a1 ⊃ Tuple([(≥(a0, Index(IntSortT(0))) ∧ token), ((token) → token)])))"
+    );
+    assert_eq!(f.check(forall), Ok(ty()));
+    let list_var = f.term(StaticTerm::Forall(types(), token));
+    assert_eq!(
+        f.statics.display(list_var, 0).to_string(),
+        "∀a0: [type]. token"
     );
     // the same body under a context of one variable, and an unbound variable
     assert_eq!(
@@ -266,26 +276,122 @@ fn errors_display_the_offending_term() {
 }
 
 #[test]
-fn products_need_at_least_two_components() {
+fn lists_have_any_length_and_their_stored_element_sort() {
     let mut f = Fixture::new();
     let token = f.token();
-    assert_eq!(f.check(token), Ok(ty()));
-    let pair = f.term(StaticTerm::Product(vec![token, token]));
-    assert_eq!(f.check(pair), Ok(ty()));
+    let single = f.types(vec![token]);
+    assert_eq!(f.check(single), Ok(types()));
+    let no_types = f.types(vec![]);
+    assert_eq!(f.check(no_types), Ok(types()));
+    assert_eq!(f.statics.display(no_types, 0).to_string(), "[]");
+    // the empty list of ints is not the empty list of types
+    let no_ints = f.term(StaticTerm::Seq(BaseSort::Index(IntSort), vec![]));
+    assert_eq!(f.check(no_ints), Ok(Sort::Seq(BaseSort::Index(IntSort))));
+    assert!(!f.statics.term_eq(no_types, no_ints));
+}
 
-    let empty = f.term(StaticTerm::Product(vec![]));
+#[test]
+fn list_items_must_have_the_element_sort() {
+    let mut f = Fixture::new();
+    let (token, one) = (f.token(), f.lit(1));
+    let mixed = f.types(vec![token, one]);
     assert_eq!(
-        f.check(empty),
-        Err(SortError::ShortProduct {
-            term: empty,
-            shown: "()".into(),
-            found: 0
+        f.check(mixed),
+        Err(SortError::SortMismatch {
+            term: one,
+            shown: "Index(IntSortT(1))".into(),
+            expected: ty(),
+            found: int()
         })
     );
-    let single = f.term(StaticTerm::Product(vec![token]));
+}
+
+#[test]
+fn list_items_are_single_elements() {
+    let mut f = Fixture::new();
+    // ∀τ̄: [type]. Tuple(τ̄) is fine: τ̄ stands alone where a list is expected
+    let (tau, token) = (f.bound(0), f.token());
+    let alone = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![tau]));
+    let forall = f.term(StaticTerm::Forall(types(), alone));
+    assert_eq!(f.check(forall), Ok(ty()));
+
+    // but not as an item of another list
+    let mixed = f.types(vec![token, tau]);
+    let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![mixed]));
+    let forall = f.term(StaticTerm::Forall(types(), tuple));
     assert_eq!(
-        f.check(single).unwrap_err().to_string(),
-        "a product needs at least 2 components, but `(token)` has 1"
+        f.check(forall),
+        Err(SortError::SortMismatch {
+            term: tau,
+            shown: "a0".into(),
+            expected: ty(),
+            found: types()
+        })
+    );
+
+    // nor is a list literal
+    let inner = f.types(vec![token]);
+    let nested = f.types(vec![token, inner]);
+    assert_eq!(
+        f.check(nested),
+        Err(SortError::SortMismatch {
+            term: inner,
+            shown: "[token]".into(),
+            expected: ty(),
+            found: types()
+        })
+    );
+}
+
+#[test]
+fn binders_and_propositions_wrap_types_not_lists() {
+    let mut f = Fixture::new();
+    let (token, yes) = (f.token(), f.bool_lit(true));
+    let list = f.types(vec![token]);
+    let exists = f.term(StaticTerm::Exists(int(), list));
+    let asserted = f.term(StaticTerm::Assert(yes, list));
+    for term in [exists, asserted] {
+        assert_eq!(
+            f.check(term),
+            Err(SortError::SortMismatch {
+                term: list,
+                shown: "[token]".into(),
+                expected: ty(),
+                found: types()
+            })
+        );
+    }
+}
+
+#[test]
+fn constructors_take_lists_of_index_sorts() {
+    let mut f = Fixture::new();
+    // Tensor(token, n̄) under ∀n̄: [int], and Tensor(token, [2, 3])
+    let (dims, token, two, three) = (f.bound(0), f.token(), f.lit(2), f.lit(3));
+    let tensor = f.term(StaticTerm::Constructor(TestCon::Tensor, vec![token, dims]));
+    let forall = f.term(StaticTerm::Forall(
+        Sort::Seq(BaseSort::Index(IntSort)),
+        tensor,
+    ));
+    assert_eq!(f.check(forall), Ok(ty()));
+    assert_eq!(
+        f.statics.display(forall, 0).to_string(),
+        "∀a0: [int]. Tensor(token, a0)"
+    );
+    let shape = f.term(StaticTerm::Seq(BaseSort::Index(IntSort), vec![two, three]));
+    let fixed = f.term(StaticTerm::Constructor(TestCon::Tensor, vec![token, shape]));
+    assert_eq!(f.check(fixed), Ok(ty()));
+
+    // a single int where the list is expected
+    let bad = f.term(StaticTerm::Constructor(TestCon::Tensor, vec![token, two]));
+    assert_eq!(
+        f.check(bad),
+        Err(SortError::SortMismatch {
+            term: two,
+            shown: "Index(IntSortT(2))".into(),
+            expected: Sort::Seq(BaseSort::Index(IntSort)),
+            found: int()
+        })
     );
 }
 
@@ -296,7 +402,7 @@ fn term_eq_compares_structure_not_ids() {
     let build = |f: &mut Fixture| {
         let (n, zero, token) = (f.bound(0), f.lit(0), f.token());
         let guard = f.int_con(IntStaticCon::Geq, vec![n, zero]);
-        let pair = f.term(StaticTerm::Product(vec![token, token]));
+        let pair = f.types(vec![token, token]);
         let guarded = f.term(StaticTerm::Guard(guard, pair));
         f.term(StaticTerm::Forall(int(), guarded))
     };
@@ -310,8 +416,8 @@ fn term_eq_distinguishes_different_terms() {
     let mut f = Fixture::new();
     let (token, zero, one) = (f.token(), f.lit(0), f.lit(1));
     let (x, y) = (f.bound(0), f.bound(1));
-    let pair = f.term(StaticTerm::Product(vec![token, token]));
-    let triple = f.term(StaticTerm::Product(vec![token, token, token]));
+    let pair = f.types(vec![token, token]);
+    let triple = f.types(vec![token, token, token]);
     let forall_int = f.term(StaticTerm::Forall(int(), token));
     let forall_bool = f.term(StaticTerm::Forall(boolean(), token));
     let exists_int = f.term(StaticTerm::Exists(int(), token));

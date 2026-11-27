@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::{IndexSort, Project, Sort, SortValue, StaticCon, StaticSig};
+use crate::{BaseSort, IndexSort, Project, Sort, SortValue, StaticCon, StaticSig};
 
 /// `int`: an index sort, introduced like any user-defined base sort.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -50,23 +50,24 @@ where
     S::T: From<IntSortT> + Project<IntSortT>,
 {
     fn signature(&self) -> StaticCon<S> {
-        let int = Sort::Index(S::from(IntSort));
+        let int = BaseSort::Index(S::from(IntSort));
+        let arg = Sort::Base(int);
         match self {
             Self::Add | Self::Sub => StaticCon {
-                args: vec![int, int],
+                args: vec![arg, arg],
                 result: int,
             },
             Self::Mul(_) => StaticCon {
-                args: vec![int],
+                args: vec![arg],
                 result: int,
             },
             Self::Geq => StaticCon {
-                args: vec![int, int],
-                result: Sort::Bool,
+                args: vec![arg, arg],
+                result: BaseSort::Bool,
             },
             Self::IntOf => StaticCon {
-                args: vec![int],
-                result: Sort::Type,
+                args: vec![arg],
+                result: BaseSort::Type,
             },
         }
     }

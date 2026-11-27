@@ -4,15 +4,24 @@ use std::fmt::{self, Display};
 
 use kirin_ir::Id;
 
-use crate::{IndexSort, Sort, SortValue, StaticTerm, StaticTermId, Statics};
+use crate::{BaseSort, IndexSort, Sort, SortValue, StaticTerm, StaticTermId, Statics};
 
-impl<B: IndexSort> Display for Sort<B> {
+impl<B: IndexSort> Display for BaseSort<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Type => "type",
             Self::Bool => "bool",
             Self::Index(base) => base.name(),
         })
+    }
+}
+
+impl<B: IndexSort> Display for Sort<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Base(base) => base.fmt(f),
+            Self::Seq(base) => write!(f, "[{base}]"),
+        }
     }
 }
 
@@ -101,10 +110,10 @@ impl<B: IndexSort, C: Display> Display for TermDisplay<'_, B, C> {
                 f.write_str(")")?;
             }
             StaticTerm::Unit => write!(f, "unit")?,
-            StaticTerm::Product(components) => {
-                f.write_str("(")?;
-                self.list(f, components, " * ")?;
-                f.write_str(")")?;
+            StaticTerm::Seq(_, items) => {
+                f.write_str("[")?;
+                self.list(f, items, ", ")?;
+                f.write_str("]")?;
             }
             StaticTerm::Function(args, result) => {
                 f.write_str("(")?;

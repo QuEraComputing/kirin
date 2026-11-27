@@ -3,7 +3,7 @@ mod common;
 use common::{Fixture, boolean, int, ty};
 use kirin_test_utils::types::assert_eval_matches_signature;
 use kirin_types::{
-    BoolStaticCon, IntSort, IntSortT, IntStaticCon, SortError, SortValue, StaticSig,
+    BaseSort, BoolStaticCon, IntSort, IntSortT, IntStaticCon, SortError, SortValue, StaticSig,
 };
 
 #[test]
@@ -14,7 +14,7 @@ fn connectives_and_equality_have_sort_bool() {
     let zero = f.lit(0);
     let not = f.bool_con(Not, vec![p]);
     let and = f.bool_con(And, vec![not, q]);
-    let eq = f.bool_con(Equal(int()), vec![n, zero]);
+    let eq = f.bool_con(Equal(BaseSort::Index(IntSort)), vec![n, zero]);
     let implies = f.bool_con(Implies, vec![and, eq]);
     let or = f.bool_con(Or, vec![implies, p]);
     assert_eq!(f.check(or), Ok(boolean()));
@@ -28,7 +28,10 @@ fn connectives_and_equality_have_sort_bool() {
 fn equality_compares_terms_of_its_sort() {
     let mut f = Fixture::new();
     let (p, zero) = (f.free(boolean()), f.lit(0));
-    let eq = f.bool_con(BoolStaticCon::Equal(int()), vec![p, zero]);
+    let eq = f.bool_con(
+        BoolStaticCon::Equal(BaseSort::Index(IntSort)),
+        vec![p, zero],
+    );
     assert_eq!(
         f.check(eq),
         Err(SortError::SortMismatch {
@@ -57,8 +60,8 @@ fn bool_of_is_the_singleton_type_of_a_proposition() {
 fn equality_is_distinguished_by_its_sort() {
     let mut f = Fixture::new();
     let n = f.free(int());
-    let eq_int = f.bool_con(BoolStaticCon::Equal(int()), vec![n, n]);
-    let eq_bool = f.bool_con(BoolStaticCon::Equal(boolean()), vec![n, n]);
+    let eq_int = f.bool_con(BoolStaticCon::Equal(BaseSort::Index(IntSort)), vec![n, n]);
+    let eq_bool = f.bool_con(BoolStaticCon::Equal(BaseSort::Bool), vec![n, n]);
     assert!(!f.statics.term_eq(eq_int, eq_bool));
 }
 
@@ -102,7 +105,10 @@ fn constructors_evaluate_across_sorts() {
     );
     // equality at `int` compares integers
     assert_eq!(
-        bool_eval(BoolStaticCon::Equal(int()), &[three, three]),
+        bool_eval(
+            BoolStaticCon::Equal(BaseSort::Index(IntSort)),
+            &[three, three]
+        ),
         Some(SortValue::Bool(true))
     );
     // bool ⇒ bool
@@ -137,6 +143,9 @@ fn eval_matches_signatures() {
     }
     assert_eval_matches_signature::<IntSort, _>(&BoolStaticCon::Not, &[yes]);
     assert_eval_matches_signature::<IntSort, _>(&BoolStaticCon::BoolOf, &[no]);
-    assert_eval_matches_signature::<IntSort, _>(&BoolStaticCon::Equal(int()), &[two, three]);
-    assert_eval_matches_signature::<IntSort, _>(&BoolStaticCon::Equal(boolean()), &[yes, no]);
+    assert_eval_matches_signature::<IntSort, _>(
+        &BoolStaticCon::Equal(BaseSort::Index(IntSort)),
+        &[two, three],
+    );
+    assert_eval_matches_signature::<IntSort, _>(&BoolStaticCon::Equal(BaseSort::Bool), &[yes, no]);
 }

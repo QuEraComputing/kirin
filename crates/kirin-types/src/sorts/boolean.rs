@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::{IndexSort, Sort, SortValue, StaticCon, StaticSig};
+use crate::{BaseSort, IndexSort, Sort, SortValue, StaticCon, StaticSig};
 
 /// Boolean static terms. `bool` is a built-in sort, so unlike `int` there is
 /// no base sort to contribute, only constructors.
@@ -18,7 +18,7 @@ pub enum BoolStaticCon<S> {
     /// `⇒ : (bool, bool) ⇒ bool`
     Implies,
     /// `= : (σ, σ) ⇒ bool`, equality at the sort `σ`: one constructor per sort.
-    Equal(Sort<S>),
+    Equal(BaseSort<S>),
     /// `bool : (bool) ⇒ type`, the singleton type of the boolean `B`: branching
     /// on its value establishes `B` in one arm and `¬B` in the other.
     BoolOf,
@@ -27,12 +27,17 @@ pub enum BoolStaticCon<S> {
 impl<S: IndexSort> StaticSig<S> for BoolStaticCon<S> {
     fn signature(&self) -> StaticCon<S> {
         let (args, result) = match *self {
-            Self::Not => (vec![Sort::Bool], Sort::Bool),
-            Self::And | Self::Or | Self::Implies => (vec![Sort::Bool, Sort::Bool], Sort::Bool),
-            Self::Equal(sort) => (vec![sort, sort], Sort::Bool),
-            Self::BoolOf => (vec![Sort::Bool], Sort::Type),
+            Self::Not => (vec![BaseSort::Bool], BaseSort::Bool),
+            Self::And | Self::Or | Self::Implies => {
+                (vec![BaseSort::Bool, BaseSort::Bool], BaseSort::Bool)
+            }
+            Self::Equal(sort) => (vec![sort, sort], BaseSort::Bool),
+            Self::BoolOf => (vec![BaseSort::Bool], BaseSort::Type),
         };
-        StaticCon { args, result }
+        StaticCon {
+            args: args.into_iter().map(Sort::Base).collect(),
+            result,
+        }
     }
 
     fn eval(&self, args: &[SortValue<S::T>]) -> Option<SortValue<S::T>> {

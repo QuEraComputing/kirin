@@ -1,6 +1,6 @@
 //! Checks for the static constructors of `kirin-types`.
 
-use kirin_types::{IndexSort, SortValue, StaticSig};
+use kirin_types::{IndexSort, Sort, SortValue, StaticSig};
 
 /// Asserts that `con`, applied to the sample `args`, evaluates consistently
 /// with its signature: `args` must match the signature's argument sorts, and
@@ -20,7 +20,7 @@ where
     );
     for (arg, expected) in args.iter().zip(&sig.args) {
         assert_eq!(
-            arg.sort::<S>(),
+            Sort::Base(arg.sort::<S>()),
             *expected,
             "the sample argument {arg:?} of `{con}` has the wrong sort"
         );

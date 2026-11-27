@@ -19,9 +19,9 @@ pub trait IndexSort: Copy + Eq + Hash + Debug {
     fn name(&self) -> &'static str;
 }
 
-/// The statics are first-order: every sort is a base sort.
+/// The sort of a single static term. The statics are first-order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Sort<S> {
+pub enum BaseSort<S> {
     /// `type`: the sort of types of dynamic terms.
     Type,
     /// `bool`: the sort of static propositions, e.g. guards.
@@ -32,10 +32,34 @@ pub enum Sort<S> {
     Index(S),
 }
 
-/// Automtically convert an [`IndexSort`] to a [`Sort`]
+/// Automatically convert an [`IndexSort`] to a [`BaseSort`]
+impl<S: IndexSort> From<S> for BaseSort<S> {
+    fn from(base: S) -> Self {
+        BaseSort::Index(base)
+    }
+}
+
+/// The sort of a static term or variable: a base sort, or a list of terms
+/// of one base sort. There are no lists of lists.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Sort<S> {
+    /// One term of a base sort, e.g. `int`.
+    Base(BaseSort<S>),
+    /// A list, possibly empty, of terms of a base sort, e.g. `[type]`: the
+    /// sort of a variable-length quantifier `∀τ̄:[type]`.
+    Seq(BaseSort<S>),
+}
+
+impl<S> From<BaseSort<S>> for Sort<S> {
+    fn from(base: BaseSort<S>) -> Self {
+        Self::Base(base)
+    }
+}
+
+/// Automatically convert an [`IndexSort`] to a [`Sort`]
 impl<S: IndexSort> From<S> for Sort<S> {
     fn from(base: S) -> Self {
-        Sort::Index(base)
+        Self::Base(BaseSort::Index(base))
     }
 }
 
@@ -85,19 +109,21 @@ impl<V> SortValue<V> {
     }
 
     /// The sort this value belongs to.
-    pub fn sort<S: IndexSort<T = V>>(&self) -> Sort<S> {
+    pub fn sort<S: IndexSort<T = V>>(&self) -> BaseSort<S> {
         match self {
-            SortValue::Bool(_) => Sort::Bool,
-            SortValue::Index(value) => Sort::Index(S::sort_of(value)),
+            SortValue::Bool(_) => BaseSort::Bool,
+            SortValue::Index(value) => BaseSort::Index(S::sort_of(value)),
         }
     }
 }
 
 /// The constructor for a static term defined in the dialect.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// An argument may be a list (e.g. `Tuple : ([type]) ⇒ type`), but the result
+/// is always a single term.
 pub struct StaticCon<S> {
     pub args: Vec<Sort<S>>,
-    pub result: Sort<S>,
+    pub result: BaseSort<S>,
 }
 
 pub trait StaticSig<S: IndexSort>: Clone + PartialEq + Display {
@@ -149,8 +175,9 @@ pub enum StaticTerm<S: IndexSort, C> {
     Constructor(C, Vec<StaticTermId>),
     /// The unit type for runtime values
     Unit,
-    /// `T_1 * … * T_n` with `n ≥ 2`, of sort `type`.
-    Product(Vec<StaticTermId>),
+    /// `[x_1, …, x_n]`, a list of sort `[σ]` whose elements have base sort `σ`.
+    /// The element sort is specified so that we can derive the sort of `[]`.
+    Seq(BaseSort<S>, Vec<StaticTermId>),
     /// `(T_1, …, T_n) → T`, of sort `type`.
     Function(Vec<StaticTermId>, StaticTermId),
     /// `B ⊃ T`: a guarded type, usable only where `B` holds.
@@ -195,7 +222,7 @@ impl<S: IndexSort, C> Statics<S, C> {
         match &*self.terms[term] {
             Free(x) => *x == var,
             Unit | Bound(_) | Lit(_) => false,
-            Constructor(_, args) | Product(args) => args.iter().any(|a| self.mentions(*a, var)),
+            Constructor(_, args) | Seq(_, args) => args.iter().any(|a| self.mentions(*a, var)),
             Function(args, result) => args.iter().chain([result]).any(|a| self.mentions(*a, var)),
             Guard(p, t) | Assert(p, t) => self.mentions(*p, var) || self.mentions(*t, var),
             Forall(_, body) | Exists(_, body) => self.mentions(*body, var),
@@ -217,11 +244,12 @@ impl<S: IndexSort, C: PartialEq> Statics<S, C> {
             return true;
         }
         match (&*self.terms[a], &*self.terms[b]) {
+            (Unit, Unit) => true,
             (Bound(i), Bound(j)) => i == j,
             (Free(x), Free(y)) => x == y,
             (Lit(x), Lit(y)) => x == y,
             (Constructor(c, xs), Constructor(d, ys)) => c == d && all_eq(xs, ys),
-            (Product(xs), Product(ys)) => all_eq(xs, ys),
+            (Seq(s, xs), Seq(t, ys)) => s == t && all_eq(xs, ys),
             (Function(xs, r), Function(ys, s)) => all_eq(xs, ys) && self.term_eq(*r, *s),
             (Guard(p, t), Guard(q, u)) | (Assert(p, t), Assert(q, u)) => {
                 self.term_eq(*p, *q) && self.term_eq(*t, *u)
@@ -274,9 +302,11 @@ impl<S: IndexSort, C: Clone> Statics<S, C> {
                     .map(|arg| map(self, arg, depth))
                     .collect::<Result<_, _>>()?,
             ),
-            Product(args) => Product(
-                args.into_iter()
-                    .map(|arg| map(self, arg, depth))
+            Seq(sort, items) => Seq(
+                sort,
+                items
+                    .into_iter()
+                    .map(|item| map(self, item, depth))
                     .collect::<Result<_, _>>()?,
             ),
             Function(args, result) => {

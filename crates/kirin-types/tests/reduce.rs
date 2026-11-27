@@ -4,8 +4,8 @@ use std::fmt;
 
 use common::{Fixture, int};
 use kirin_types::{
-    IntSort, IntSortT, IntStaticCon, Sort, SortError, SortValue, StaticCon, StaticSig, StaticTerm,
-    Statics,
+    BaseSort, IntSort, IntSortT, IntStaticCon, SortError, SortValue, StaticCon, StaticSig,
+    StaticTerm, Statics,
 };
 
 #[test]
@@ -78,7 +78,7 @@ impl StaticSig<IntSort> for Liar {
     fn signature(&self) -> StaticCon<IntSort> {
         StaticCon {
             args: vec![],
-            result: int(),
+            result: BaseSort::Index(IntSort),
         }
     }
 
@@ -102,8 +102,8 @@ fn reduce_rejects_a_value_of_the_wrong_sort() {
         Err(SortError::EvalSort {
             term: liar,
             shown: "liar".into(),
-            expected: int(),
-            found: Sort::Bool
+            expected: BaseSort::Index(IntSort),
+            found: BaseSort::Bool
         })
     );
     assert_eq!(
