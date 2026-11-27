@@ -109,6 +109,16 @@ impl Worklist {
         self.move_occurred
     }
 
+    /// Whether `events` include a move of existing statements: a statement
+    /// that was already under the root placed somewhere, or a `CFG` splice.
+    pub(super) fn moves_existing_statements(&self, events: &[MutationEvent]) -> bool {
+        events.iter().any(|event| match *event {
+            MutationEvent::PlacedStatement { stmt } => self.status.get(stmt) != Status::OutsideRoot,
+            MutationEvent::SplicedCfg { .. } => true,
+            _ => false,
+        })
+    }
+
     /// The next statement to visit, or `None` once the worklist is empty.
     pub(super) fn pop(&mut self) -> Option<Statement> {
         let stmt = match self.snapshot.get(self.next) {
