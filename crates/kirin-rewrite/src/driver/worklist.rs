@@ -2,8 +2,10 @@ use std::collections::{HashSet, VecDeque};
 
 use kirin_ir::walk::WalkOrder;
 use kirin_ir::{
-    Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, StatementParent, Use,
+    Dialect, GetInfo, MutationEvent, SSAValue, StageInfo, Statement, StatementParent, Use,
 };
+
+use crate::rule::producer;
 
 /// The statements a driver sweep still has to visit, in order.
 ///
@@ -244,9 +246,7 @@ impl Worklist {
                 self.push(owner);
             }
             for &operand in definition.arguments() {
-                if let Some(SSAKind::Result(producer, _)) =
-                    operand.get_info(stage).map(|v| *v.kind())
-                {
+                if let Some(producer) = producer(stage, operand) {
                     self.push(producer);
                 }
             }

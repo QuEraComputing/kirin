@@ -1,10 +1,9 @@
 use kirin_ir::walk::WalkOrder;
-use kirin_ir::{
-    Block, DiGraph, Dialect, GetInfo, Rewriter, SSAKind, SSAValue, StageInfo, Statement,
-};
+use kirin_ir::{Block, DiGraph, Dialect, GetInfo, Rewriter, SSAValue, StageInfo, Statement};
 
 use super::rewrite_driver::owned_blocks;
 use super::{DriverError, RewriteDriver};
+use crate::rule::producer;
 
 impl<L: Dialect, O: WalkOrder> RewriteDriver<'_, L, O> {
     /// Erase the statements left dead under `root`, and return how many
@@ -123,7 +122,7 @@ fn producers_in<L: Dialect>(
         return producers;
     };
     for &operand in info.definition().arguments() {
-        let Some(SSAKind::Result(producer, _)) = operand.get_info(stage).map(|v| *v.kind()) else {
+        let Some(producer) = producer(stage, operand) else {
             continue;
         };
         let in_graph = graph
