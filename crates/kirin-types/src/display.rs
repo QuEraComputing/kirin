@@ -82,8 +82,7 @@ impl<B: IndexSort, C: Display> Display for TermDisplay<'_, B, C> {
         let term = &*self.statics.terms[self.term];
         let compound = matches!(
             term,
-            StaticTerm::Function(..)
-                | StaticTerm::Guard(..)
+            StaticTerm::Guard(..)
                 | StaticTerm::Assert(..)
                 | StaticTerm::Forall(..)
                 | StaticTerm::Exists(..)
@@ -109,16 +108,10 @@ impl<B: IndexSort, C: Display> Display for TermDisplay<'_, B, C> {
                 self.list(f, args, ", ")?;
                 f.write_str(")")?;
             }
-            StaticTerm::Unit => write!(f, "unit")?,
             StaticTerm::Seq(_, items) => {
                 f.write_str("[")?;
                 self.list(f, items, ", ")?;
                 f.write_str("]")?;
-            }
-            StaticTerm::Function(args, result) => {
-                f.write_str("(")?;
-                self.list(f, args, ", ")?;
-                write!(f, ") → {}", self.child(*result, self.depth))?;
             }
             StaticTerm::Guard(prop, ty) => write!(
                 f,

@@ -4,6 +4,7 @@ use common::{Fixture, boolean, int, ty};
 use kirin_test_utils::types::assert_eval_matches_signature;
 use kirin_types::{
     BaseSort, BoolStaticCon, IntSort, IntSortT, IntStaticCon, SortError, SortValue, StaticSig,
+    UnitStaticCon,
 };
 
 #[test]
@@ -148,4 +149,5 @@ fn eval_matches_signatures() {
         &[two, three],
     );
     assert_eval_matches_signature::<IntSort, _>(&BoolStaticCon::Equal(BaseSort::Bool), &[yes, no]);
+    assert_eval_matches_signature::<IntSort, _>(&UnitStaticCon, &[]);
 }

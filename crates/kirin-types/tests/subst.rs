@@ -1,6 +1,6 @@
 mod common;
 
-use common::{Fixture, TestCon, int, ty, types};
+use common::{Fixture, int, ty};
 use kirin_types::{BaseSort, BoolStaticCon, IntSort, IntStaticCon, StaticTerm};
 
 #[test]
@@ -72,31 +72,31 @@ fn close_then_instantiate_gives_back_the_term() {
 #[test]
 fn instantiate_replaces_a_list_variable_whole() {
     let mut f = Fixture::new();
-    // [int(s), Tuple(τ̄)] under the quantifiers (s: int, τ̄: [type])
+    // Fn([int(s)], τ̄) under the quantifiers (s: int, τ̄: [type])
     let (s, tau, five, token) = (f.bound(1), f.bound(0), f.lit(5), f.token());
     let int_s = f.int_con(IntStaticCon::IntOf, vec![s]);
-    let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![tau]));
-    let args = f.types(vec![int_s, tuple]);
+    let args = f.types(vec![int_s]);
+    let fun_ty = f.fun(args, tau);
 
-    let unit = f.term(StaticTerm::Unit);
+    let unit = f.unit();
     let two = f.types(vec![token, unit]);
-    let instantiated = f.statics.instantiate(args, &[five, two]);
+    let instantiated = f.statics.instantiate(fun_ty, &[five, two]);
     assert_eq!(
         f.statics.display(instantiated, 0).to_string(),
-        "[int(Index(IntSortT(5))), Tuple([token, unit])]"
+        "Fn([int(Index(IntSortT(5)))], [token, unit])"
     );
     let int_five = f.int_con(IntStaticCon::IntOf, vec![five]);
-    let expected_tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![two]));
-    let expected = f.types(vec![int_five, expected_tuple]);
+    let expected_args = f.types(vec![int_five]);
+    let expected = f.fun(expected_args, two);
     assert!(f.statics.term_eq(instantiated, expected));
-    assert_eq!(f.check(instantiated), Ok(types()));
+    assert_eq!(f.check(instantiated), Ok(ty()));
 
     // the empty list
     let none = f.types(vec![]);
-    let empty = f.statics.instantiate(args, &[five, none]);
+    let no_results = f.statics.instantiate(fun_ty, &[five, none]);
     assert_eq!(
-        f.statics.display(empty, 0).to_string(),
-        "[int(Index(IntSortT(5))), Tuple([])]"
+        f.statics.display(no_results, 0).to_string(),
+        "Fn([int(Index(IntSortT(5)))], [])"
     );
 }
 
@@ -106,4 +106,23 @@ fn instantiate_replaces_a_bare_list_variable_with_the_list() {
     let (tau, token) = (f.bound(0), f.token());
     let list = f.types(vec![token, token]);
     assert_eq!(f.statics.instantiate(tau, &[list]), list);
+}
+
+#[test]
+fn instantiate_replaces_list_variables_under_inner_binders() {
+    let mut f = Fixture::new();
+    // ∀i: int. Fn([int(i)], τ̄), with τ̄ the eliminated binder
+    let (i, tau, token) = (f.bound(0), f.bound(1), f.token());
+    let int_i = f.int_con(IntStaticCon::IntOf, vec![i]);
+    let args = f.types(vec![int_i]);
+    let body = f.fun(args, tau);
+    let forall = f.term(StaticTerm::Forall(int(), body));
+
+    let carried = f.types(vec![token]);
+    let instantiated = f.statics.instantiate(forall, &[carried]);
+    assert_eq!(
+        f.statics.display(instantiated, 0).to_string(),
+        "∀a0: int. Fn([int(a0)], [token])"
+    );
+    assert_eq!(f.check(instantiated), Ok(ty()));
 }

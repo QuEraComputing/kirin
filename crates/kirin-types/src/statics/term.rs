@@ -173,13 +173,9 @@ pub enum StaticTerm<S: IndexSort, C> {
     Lit(SortValue<S::T>),
     /// A dialect's signature applied to its arguments.
     Constructor(C, Vec<StaticTermId>),
-    /// The unit type for runtime values
-    Unit,
     /// `[x_1, …, x_n]`, a list of sort `[σ]` whose elements have base sort `σ`.
     /// The element sort is specified so that we can derive the sort of `[]`.
     Seq(BaseSort<S>, Vec<StaticTermId>),
-    /// `(T_1, …, T_n) → T`, of sort `type`.
-    Function(Vec<StaticTermId>, StaticTermId),
     /// `B ⊃ T`: a guarded type, usable only where `B` holds.
     Guard(StaticTermId, StaticTermId),
     /// `B ∧ T`: an asserting type, whose values establish `B`.
@@ -221,9 +217,8 @@ impl<S: IndexSort, C> Statics<S, C> {
         use StaticTerm::*;
         match &*self.terms[term] {
             Free(x) => *x == var,
-            Unit | Bound(_) | Lit(_) => false,
+            Bound(_) | Lit(_) => false,
             Constructor(_, args) | Seq(_, args) => args.iter().any(|a| self.mentions(*a, var)),
-            Function(args, result) => args.iter().chain([result]).any(|a| self.mentions(*a, var)),
             Guard(p, t) | Assert(p, t) => self.mentions(*p, var) || self.mentions(*t, var),
             Forall(_, body) | Exists(_, body) => self.mentions(*body, var),
         }
@@ -244,13 +239,11 @@ impl<S: IndexSort, C: PartialEq> Statics<S, C> {
             return true;
         }
         match (&*self.terms[a], &*self.terms[b]) {
-            (Unit, Unit) => true,
             (Bound(i), Bound(j)) => i == j,
             (Free(x), Free(y)) => x == y,
             (Lit(x), Lit(y)) => x == y,
             (Constructor(c, xs), Constructor(d, ys)) => c == d && all_eq(xs, ys),
             (Seq(s, xs), Seq(t, ys)) => s == t && all_eq(xs, ys),
-            (Function(xs, r), Function(ys, s)) => all_eq(xs, ys) && self.term_eq(*r, *s),
             (Guard(p, t), Guard(q, u)) | (Assert(p, t), Assert(q, u)) => {
                 self.term_eq(*p, *q) && self.term_eq(*t, *u)
             }
@@ -295,7 +288,7 @@ impl<S: IndexSort, C: Clone> Statics<S, C> {
         // We take a copy of the node, so the recursive `&mut self` calls don't
         // overlap its borrow.
         let rebuilt = match (*self.terms[term]).clone() {
-            leaf @ (Unit | Bound(_) | Free(_) | Lit(_)) => leaf,
+            leaf @ (Bound(_) | Free(_) | Lit(_)) => leaf,
             Constructor(c, args) => Constructor(
                 c,
                 args.into_iter()
@@ -309,13 +302,6 @@ impl<S: IndexSort, C: Clone> Statics<S, C> {
                     .map(|item| map(self, item, depth))
                     .collect::<Result<_, _>>()?,
             ),
-            Function(args, result) => {
-                let args = args
-                    .into_iter()
-                    .map(|arg| map(self, arg, depth))
-                    .collect::<Result<_, _>>()?;
-                Function(args, map(self, result, depth)?)
-            }
             Guard(p, t) => Guard(map(self, p, depth)?, map(self, t, depth)?),
             Assert(p, t) => Assert(map(self, p, depth)?, map(self, t, depth)?),
             Forall(sort, body) => Forall(sort, map(self, body, depth + 1)?),

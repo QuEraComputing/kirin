@@ -184,7 +184,7 @@ fn guard_and_assert_need_a_bool_then_a_type() {
 }
 
 #[test]
-fn tuple_and_function_types_take_types() {
+fn function_types_take_lists_of_types() {
     let mut f = Fixture::new();
     let token = f.token();
     let triple = f.types(vec![token, token, token]);
@@ -192,23 +192,25 @@ fn tuple_and_function_types_take_types() {
     // a language's tuple type is a constructor over a list of types
     let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![triple]));
     assert_eq!(f.check(tuple), Ok(ty()));
-    let fun_ty = f.term(StaticTerm::Function(vec![token, tuple], token));
+    let (args, results) = (f.types(vec![token, tuple]), f.types(vec![]));
+    let fun_ty = f.fun(args, results);
     assert_eq!(f.check(fun_ty), Ok(ty()));
 }
 
 #[test]
-fn function_type_result_must_be_a_type() {
+fn function_type_results_must_be_a_list() {
     let mut f = Fixture::new();
-    let (token, one) = (f.token(), f.lit(1));
-    // (token, token) → 1: the result is argument 2, after the two parameters
-    let fun_ty = f.term(StaticTerm::Function(vec![token, token], one));
+    let token = f.token();
+    let args = f.types(vec![token, token]);
+    // Fn([token, token], token): the results are one type, not a list
+    let fun_ty = f.fun(args, token);
     assert_eq!(
         f.check(fun_ty),
         Err(SortError::SortMismatch {
-            term: one,
-            shown: "Index(IntSortT(1))".into(),
-            expected: ty(),
-            found: int()
+            term: token,
+            shown: "token".into(),
+            expected: types(),
+            found: ty()
         })
     );
 }
@@ -216,19 +218,20 @@ fn function_type_result_must_be_a_type() {
 #[test]
 fn terms_render_with_variables_named_by_level() {
     let mut f = Fixture::new();
-    // ∀a0: int. ∃a1: bool. a1 ⊃ Tuple([≥(a0, 0) ∧ token, (token) → token])
+    // ∀a0: int. ∃a1: bool. a1 ⊃ Fn([≥(a0, 0) ∧ token, Fn([token], [])], [])
     let (b, n, zero, token) = (f.bound(0), f.bound(1), f.lit(0), f.token());
     let nonneg = f.int_con(IntStaticCon::Geq, vec![n, zero]);
     let asserted = f.term(StaticTerm::Assert(nonneg, token));
-    let thunk = f.term(StaticTerm::Function(vec![token], token));
+    let (args, nothing) = (f.types(vec![token]), f.types(vec![]));
+    let thunk = f.fun(args, nothing);
     let pair = f.types(vec![asserted, thunk]);
-    let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![pair]));
-    let guarded = f.term(StaticTerm::Guard(b, tuple));
+    let fun_ty = f.fun(pair, nothing);
+    let guarded = f.term(StaticTerm::Guard(b, fun_ty));
     let exists = f.term(StaticTerm::Exists(boolean(), guarded));
     let forall = f.term(StaticTerm::Forall(int(), exists));
     assert_eq!(
         f.statics.display(forall, 0).to_string(),
-        "∀a0: int. (∃a1: bool. (a1 ⊃ Tuple([(≥(a0, Index(IntSortT(0))) ∧ token), ((token) → token)])))"
+        "∀a0: int. (∃a1: bool. (a1 ⊃ Fn([(≥(a0, Index(IntSortT(0))) ∧ token), Fn([token], [])], [])))"
     );
     assert_eq!(f.check(forall), Ok(ty()));
     let list_var = f.term(StaticTerm::Forall(types(), token));
@@ -309,16 +312,16 @@ fn list_items_must_have_the_element_sort() {
 #[test]
 fn list_items_are_single_elements() {
     let mut f = Fixture::new();
-    // ∀τ̄: [type]. Tuple(τ̄) is fine: τ̄ stands alone where a list is expected
-    let (tau, token) = (f.bound(0), f.token());
-    let alone = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![tau]));
+    // ∀τ̄: [type]. Fn(τ̄, []) is fine: τ̄ stands alone where a list is expected
+    let (tau, token, nothing) = (f.bound(0), f.token(), f.types(vec![]));
+    let alone = f.fun(tau, nothing);
     let forall = f.term(StaticTerm::Forall(types(), alone));
     assert_eq!(f.check(forall), Ok(ty()));
 
     // but not as an item of another list
     let mixed = f.types(vec![token, tau]);
-    let tuple = f.term(StaticTerm::Constructor(TestCon::Tuple, vec![mixed]));
-    let forall = f.term(StaticTerm::Forall(types(), tuple));
+    let fun_ty = f.fun(mixed, nothing);
+    let forall = f.term(StaticTerm::Forall(types(), fun_ty));
     assert_eq!(
         f.check(forall),
         Err(SortError::SortMismatch {
@@ -444,9 +447,9 @@ fn mentions_finds_free_variables_under_binders() {
 }
 
 #[test]
-fn unit_is_a_type_equal_to_any_other_unit() {
+fn unit_is_a_constructor_equal_to_any_other_unit() {
     let mut f = Fixture::new();
-    let (unit, other) = (f.term(StaticTerm::Unit), f.term(StaticTerm::Unit));
+    let (unit, other) = (f.unit(), f.unit());
     assert_eq!(f.check(unit), Ok(ty()));
     assert_eq!(f.statics.display(unit, 0).to_string(), "unit");
     // two separately allocated units are the same type

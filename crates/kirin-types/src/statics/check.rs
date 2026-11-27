@@ -48,18 +48,11 @@ impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
                 }
                 Ok(sig.result.into())
             }
-            StaticTerm::Unit => Ok(BaseSort::Type.into()),
             StaticTerm::Seq(element, items) => {
                 for item in items {
                     self.expect(*item, Sort::Base(*element), context)?;
                 }
                 Ok(Sort::Seq(*element))
-            }
-            StaticTerm::Function(args, result) => {
-                for arg in args.iter().chain([result]) {
-                    self.expect(*arg, BaseSort::Type.into(), context)?;
-                }
-                Ok(BaseSort::Type.into())
             }
             StaticTerm::Guard(prop, ty) | StaticTerm::Assert(prop, ty) => {
                 self.expect(*prop, BaseSort::Bool.into(), context)?;

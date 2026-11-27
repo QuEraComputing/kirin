@@ -4,11 +4,11 @@
 use std::fmt;
 
 use kirin_types::{
-    BaseSort, BoolStaticCon, IntSort, IntSortT, IntStaticCon, Sort, SortError, SortValue,
-    StaticCon, StaticSig, StaticTerm, StaticTermId, Statics,
+    BaseSort, BoolStaticCon, FnStaticCon, IntSort, IntSortT, IntStaticCon, Sort, SortError,
+    SortValue, StaticCon, StaticSig, StaticTerm, StaticTermId, Statics, UnitStaticCon,
 };
 
-/// The `bool` and `int` constructors plus:
+/// The `bool`, `int`, `Fn` and `unit` constructors plus:
 ///  - `token : () ⇒ type`, a type with no structure to stand in wherever a
 ///    test needs some type,
 ///  - `Tuple : ([type]) ⇒ type`, a language-defined tuple type,
@@ -17,6 +17,8 @@ use kirin_types::{
 pub enum TestCon {
     Bool(BoolStaticCon<IntSort>),
     Int(IntStaticCon),
+    Fn,
+    Unit,
     Token,
     Tuple,
     Tensor,
@@ -27,6 +29,8 @@ impl StaticSig<IntSort> for TestCon {
         match self {
             Self::Bool(con) => con.signature(),
             Self::Int(con) => con.signature(),
+            Self::Fn => StaticSig::<IntSort>::signature(&FnStaticCon),
+            Self::Unit => StaticSig::<IntSort>::signature(&UnitStaticCon),
             Self::Token => StaticCon {
                 args: vec![],
                 result: BaseSort::Type,
@@ -46,7 +50,7 @@ impl StaticSig<IntSort> for TestCon {
         match self {
             Self::Bool(con) => con.eval(args),
             Self::Int(con) => StaticSig::<IntSort>::eval(con, args),
-            Self::Token | Self::Tuple | Self::Tensor => None,
+            Self::Fn | Self::Unit | Self::Token | Self::Tuple | Self::Tensor => None,
         }
     }
 }
@@ -56,6 +60,8 @@ impl fmt::Display for TestCon {
         match self {
             Self::Bool(con) => con.fmt(f),
             Self::Int(con) => con.fmt(f),
+            Self::Fn => FnStaticCon.fmt(f),
+            Self::Unit => UnitStaticCon.fmt(f),
             Self::Token => f.write_str("token"),
             Self::Tuple => f.write_str("Tuple"),
             Self::Tensor => f.write_str("Tensor"),
@@ -134,6 +140,15 @@ impl Fixture {
     /// The list of types `[items]`.
     pub fn types(&mut self, items: Vec<StaticTermId>) -> StaticTermId {
         self.term(StaticTerm::Seq(BaseSort::Type, items))
+    }
+
+    /// The function type `Fn(args, results)`.
+    pub fn fun(&mut self, args: StaticTermId, results: StaticTermId) -> StaticTermId {
+        self.term(StaticTerm::Constructor(TestCon::Fn, vec![args, results]))
+    }
+
+    pub fn unit(&mut self) -> StaticTermId {
+        self.term(StaticTerm::Constructor(TestCon::Unit, vec![]))
     }
 
     pub fn token(&mut self) -> StaticTermId {
