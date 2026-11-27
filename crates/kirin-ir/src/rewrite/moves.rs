@@ -182,15 +182,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if chain.is_empty() {
             return Ok(());
         }
-        // Read before linking, which joins the chain's last statement to
-        // what follows it in `dest`.
-        let moved = self.chain_from(chain.head);
-        self.link(chain, dest, prev, next);
-        self.events.extend(
-            moved
-                .into_iter()
-                .map(|stmt| MutationEvent::PlacedStatement { stmt }),
-        );
+        self.link_and_record(chain, dest, prev, next);
         self.events
             .push(MutationEvent::SplicedBlock { source, dest });
         Ok(())

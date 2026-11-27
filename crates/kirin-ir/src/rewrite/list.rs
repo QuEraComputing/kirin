@@ -4,7 +4,7 @@
 
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::{LinkedList, LinkedListNode};
-use crate::rewrite::rewriter::Rewriter;
+use crate::rewrite::rewriter::{MutationEvent, Rewriter};
 use crate::{Block, BlockParent, CFG, Dialect, Statement, StatementParent};
 
 /// An item of one of the IR's linked lists, kept in a list its `Owner` holds:
@@ -70,6 +70,33 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         prev: Option<T>,
         next: Option<T>,
     ) {
+        self.link_and_apply(chain, owner, prev, next, |_, _| {});
+    }
+
+    /// [`link`](Self::link) a chain of statements moved from another block,
+    /// recording [`MutationEvent::PlacedStatement`] for each, in order.
+    pub(super) fn link_and_record(
+        &mut self,
+        chain: LinkedList<Statement>,
+        owner: Block,
+        prev: Option<Statement>,
+        next: Option<Statement>,
+    ) {
+        self.link_and_apply(chain, owner, prev, next, |events, stmt| {
+            events.push(MutationEvent::PlacedStatement { stmt });
+        });
+    }
+
+    /// [`link`](Self::link), handing each item to `apply` as it is given
+    /// its new owner.
+    fn link_and_apply<T: ListItem<L>>(
+        &mut self,
+        chain: LinkedList<T>,
+        owner: T::Owner,
+        prev: Option<T>,
+        next: Option<T>,
+        mut apply: impl FnMut(&mut Vec<MutationEvent>, T),
+    ) {
         let (Some(head), Some(tail)) = (chain.head, chain.tail) else {
             return;
         };
@@ -85,6 +112,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             } else {
                 T::node(info).next
             };
+            apply(&mut self.events, item);
         }
         if let Some(info) = head.get_info_mut(self.stage) {
             T::node(info).prev = prev;

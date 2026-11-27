@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
-use crate::{Block, Dialect, SSAValue, Statement};
+use crate::{Block, Dialect, SSAValue};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, remove_predecessor};
 
@@ -90,14 +90,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             Some(info) => (std::mem::take(&mut info.statements), info.terminator.take()),
             None => (LinkedList::new(), None),
         };
-        let placed: Vec<Statement> = self
-            .chain_from(succ_chain.head)
-            .into_iter()
-            .chain(succ_terminator)
-            .collect();
         let pred_tail = pred.expect_info(self.stage).statements.tail;
-        self.link(succ_chain, pred, pred_tail, None);
+        self.link_and_record(succ_chain, pred, pred_tail, None);
         self.set_terminator(pred, succ_terminator);
+        self.events
+            .extend(succ_terminator.map(|stmt| MutationEvent::PlacedStatement { stmt }));
 
         // succ is now empty: tombstoning it only removes the block and its
         // (already redirected) arguments.
@@ -110,11 +107,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             remove_predecessor(self.stage, target, succ);
         }
 
-        self.events.extend(
-            placed
-                .into_iter()
-                .map(|stmt| MutationEvent::PlacedStatement { stmt }),
-        );
         self.events.push(MutationEvent::ChangedBlockList { cfg });
         self.events.push(MutationEvent::ChangedCfg { cfg });
         Ok(())

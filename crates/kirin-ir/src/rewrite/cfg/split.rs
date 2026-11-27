@@ -43,17 +43,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         } else {
             self.split_off(block, at)
         };
-        let placed: Vec<Statement> = self
-            .chain_from(moved.head)
-            .into_iter()
-            .chain(terminator)
-            .collect();
-
         // Give the cut statements and the terminator to a new block right
         // after the original.
         let new_block = self.create_block(cfg, Some(block), next_block, []);
-        self.link(moved, new_block, None, None);
+        self.link_and_record(moved, new_block, None, None);
         self.set_terminator(new_block, terminator);
+        self.events
+            .extend(terminator.map(|stmt| MutationEvent::PlacedStatement { stmt }));
         self.set_terminator(block, None);
 
         // The moved edges now leave from the new block; whatever stays in the
@@ -64,11 +60,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             add_predecessor(self.stage, target, new_block);
         }
 
-        self.events.extend(
-            placed
-                .into_iter()
-                .map(|stmt| MutationEvent::PlacedStatement { stmt }),
-        );
         self.events.push(MutationEvent::ChangedCfg { cfg });
         Ok(new_block)
     }
