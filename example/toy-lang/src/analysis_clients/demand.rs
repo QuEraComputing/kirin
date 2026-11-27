@@ -89,8 +89,8 @@ impl StatementRule<LowLevel> for FreeUndemanded {
             return Ok(WalkResult::Advance);
         }
         let placeholder = rewriter.new_result(ArithType::I64);
-        rewriter.insert_before(
-            stmt,
+        rewriter.create(
+            InsertionPoint::Before(stmt),
             LowLevel::Constant(Constant {
                 value: ArithValue::I64(0),
                 result: placeholder,
