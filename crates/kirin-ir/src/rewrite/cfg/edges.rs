@@ -76,8 +76,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::NoSuccessorOperands`]), an edge's operand list is
     /// shorter than `index`, or a forwarded value is not live.
     ///
-    /// Records one [`MutationEvent::ReplacedStatement`] per rewritten edge
-    /// statement, then [`MutationEvent::ChangedCfg`].
+    /// Records, per rewritten terminator, [`MutationEvent::ReplacedStatement`]
+    /// then [`MutationEvent::ChangedTerminator`] for its block, then
+    /// [`MutationEvent::ChangedCfg`].
     pub fn insert_block_arg(
         &mut self,
         block: Block,
@@ -122,8 +123,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Costs the incoming edges, not the size of the predecessor blocks.
     ///
-    /// Records one [`MutationEvent::ReplacedStatement`] per rewritten edge
-    /// statement, then [`MutationEvent::ChangedCfg`].
+    /// Records, per rewritten terminator, [`MutationEvent::ReplacedStatement`]
+    /// then [`MutationEvent::ChangedTerminator`] for its block, then
+    /// [`MutationEvent::ChangedCfg`].
     pub fn erase_block_arg(&mut self, block: Block, index: usize) -> Result<(), RewriteError> {
         let cfg = self.owning_cfg(block)?;
         let arg: SSAValue = self
