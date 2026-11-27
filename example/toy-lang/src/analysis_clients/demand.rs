@@ -83,8 +83,8 @@ impl Analysis<Stage> for DemandFacts {
 
 /// Moves the uses of an `arith` result that nothing demands onto a new
 /// `constant 0`, so the result has no uses and the driver's dead-code cleanup
-/// erases the statement. No use of the result is ever read, so the value
-/// passed in its place does not matter.
+/// erases the statement. An undemanded value never reaches a demanded output,
+/// so the value passed in its place does not change one.
 ///
 /// Every `arith` statement existed when [`DemandFacts`] ran, since this pass
 /// creates none, so a missing fact means not demanded.
