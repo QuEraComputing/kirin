@@ -508,7 +508,7 @@ fn split_block_at_terminator_moves_only_the_terminator() {
     verify_derived(&stage).unwrap();
 }
 
-/// The raw predecessor list of `block`, one entry per incoming edge.
+/// The raw predecessor list of `block`, one entry per predecessor.
 fn pred_list(stage: &StageInfo<BuilderDialect>, block: Block) -> Vec<Block> {
     block.expect_info(stage).predecessors().to_vec()
 }
