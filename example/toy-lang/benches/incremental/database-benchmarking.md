@@ -44,15 +44,18 @@ The cases:
 
 Times are medians of 3 runs on a release build, for all 6 passes.
 
-| Program | Case | Total, no database (ms) | Total, database (ms) | Analysis runs, no database / database | Analysis time, database (ms) |
-| --- | --- | --- | --- | --- | --- |
-| 1,000 separate | first compile | 89 | 73 | 6 / 4 | 35 |
-| 1,000 separate | edit `f0` | 108 | 89 | 6 / 4 | 40 |
-| 1,000 separate | nothing to do | 107 | 67 | 6 / 2 | 19 |
-| 300 chained | first compile | 1,788 | 1,210 | 6 / 4 | 1,199 |
-| 300 chained | edit `f0` | 2,155 | 1,425 | 6 / 4 | 1,411 |
-| 300 chained | edit last | 2,174 | 1,425 | 6 / 4 | 1,410 |
-| 300 chained | nothing to do | 2,155 | 723 | 6 / 2 | 708 |
+| Program | Case | Total, no database (ms) | Total, database (ms) | Analysis runs, no database / database | Cache hits, database | Analysis time, database (ms) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1,000 separate | first compile | 89 | 73 | 6 / 4 | 2 | 35 |
+| 1,000 separate | edit `f0` | 108 | 89 | 6 / 4 | 2 | 40 |
+| 1,000 separate | nothing to do | 107 | 67 | 6 / 2 | 4 | 19 |
+| 300 chained | first compile | 1,788 | 1,210 | 6 / 4 | 2 | 1,199 |
+| 300 chained | edit `f0` | 2,155 | 1,425 | 6 / 4 | 2 | 1,411 |
+| 300 chained | edit last | 2,174 | 1,425 | 6 / 4 | 2 | 1,410 |
+| 300 chained | nothing to do | 2,155 | 723 | 6 / 2 | 4 | 708 |
+
+Both analyses are keyed by stage, so a cache hit reuses one result for the
+whole stage, not one per function.
 
 ## Findings
 
