@@ -1,4 +1,3 @@
-use crate::arena::Id;
 use crate::identifier;
 
 use super::digraph::DiGraph;

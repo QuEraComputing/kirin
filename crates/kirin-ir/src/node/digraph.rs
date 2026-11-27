@@ -1,5 +1,5 @@
 use crate::Dialect;
-use crate::arena::{GetInfo, GetInfoMut, Id};
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::identifier;
 
 use super::graph::{DiGraphExtra, GraphInfo};
