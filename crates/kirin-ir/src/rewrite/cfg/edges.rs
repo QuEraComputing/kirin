@@ -62,12 +62,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// incoming edge.
     ///
     /// Edges are found through [`BranchOp`](crate::BranchOp): for each
-    /// statement (in a predecessor block) that has `block` as a successor,
+    /// predecessor whose terminator has `block` as a successor,
     /// `forwarded(stmt, successor)` gives the value that edge passes for the
-    /// new argument, where `successor` is the edge's position in
-    /// `successors()`. Every rewritten edge is checked as by
-    /// [`Rewriter::replace_statement`] before any edit is made. Returns the new
-    /// argument.
+    /// new argument, where `stmt` is that terminator and `successor` is the
+    /// edge's position in `successors()`. Every rewritten edge is checked as
+    /// by [`Rewriter::replace_statement`] before any edit is made. Returns the
+    /// new argument.
+    ///
+    /// Costs the incoming edges, not the size of the predecessor blocks.
     ///
     /// Rejects, leaving the stage untouched, if `index` is past the end of the
     /// argument list, an incoming edge has no editable operand list
@@ -118,6 +120,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// argument is still used, an incoming edge has no editable operand list,
     /// or an edge's operand list has no operand at `index`.
     ///
+    /// Costs the incoming edges, not the size of the predecessor blocks.
+    ///
     /// Records one [`MutationEvent::ReplacedStatement`] per rewritten edge
     /// statement, then [`MutationEvent::ChangedCfg`].
     pub fn erase_block_arg(&mut self, block: Block, index: usize) -> Result<(), RewriteError> {
@@ -158,10 +162,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(())
     }
 
-    /// For every statement that branches to `block`, apply `edit` to the
-    /// operand list it forwards on each such edge (a statement may target
-    /// `block` more than once), then check the edited definition, without
-    /// mutating the stage.
+    /// For every predecessor's terminator that branches to `block`, apply
+    /// `edit` to the operand list it forwards on each such edge (a terminator
+    /// may target `block` more than once), then check the edited definition,
+    /// without mutating the stage.
+    ///
+    /// Only a terminator has successors (`verify_derived` reports any other
+    /// statement that does), so the rest of each predecessor is not read.
     fn prepare_incoming_edges(
         &self,
         block: Block,
@@ -169,27 +176,28 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ) -> Result<Vec<(Statement, PreparedReplacement, L)>, RewriteError> {
         let mut edges = Vec::new();
         for &pred in &self.live_block(block)?.predecessors {
-            for stmt in self.block_statements(pred) {
-                let definition = &stmt.expect_info(self.stage).definition;
-                let positions: SmallVec<[usize; 2]> = definition
-                    .successors()
-                    .enumerate()
-                    .filter(|(_, successor)| successor.target() == block)
-                    .map(|(position, _)| position)
-                    .collect();
-                if positions.is_empty() {
-                    continue;
-                }
-                let mut definition = definition.clone();
-                for successor in positions {
-                    let operands = definition
-                        .successor_operands_mut(successor)
-                        .ok_or(RewriteError::NoSuccessorOperands { stmt, successor })?;
-                    edit(stmt, successor, operands)?;
-                }
-                let prepared = self.prepare_replacement(stmt, &definition)?;
-                edges.push((stmt, prepared, definition));
+            let Some(stmt) = pred.get_info(self.stage).and_then(|info| info.terminator) else {
+                continue;
+            };
+            let definition = &stmt.expect_info(self.stage).definition;
+            let positions: SmallVec<[usize; 2]> = definition
+                .successors()
+                .enumerate()
+                .filter(|(_, successor)| successor.target() == block)
+                .map(|(position, _)| position)
+                .collect();
+            if positions.is_empty() {
+                continue;
             }
+            let mut definition = definition.clone();
+            for successor in positions {
+                let operands = definition
+                    .successor_operands_mut(successor)
+                    .ok_or(RewriteError::NoSuccessorOperands { stmt, successor })?;
+                edit(stmt, successor, operands)?;
+            }
+            let prepared = self.prepare_replacement(stmt, &definition)?;
+            edges.push((stmt, prepared, definition));
         }
         Ok(edges)
     }
