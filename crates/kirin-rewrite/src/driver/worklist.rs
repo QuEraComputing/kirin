@@ -177,6 +177,10 @@ impl Worklist {
                     if stmt.get_info(stage).is_none() {
                         continue;
                     }
+                    // The root moving takes nothing out of its own tree.
+                    if Some(stmt) == self.root {
+                        continue;
+                    }
                     // The block or graph it was moved into.
                     let Some(dest) = *stmt.parent(stage) else {
                         continue;
