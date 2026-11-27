@@ -9,4 +9,4 @@ pub use error::{RuleError, RuleErrorKind};
 pub(crate) use native::NativeRule;
 pub use native::{BlockRule, StatementRule};
 pub(crate) use rule_set::Rule;
-pub use rule_set::RuleSet;
+pub use rule_set::{AddedRule, RuleSet};

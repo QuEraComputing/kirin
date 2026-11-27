@@ -1992,6 +1992,7 @@ dependencies = [
  "kirin-interpreter",
  "kirin-liveness",
  "kirin-prettyless",
+ "kirin-rewrite",
  "kirin-scf",
  "predicates",
  "rustc-hash",

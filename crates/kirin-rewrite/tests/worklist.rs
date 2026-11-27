@@ -200,7 +200,7 @@ fn a_statement_changed_before_its_turn_is_visited_once() {
     let visits: Visits = Rc::default();
     let mut rules = RuleSet::build(|stage| vec![double_neg(stage)]).unwrap();
     let counting = Rc::clone(&visits);
-    rules.add_statement_rule("count_visits", move || CountVisits::new(&counting));
+    rules.add_statement_rule("count_visits", move |_| CountVisits::new(&counting));
     let (_, summary, statements, _) = run(&RewriteDriver::new(&rules), FOUR_NEGS);
     assert_eq!(summary.unwrap().sweeps, 2);
 
@@ -219,7 +219,7 @@ fn a_statement_changed_before_its_turn_is_visited_once() {
 #[test]
 fn a_sweep_rewriting_without_end_fails_the_run() {
     let mut rules = RuleSet::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
-    rules.add_statement_rule("swap_add_operands", || SwapAddOperands);
+    rules.add_statement_rule("swap_add_operands", |_| SwapAddOperands);
     let driver = RewriteDriver::new(&rules).max_rewrites_per_sweep(10);
     let (_, outcome, statements, status) = run(&driver, ADD);
     assert_eq!(
@@ -253,7 +253,7 @@ fn run_at_visits_only_the_tree_under_its_root() {
     let visits: Visits = Rc::default();
     let mut rules = RuleSet::build(|stage| vec![double_neg(stage)]).unwrap();
     let counting = Rc::clone(&visits);
-    rules.add_statement_rule("count_visits", move || CountVisits::new(&counting));
+    rules.add_statement_rule("count_visits", move |_| CountVisits::new(&counting));
     let driver = RewriteDriver::new(&rules);
 
     let mut program: Program<StageInfo<L>> = Program::new();
@@ -365,9 +365,9 @@ specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
     fn run_at_skips_a_statement_moved_out_of_its_root() {
         let visits: Rc<RefCell<HashMap<Statement, usize>>> = Rc::default();
         let mut rules = RuleSet::<L>::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
-        rules.add_statement_rule("hoist", || Hoist);
+        rules.add_statement_rule("hoist", |_| Hoist);
         let counting = Rc::clone(&visits);
-        rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&counting)));
+        rules.add_statement_rule("count_visits", move |_| CountVisits(Rc::clone(&counting)));
         let driver = RewriteDriver::new(&rules);
 
         let mut program: Program<StageInfo<L>> = Program::new();

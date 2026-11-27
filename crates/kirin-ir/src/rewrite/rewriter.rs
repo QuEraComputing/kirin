@@ -591,6 +591,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         std::mem::take(&mut self.events)
     }
 
+    /// Whether this rewriter has edited the stage.
+    pub fn edited(&self) -> bool {
+        !self.events.is_empty()
+    }
+
     /// The live statement `stmt`, or [`RewriteError::UnknownStatement`] for a
     /// deleted or unknown id.
     pub(super) fn live_statement(

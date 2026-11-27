@@ -5,7 +5,7 @@ use kirin_ir::{Block, Dialect, GetInfo, Rewriter, StageInfo, Statement};
 
 use super::{DriverError, Match, Worklist};
 use crate::rule::{NativeRule, Rule};
-use crate::{BlockRule, CheckedRule, RuleSet, StatementRule};
+use crate::{AnalysisCache, BlockRule, CheckedRule, RuleSet, StatementRule};
 
 /// What a driver run did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -103,14 +103,26 @@ impl std::ops::AddAssign for RewriteSummary {
 /// hanging. The limits are meant to be far above what a terminating rule
 /// set needs, never a way to stop a run early.
 ///
+/// Native rules' recipes build them from the analysis results given with
+/// [`with_cache`](Self::with_cache), or from an empty cache if none was
+/// given. Before its first sweep, a run checks that the cache holds every
+/// result a rule [declared](crate::AddedRule::requires), and fails with
+/// [`DriverError::MissingAnalysis`] otherwise.
+///
 /// The driver edits through the [`Rewriter`] a pass is given, so it runs
-/// inside [`Program::run_pass`](kirin_ir::Program::run_pass):
+/// inside [`Program::run_pass`](kirin_ir::Program::run_pass), or inside
+/// [`Database::run_pass`](crate::Database::run_pass), which also hands the
+/// pass the analysis results its rules require:
 ///
 /// ```ignore
 /// program.run_pass(stage, |rewriter| driver.run(rewriter))?;
+/// db.run_pass(stage, rules.required(), |rewriter, cache| {
+///     RewriteDriver::new(&rules).with_cache(cache).run(rewriter)
+/// })?;
 /// ```
 pub struct RewriteDriver<'r, L: Dialect, O: WalkOrder = PreOrder> {
     rules: &'r RuleSet<L>,
+    cache: Option<&'r AnalysisCache>,
     max_sweeps: usize,
     max_rewrites_per_sweep: usize,
     order: PhantomData<O>,
@@ -121,6 +133,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
     pub fn new(rules: &'r RuleSet<L>) -> Self {
         Self {
             rules,
+            cache: None,
             max_sweeps: Self::DEFAULT_MAX_SWEEPS,
             max_rewrites_per_sweep: Self::DEFAULT_MAX_REWRITES_PER_SWEEP,
             order: PhantomData,
@@ -139,10 +152,18 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
     pub fn walk_order<P: WalkOrder>(self) -> RewriteDriver<'r, L, P> {
         RewriteDriver {
             rules: self.rules,
+            cache: self.cache,
             max_sweeps: self.max_sweeps,
             max_rewrites_per_sweep: self.max_rewrites_per_sweep,
             order: PhantomData,
         }
+    }
+
+    /// Build native rules from the analysis results in `cache`, such as the
+    /// cache [`Database::run_pass`](crate::Database::run_pass) hands a pass.
+    pub fn with_cache(mut self, cache: &'r AnalysisCache) -> Self {
+        self.cache = Some(cache);
+        self
     }
 
     /// Fail a run on a root still changing after `max_sweeps` sweeps.
@@ -169,10 +190,12 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
             .filter(|specialization| !specialization.is_invalidated())
             .map(|specialization| *specialization.definition())
             .collect();
+        let empty = AnalysisCache::default();
+        let cache = self.checked_cache(&empty)?;
         let mut summary = RewriteSummary::default();
         let mut worklist = Worklist::default();
         for root in roots {
-            summary += self.run_with(rewriter, root, &mut worklist)?;
+            summary += self.run_with(rewriter, root, &mut worklist, cache)?;
         }
         Ok(summary)
     }
@@ -183,20 +206,45 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
-        self.run_with(rewriter, root, &mut Worklist::default())
+        let empty = AnalysisCache::default();
+        let cache = self.checked_cache(&empty)?;
+        self.run_with(rewriter, root, &mut Worklist::default(), cache)
+    }
+
+    /// The cache native rules are built from, `empty` if none was given,
+    /// once every rule's declared results are checked to be in it.
+    fn checked_cache<'c>(
+        &'c self,
+        empty: &'c AnalysisCache,
+    ) -> Result<&'c AnalysisCache, DriverError> {
+        let cache = self.cache.unwrap_or(empty);
+        for rule in self.rules.rules() {
+            if let Some(missing) = rule
+                .requirements()
+                .iter()
+                .find(|requirement| !requirement.is_cached_in(cache))
+            {
+                return Err(DriverError::MissingAnalysis {
+                    rule: rule.name().to_string(),
+                    analysis: missing.name(),
+                });
+            }
+        }
+        Ok(cache)
     }
 
     /// [`run_at`](Self::run_at), sweeping from `worklist`, which may come
-    /// from an earlier run.
+    /// from an earlier run, and building native rules from `cache`.
     fn run_with(
         &self,
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
         worklist: &mut Worklist,
+        cache: &AnalysisCache,
     ) -> Result<RewriteSummary, DriverError> {
         let mut summary = RewriteSummary::default();
         while summary.sweeps < self.max_sweeps {
-            let applied = self.sweep(rewriter, root, worklist)?;
+            let applied = self.sweep(rewriter, root, worklist, cache)?;
             let erased = Self::clean_up_dead_code(rewriter, root)?;
             summary += RewriteSummary {
                 sweeps: 1,
@@ -224,11 +272,16 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
         worklist: &mut Worklist,
+        cache: &AnalysisCache,
     ) -> Result<usize, DriverError> {
         let mut applied = 0;
         worklist.seed::<O, L>(rewriter.stage(), root, self.rules.has_native_rules());
-        let mut sweep_rules: Vec<SweepRule<'_, L>> =
-            self.rules.rules().iter().map(SweepRule::new).collect();
+        let mut sweep_rules: Vec<SweepRule<'_, L>> = self
+            .rules
+            .rules()
+            .iter()
+            .map(|rule| SweepRule::new(rule, cache))
+            .collect();
         while let Some(stmt) = worklist.pop() {
             // An earlier visit erased it, or moved it out of the root's tree.
             // Without a move, every queued statement is still under the root.
@@ -238,7 +291,7 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
                 continue;
             }
             let num_prior_events = rewriter.events().len();
-            let walk_result = self.visit(&mut sweep_rules, rewriter, stmt, &mut applied)?;
+            let walk_result = self.visit(&mut sweep_rules, cache, rewriter, stmt, &mut applied)?;
             if applied > self.max_rewrites_per_sweep {
                 return Err(DriverError::RewritesExhausted {
                     root,
@@ -262,13 +315,14 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
     fn visit(
         &self,
         sweep_rules: &mut [SweepRule<'r, L>],
+        cache: &AnalysisCache,
         rewriter: &mut Rewriter<'_, L>,
         stmt: Statement,
         applied: &mut usize,
     ) -> Result<WalkResult, DriverError> {
         let mut walk_result = WalkResult::Advance;
         for rule in sweep_rules {
-            match rule.apply(self.rules, rewriter, stmt, applied)? {
+            match rule.apply(self.rules, cache, rewriter, stmt, applied)? {
                 WalkResult::Advance => {}
                 WalkResult::Skip => walk_result = WalkResult::Skip,
                 WalkResult::Interrupt => return Ok(WalkResult::Interrupt),
@@ -295,12 +349,12 @@ enum SweepRule<'r, L: Dialect> {
 }
 
 impl<'r, L: Dialect> SweepRule<'r, L> {
-    fn new(rule: &'r Rule<L>) -> Self {
+    fn new(rule: &'r Rule<L>, cache: &AnalysisCache) -> Self {
         match rule {
             Rule::Pattern(rule) => SweepRule::Pattern(rule),
             Rule::Statement(native) => SweepRule::Statement {
                 name: native.name(),
-                rule: native.build(),
+                rule: native.build(cache),
             },
             Rule::Block(native) => SweepRule::Block(native),
         }
@@ -316,6 +370,7 @@ impl<'r, L: Dialect> SweepRule<'r, L> {
     fn apply(
         &mut self,
         rules: &RuleSet<L>,
+        cache: &AnalysisCache,
         rewriter: &mut Rewriter<'_, L>,
         stmt: Statement,
         applied: &mut usize,
@@ -345,7 +400,7 @@ impl<'r, L: Dialect> SweepRule<'r, L> {
                     }
                     let before = rewriter.events().len();
                     let result = native
-                        .build()
+                        .build(cache)
                         .apply(rewriter, block)
                         .map_err(|error| failed(native.name(), error))?;
                     if rewriter.events().len() > before {

@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod analysis_clients;
 mod interpreter;
 mod language;
 mod stage;

@@ -29,5 +29,6 @@ smallvec = { workspace = true }
 rustc-hash = "2.1.2"
 
 [dev-dependencies]
+kirin-rewrite = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }

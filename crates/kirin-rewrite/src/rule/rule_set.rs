@@ -2,12 +2,49 @@ use kirin_ir::{BuilderStageInfo, Dialect, StageInfo};
 use kirin_wildcard::{PatternLanguage, PatternRule};
 
 use super::{BlockRule, CheckedRule, NativeRule, RuleError, RuleErrorKind, StatementRule};
+use crate::{AnalysisCache, AnalysisKind, Requirement};
 
 /// A rule of a [`RuleSet`]: a checked pattern or a native rule's recipe.
 pub(crate) enum Rule<L: Dialect> {
     Pattern(CheckedRule<L>),
     Statement(NativeRule<dyn StatementRule<L>>),
     Block(NativeRule<dyn BlockRule<L>>),
+}
+
+impl<L: Dialect> Rule<L> {
+    /// The rule's name, used in errors.
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Rule::Pattern(rule) => rule.name(),
+            Rule::Statement(native) => native.name(),
+            Rule::Block(native) => native.name(),
+        }
+    }
+
+    /// The analysis results the rule reads. Pattern rules read none.
+    pub(crate) fn requirements(&self) -> &[Requirement] {
+        match self {
+            Rule::Pattern(_) => &[],
+            Rule::Statement(native) => native.requirements(),
+            Rule::Block(native) => native.requirements(),
+        }
+    }
+}
+
+/// A native rule just added to a [`RuleSet`], to declare the analysis results
+/// its recipe reads.
+pub struct AddedRule<'a> {
+    requirements: &'a mut Vec<Requirement>,
+}
+
+impl AddedRule<'_> {
+    /// Declare that the rule reads analysis `A`'s result for `key`, so that
+    /// [`RuleSet::required`] lists it and a pass computes it first. A rule
+    /// that reads several results declares each.
+    pub fn requires<A: AnalysisKind>(&mut self, key: A::Key) -> &mut Self {
+        self.requirements.push(Requirement::of::<A>(key));
+        self
+    }
 }
 
 /// The rules one driver run tries, in order, with the stage holding their
@@ -64,33 +101,58 @@ impl<L: Dialect> RuleSet<L> {
     }
 
     /// Add a native statement rule as the last rule to try. `build` makes a
-    /// new copy of the rule, and the driver calls it at the start of every
-    /// sweep. `name` identifies the rule in errors.
+    /// new copy of the rule from the analysis results the pass was given, and
+    /// the driver calls it at the start of every sweep. `name` identifies the
+    /// rule in errors. Declare the results `build` reads with
+    /// [`AddedRule::requires`].
     pub fn add_statement_rule<R: StatementRule<L> + 'static>(
         &mut self,
         name: impl Into<String>,
-        build: impl Fn() -> R + 'static,
-    ) -> &mut Self {
+        build: impl Fn(&AnalysisCache) -> R + 'static,
+    ) -> AddedRule<'_> {
         self.rules.push(Rule::Statement(NativeRule::new(
             name.into(),
-            Box::new(move || Box::new(build())),
+            Box::new(move |cache| Box::new(build(cache))),
         )));
-        self
+        self.last_added()
     }
 
     /// Add a native block rule as the last rule to try. `build` makes a new
-    /// copy of the rule, and the driver calls it for every block. `name`
-    /// identifies the rule in errors.
+    /// copy of the rule from the analysis results the pass was given, and the
+    /// driver calls it for every block. `name` identifies the rule in errors.
+    /// Declare the results `build` reads with [`AddedRule::requires`].
     pub fn add_block_rule<R: BlockRule<L> + 'static>(
         &mut self,
         name: impl Into<String>,
-        build: impl Fn() -> R + 'static,
-    ) -> &mut Self {
+        build: impl Fn(&AnalysisCache) -> R + 'static,
+    ) -> AddedRule<'_> {
         self.rules.push(Rule::Block(NativeRule::new(
             name.into(),
-            Box::new(move || Box::new(build())),
+            Box::new(move |cache| Box::new(build(cache))),
         )));
-        self
+        self.last_added()
+    }
+
+    /// The native rule just added.
+    fn last_added(&mut self) -> AddedRule<'_> {
+        let requirements = match self.rules.last_mut() {
+            Some(Rule::Statement(native)) => native.requirements_mut(),
+            Some(Rule::Block(native)) => native.requirements_mut(),
+            _ => unreachable!("called right after adding a native rule"),
+        };
+        AddedRule { requirements }
+    }
+
+    /// Every rule's [declared](AddedRule::requires) analysis results, in
+    /// rule order, for [`Database::run_pass`](crate::Database::run_pass). A
+    /// result two rules read is listed twice; computing it the second time
+    /// is a cache hit.
+    pub fn required(&self) -> Vec<Requirement> {
+        self.rules
+            .iter()
+            .flat_map(|rule| rule.requirements())
+            .cloned()
+            .collect()
     }
 
     /// The rules, in the order they are tried.

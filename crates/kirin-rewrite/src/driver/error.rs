@@ -71,6 +71,13 @@ pub enum DriverError {
     /// than the driver's limit: the rules most likely keep undoing each
     /// other.
     RewritesExhausted { root: Statement, rewrites: usize },
+    /// `rule` declared that it reads `analysis`'s result, but the cache the
+    /// driver was given does not hold it. The run fails before its first
+    /// sweep, so nothing was edited.
+    MissingAnalysis {
+        rule: String,
+        analysis: &'static str,
+    },
     /// The dead-code cleanup could not erase `stmt`.
     DeadCode {
         stmt: Statement,
@@ -195,6 +202,10 @@ impl fmt::Display for DriverError {
                 f,
                 "one sweep of the IR under {root:?} made {rewrites} rewrites; \
                  the rules may never reach a fixpoint"
+            ),
+            DriverError::MissingAnalysis { rule, analysis } => write!(
+                f,
+                "rule `{rule}` reads analysis `{analysis}`, but the driver's cache does not hold it"
             ),
             DriverError::DeadCode { stmt, error } => {
                 write!(f, "dead-code elimination could not erase {stmt:?}: {error}")

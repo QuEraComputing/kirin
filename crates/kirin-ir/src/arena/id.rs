@@ -4,7 +4,7 @@ use std::hash::Hash;
 /// Arena ID
 /// an ID object can only be created by
 /// `arena.next_id()` or `arena.insert`
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Id(pub(crate) usize);
 
@@ -54,7 +54,7 @@ pub(crate) trait GetInfoMut<L: Dialect>: GetInfo<L> {
 macro_rules! identifier {
     ($(#[$attr:meta])* struct $name:ident) => {
         $(#[$attr])*
-        #[derive(Clone, Copy, Hash, PartialEq, Eq)]
+        #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         pub struct $name(pub(crate) Id);
 
