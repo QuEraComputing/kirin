@@ -81,7 +81,7 @@ impl Analysis<Stage> for DemandFacts {
     }
 }
 
-/// Moves the uses of an `arith` result that nothing demands onto a new
+/// Moves the uses of an `i64` `arith` result that nothing demands onto a new
 /// `constant 0`, so the result has no uses and the driver's dead-code cleanup
 /// erases the statement. An undemanded value never reaches a demanded output,
 /// so the value passed in its place does not change one.
@@ -103,6 +103,10 @@ impl StatementRule<LowLevel> for FreeUndemanded {
             return Ok(WalkResult::Advance);
         }
         let result: SSAValue = (*definition.results().next().expect("arith has a result")).into();
+        // The placeholder is an `i64`, so it can stand in only for an `i64`.
+        if *result.expect_info(rewriter.stage()).ty() != ArithType::I64 {
+            return Ok(WalkResult::Advance);
+        }
         let has_uses = !result.expect_info(rewriter.stage()).uses().is_empty();
         if !has_uses || self.demand.is_demanded(result) {
             return Ok(WalkResult::Advance);
