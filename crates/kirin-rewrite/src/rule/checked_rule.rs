@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use kirin_ir::{Dialect, GetInfo, SSAKind, SSAValue, StageInfo, Statement};
 use kirin_wildcard::{
-    ActionFn, CheckFn, NativeCall, PatternLanguage, PatternRule, PatternStatement,
+    ActionFn, CheckFn, NativeCall, PatternLanguage, PatternRule, PatternStatement, Rewrite,
 };
 
 use super::{RuleError, RuleErrorKind};
@@ -98,19 +98,42 @@ impl<L: Dialect> CheckedRule<L> {
             .resolve(pattern.name())
             .cloned()
             .unwrap_or_default();
-        let error = |kind| RuleError::new(&name, kind);
 
         let rewrite = pattern
             .rewrite(stage)
-            .ok_or_else(|| error(RuleErrorKind::MissingRewrite))?;
+            .ok_or_else(|| RuleError::new(&name, RuleErrorKind::MissingRewrite))?;
         let body: Vec<Statement> = pattern.body().statements(stage).collect();
         let root = rewrite.root();
         if !body.contains(&root) {
-            return Err(error(RuleErrorKind::RootNotInBody));
+            return Err(RuleError::new(&name, RuleErrorKind::RootNotInBody));
         }
-        let position = |stmt: Statement| body.iter().position(|&s| s == stmt).unwrap_or_default();
 
-        // The root and its producers.
+        let matched = Self::matched_ops(stage, &name, &body, root)?;
+        let checks = Self::build_checks(stage, &natives, &name, &body, &matched)?;
+        let (actions, erases_root) =
+            Self::build_actions(stage, &natives, &name, rewrite, &matched, root)?;
+        let walk_result = Self::check_walk_result(stage, &name, rewrite, &actions)?;
+
+        Ok(Self {
+            name,
+            root,
+            checks,
+            actions,
+            erases_root,
+            walk_result,
+        })
+    }
+
+    /// The ops the match covers: `root` and, through their operands, the ops
+    /// producing them, stopping at holes. Rejects an op that owns bodies or
+    /// has successors, and an operand that is neither a hole nor an op.
+    fn matched_ops(
+        stage: &StageInfo<PatternLanguage<L>>,
+        name: &str,
+        body: &[Statement],
+        root: Statement,
+    ) -> Result<HashSet<Statement>, RuleError> {
+        let error = |kind| RuleError::new(name, kind);
         let mut matched = HashSet::new();
         let mut pending = vec![root];
         while let Some(stmt) = pending.pop() {
@@ -127,7 +150,7 @@ impl<L: Dialect> CheckedRule<L> {
                 || op.successors().next().is_some();
             if owns_bodies {
                 return Err(error(RuleErrorKind::OpWithBodies {
-                    position: position(stmt),
+                    position: position(body, stmt),
                 }));
             }
             for &operand in op.arguments() {
@@ -136,13 +159,27 @@ impl<L: Dialect> CheckedRule<L> {
                     Some((producer, PatternLanguage::Op(_))) => pending.push(producer),
                     _ => {
                         return Err(error(RuleErrorKind::UnsupportedOperand {
-                            position: position(stmt),
+                            position: position(body, stmt),
                         }));
                     }
                 }
             }
         }
+        Ok(matched)
+    }
 
+    /// The `native_call`s and `constraint`s of the pattern body `body`, in
+    /// order, each `native_call` with its one check function. Rejects an op
+    /// the match does not cover, a `constraint` not testing a `native_call`'s
+    /// result, and any other statement but a hole.
+    fn build_checks(
+        stage: &StageInfo<PatternLanguage<L>>,
+        natives: &PatternRule<L>,
+        name: &str,
+        body: &[Statement],
+        matched: &HashSet<Statement>,
+    ) -> Result<Vec<Step<CheckFn<L>>>, RuleError> {
+        let error = |kind| RuleError::new(name, kind);
         let mut checks = Vec::new();
         for (position, &stmt) in body.iter().enumerate() {
             match stmt.expect_info(stage).definition() {
@@ -180,7 +217,26 @@ impl<L: Dialect> CheckedRule<L> {
                 _ => return Err(error(RuleErrorKind::UnexpectedStatement { position })),
             }
         }
+        Ok(checks)
+    }
 
+    /// The statements of `rewrite`'s body, in order, each `native_call` with
+    /// its one action function, and whether one of them erases `root`.
+    /// Rejects a `replace` or `erase` of something the match does not cover,
+    /// and any other statement.
+    #[expect(
+        clippy::type_complexity,
+        reason = "the steps and `erases_root` are found in one pass over the body"
+    )]
+    fn build_actions(
+        stage: &StageInfo<PatternLanguage<L>>,
+        natives: &PatternRule<L>,
+        name: &str,
+        rewrite: &Rewrite<L::Type>,
+        matched: &HashSet<Statement>,
+        root: Statement,
+    ) -> Result<(Vec<Step<ActionFn<L>>>, bool), RuleError> {
+        let error = |kind| RuleError::new(name, kind);
         let mut actions = Vec::new();
         let mut erases_root = false;
         for (position, stmt) in rewrite.body().statements(stage).enumerate() {
@@ -215,9 +271,19 @@ impl<L: Dialect> CheckedRule<L> {
                 _ => return Err(error(RuleErrorKind::UnsupportedAction { position })),
             }
         }
+        Ok((actions, erases_root))
+    }
 
-        // The body ends in a walk result, if any; a `walk_result` reads what a
-        // native call of the body computed.
+    /// The terminator `rewrite`'s body ends in, if any: a walk result saying
+    /// how the driver goes on walking. A `walk_result` must read what a
+    /// `native_call` among `actions` computed.
+    fn check_walk_result(
+        stage: &StageInfo<PatternLanguage<L>>,
+        name: &str,
+        rewrite: &Rewrite<L::Type>,
+        actions: &[Step<ActionFn<L>>],
+    ) -> Result<Option<Statement>, RuleError> {
+        let error = |kind| RuleError::new(name, kind);
         let walk_result = rewrite.body().terminator(stage);
         if let Some(terminator) = walk_result {
             match terminator.expect_info(stage).definition() {
@@ -240,16 +306,13 @@ impl<L: Dialect> CheckedRule<L> {
                 _ => return Err(error(RuleErrorKind::UnexpectedTerminator)),
             }
         }
-
-        Ok(Self {
-            name,
-            root,
-            checks,
-            actions,
-            erases_root,
-            walk_result,
-        })
+        Ok(walk_result)
     }
+}
+
+/// Where `stmt` is in the pattern body `body`, counting from 0, for errors.
+fn position(body: &[Statement], stmt: Statement) -> usize {
+    body.iter().position(|&s| s == stmt).unwrap_or_default()
 }
 
 /// The `native_call` a [`Step::Native`] runs.
