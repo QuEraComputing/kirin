@@ -40,10 +40,10 @@ impl std::ops::AddAssign for RewriteSummary {
 /// [`MutationEvent`](kirin_ir::MutationEvent)s add to the worklist the
 /// statements they may have given a new match: for each statement changed,
 /// replaced, created or newly placed under the root, the statement itself and
-/// the users of its results.
-/// If the rule set has a [`StatementRule`] or [`BlockRule`], which may read
-/// anything around a statement, also its owner, unless that is the root, and
-/// the producers of its operands; a pattern rule cannot gain a match there.
+/// the users of its results. If the rule set has a [`StatementRule`] or
+/// [`BlockRule`], which may read anything around a statement, also its owner,
+/// unless that is the root, and the producers of its operands; a pattern rule
+/// cannot gain a match there.
 /// Only statements under the root are added, and a statement an edit moved
 /// out of the root's tree before its turn is not visited, so a run never
 /// leaves that tree. A statement still in the queue keeps its place, so it

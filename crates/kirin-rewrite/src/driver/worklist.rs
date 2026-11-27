@@ -28,7 +28,7 @@ pub(super) struct Worklist {
     /// The statements added since the sweep began, after the rest of
     /// `snapshot`.
     queue: VecDeque<Statement>,
-    /// The statements inserted under the root during the sweep.
+    /// The statements created or placed under the root during the sweep.
     inserted: Vec<Statement>,
     /// Each statement's status.
     status: Statuses,
