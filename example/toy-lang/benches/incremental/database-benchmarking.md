@@ -43,20 +43,16 @@ The cases:
 ## Results
 
 Times are medians of 3 runs on a release build, for all 6 passes.
-"Needed" is the measured analysis time of only the functions whose analysis
-reaches the edited function. It shows how much of the re-analysis an edit
-actually required. That set comes from the program's known call structure,
-not from the analysis results.
 
-| Program | Case | Total, no database (ms) | Total, database (ms) | Analysis runs, no database / database | Analysis time, database (ms) | Needed (ms) |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1,000 separate | first compile | 89 | 73 | 6 / 4 | 35 | – |
-| 1,000 separate | edit `f0` | 108 | 89 | 6 / 4 | 40 | 0.1 |
-| 1,000 separate | nothing to do | 107 | 67 | 6 / 2 | 19 | – |
-| 300 chained | first compile | 1,788 | 1,210 | 6 / 4 | 1,199 | – |
-| 300 chained | edit `f0` | 2,155 | 1,425 | 6 / 4 | 1,411 | 10 |
-| 300 chained | edit last | 2,174 | 1,425 | 6 / 4 | 1,410 | 1,399 |
-| 300 chained | nothing to do | 2,155 | 723 | 6 / 2 | 708 | – |
+| Program | Case | Total, no database (ms) | Total, database (ms) | Analysis runs, no database / database | Analysis time, database (ms) |
+| --- | --- | --- | --- | --- | --- |
+| 1,000 separate | first compile | 89 | 73 | 6 / 4 | 35 |
+| 1,000 separate | edit `f0` | 108 | 89 | 6 / 4 | 40 |
+| 1,000 separate | nothing to do | 107 | 67 | 6 / 2 | 19 |
+| 300 chained | first compile | 1,788 | 1,210 | 6 / 4 | 1,199 |
+| 300 chained | edit `f0` | 2,155 | 1,425 | 6 / 4 | 1,411 |
+| 300 chained | edit last | 2,174 | 1,425 | 6 / 4 | 1,410 |
+| 300 chained | nothing to do | 2,155 | 723 | 6 / 2 | 708 |
 
 ## Findings
 
@@ -72,12 +68,19 @@ anything, and with it the two modes time the same.
 ### Analysis dominates, and an edit re-analyzes everything
 
 Analysis is about half the time on separate functions and 99% on chained
-ones. After editing one function, every function is re-analyzed:
+ones. After editing one function, every function is re-analyzed, though
+only the analyses that reach the edited function can change. Their measured
+share of the re-analysis:
 
-- 1,000 separate functions: 40 ms re-analyzed, 0.1 ms needed.
-- 300 chained functions, editing `f0`: 1,411 ms re-analyzed, 10 ms needed.
-- 300 chained functions, editing the last: 1,410 ms re-analyzed, 1,399 ms
-  needed, since every function's analysis reaches it.
+- 1,000 separate functions, editing `f0`: 40 ms re-analyzed, 0.1 ms of it on
+  `f0`, the only analysis that reaches it.
+- 300 chained functions, editing `f0`: 1,411 ms re-analyzed, 10 ms of it on
+  `f0`, since nothing calls `f0`.
+- 300 chained functions, editing the last: 1,410 ms re-analyzed, 1,399 ms of
+  it on analyses that reach it, which is all of them.
+
+Which analyses reach the edited function comes from the program's call
+structure, not from the analysis results.
 
 ### Stage-wide roots repeat work across callers
 
@@ -97,7 +100,7 @@ It has not been broken down further.
 - The functions are 26 straight-line statements with no loops, so each
   analysis converges in one visit. Real code would make analysis costlier
   and the gap larger.
-- "Needed" ignores the cost of tracking which functions an analysis reached
+- These shares ignore the cost of tracking which functions an analysis reached
   and storing results per function.
 
 ## Implications for per-function invalidation
