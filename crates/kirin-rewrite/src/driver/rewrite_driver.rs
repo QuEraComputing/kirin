@@ -40,14 +40,16 @@ impl std::ops::AddAssign for RewriteSummary {
 /// [`MutationEvent`](kirin_ir::MutationEvent)s add to the worklist the
 /// statements they may have given a new match: for each statement changed,
 /// replaced, created or newly placed under the root, the statement itself and
-/// the users of its results.
-/// If the rule set has a [`StatementRule`] or [`BlockRule`], which may read
-/// anything around a statement, also its owner, unless that is the root, and
-/// the producers of its operands; a pattern rule cannot gain a match there.
-/// Only statements under the root are added, and a statement an edit moved
-/// out of the root's tree before its turn is not visited, so a run never
-/// leaves that tree. A statement still in the queue keeps its place, so it
-/// is visited once, after the edit; one already visited goes to the back.
+/// the users of its results. If the rule set has a [`StatementRule`] or
+/// [`BlockRule`], which may read anything around a statement, also its owner,
+/// unless that is the root, and the producers of its operands; a pattern rule
+/// cannot gain a match there.
+/// Only statements under the root are added, so a run never leaves the
+/// root's tree. If an edit moves a queued statement out of that tree, the
+/// statement is not visited. If a rule moves the statement it is visiting
+/// out of the tree, the rules after it are not tried there. A statement
+/// still in the queue keeps its place, so it is visited once, after the
+/// edit; one already visited goes to the back.
 /// Other edits, such as erasing a statement or changing a `CFG`, add
 /// nothing: the next sweep, which starts from every statement again, sees
 /// them.
@@ -89,11 +91,12 @@ impl std::ops::AddAssign for RewriteSummary {
 /// Graph bodies are not handed to it. The blocks are listed when its turn
 /// comes, so it sees the edits of the rules before it at that statement. A
 /// statement visited again, such as the owner of a block whose statements an
-/// edit changed, hands its blocks to the rule again. A listed block an earlier copy erased
-/// or merged away is skipped. For every block, the driver builds a fresh
-/// copy of the rule with the recipe given to [`RuleSet::add_block_rule`],
-/// and each block whose run edits the IR counts as one application. An
-/// `interrupt` ends the sweep at once, leaving the remaining blocks unrun.
+/// edit changed, hands its blocks to the rule again. A listed block an
+/// earlier copy erased or merged away is skipped. For every block, the driver
+/// builds a fresh copy of the rule with the recipe given to
+/// [`RuleSet::add_block_rule`], and each block whose run edits the IR counts
+/// as one application. An `interrupt` ends the sweep at once, leaving the
+/// remaining blocks unrun.
 ///
 /// Rules that keep undoing each other never reach a fixpoint. As safety
 /// nets, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
@@ -240,7 +243,14 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
                 continue;
             }
             let num_prior_events = rewriter.events().len();
-            let walk_result = self.visit(&mut sweep_rules, rewriter, stmt, &mut applied)?;
+            let walk_result = self.visit(
+                &mut sweep_rules,
+                rewriter,
+                root,
+                worklist,
+                stmt,
+                &mut applied,
+            )?;
             if applied > self.max_rewrites_per_sweep {
                 return Err(DriverError::RewritesExhausted {
                     root,
@@ -260,22 +270,34 @@ impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
     ///
     /// After a `skip`, the remaining rules still run at `stmt`, and the
     /// result is `Skip`. An `interrupt` stops trying rules at once. A rule
-    /// erasing `stmt` ends the visit, since no later rule can see it.
+    /// erasing `stmt`, or moving it or an ancestor out of `root`'s tree, ends
+    /// the visit, since the later rules must not see it.
     fn visit(
         &self,
         sweep_rules: &mut [SweepRule<'r, L>],
         rewriter: &mut Rewriter<'_, L>,
+        root: Statement,
+        worklist: &Worklist,
         stmt: Statement,
         applied: &mut usize,
     ) -> Result<WalkResult, DriverError> {
         let mut walk_result = WalkResult::Advance;
         for rule in sweep_rules {
+            let num_prior_events = rewriter.events().len();
             match rule.apply(self.rules, rewriter, stmt, applied)? {
                 WalkResult::Advance => {}
                 WalkResult::Skip => walk_result = WalkResult::Skip,
                 WalkResult::Interrupt => return Ok(WalkResult::Interrupt),
             }
-            if stmt.get_info(rewriter.stage()).is_none() {
+            // Stop if the rule erased `stmt`, or moved `stmt` or one of its
+            // ancestors out of the root's tree. Checking whether `stmt` is
+            // still under the root walks up its ancestors, so do it only
+            // after a rule that moved something.
+            let stage = rewriter.stage();
+            if stmt.get_info(stage).is_none()
+                || (worklist.moves_existing_statements(&rewriter.events()[num_prior_events..])
+                    && !stmt.is_within(stage, root))
+            {
                 break;
             }
         }

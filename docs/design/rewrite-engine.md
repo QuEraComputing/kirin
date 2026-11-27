@@ -338,7 +338,7 @@ Concrete analyses may integrate through registered keys or traits. Do not make
 | **rewrite-pass contract** | A pass owns the stage exclusively, preserves operational coherence and mirrors after every successful action, and returns it only after derived verification succeeds. |
 | **rewrite pass** | One ownership-scoped mutation run. Success returns the same stage by value; any error or panic returns a diagnostic-only quarantined stage. |
 | **quarantined stage** | A non-`Clone`, non-`Default` owner of failed `StageInfo` plus cause and mutation events. It exposes diagnostic rendering but no `Deref`, `GetInfo`, or safe extraction. |
-| **worklist** | The queue of statements a driver sweep still has to visit. After every match and rewrite, the driver pushes the statement itself and the result users of each statement the rewrite changed, replaced, or inserted (with native rules, also its owner, unless that is the root, and its operand producers), so a new match they now have is found in the same sweep. Example: folding `%y = arith.add %c1, %c2` into a constant pushes the users of `%y`, which may now fold too. |
+| **worklist** | The queue of statements a driver sweep still has to visit. After every match and rewrite, the driver pushes the statement itself and the result users of each statement the rewrite changed, replaced, created, or newly placed under the root (with native rules, also its owner, unless that is the root, and its operand producers), so a new match they now have is found in the same sweep. Example: folding `%y = arith.add %c1, %c2` into a constant pushes the users of `%y`, which may now fold too. |
 | **mutation event** | A structured summary of an edit, such as `ErasedStatement`, `ReplacedUses`, or `ChangedCfg`; the driver reads the events of each rewrite to decide what to push onto the worklist. |
 | **tombstone** | A deleted arena slot retained until a later compaction pass. |
 | **IdMap** | The old-id to new-id map returned by arena compaction/GC. |
@@ -1036,7 +1036,8 @@ match the rule's pattern at stmt
 run the rewrite body's steps in order through Rewriter,
 resolving each pattern value a step reads through the match's bindings
     each step records mutation events
-for each statement the events name as changed, replaced, or inserted:
+for each statement the events name as changed, replaced, created, or newly
+placed under the root:
     push the statement itself and the users of its results onto the
     worklist, plus its owner (unless it is the root) and the producers of
     its operands if the rule set has native rules,
@@ -1292,7 +1293,8 @@ repeat:                                    # a sweep; at most max_sweeps
             if rule applies:
                 apply rewrite in place through Rewriter
         fail after max_rewrites_per_sweep rewrites; stop the sweep on interrupt
-        for each statement a mutation event names as changed/replaced/inserted:
+        for each statement a mutation event names as changed, replaced,
+        created or newly placed under the root:
             enqueue it and its users, plus its owner (unless the root) and
             its producers if there are native rules, whichever
             are under the root (ones already in the queue keep their place)
@@ -1863,7 +1865,9 @@ inlines one level of calls in a CFG to specialized functions in the same stage,
 leaving the calls the inlined code brings in for another run. A single-block
 callee is copied in front of the call; any other callee is copied between the
 halves of the call's split block. Its walk order moves each statement at most
-once, so a run is linear in the size of its result.
+once, a split reads only the statements it moves and the terminator, and the
+calls' results are redirected once all are inlined, each straight to the value
+it ends up as, so a run is linear in the size of its result.
 
 Deferred to later slices (each is rejected, not silently mishandled):
 `UnGraph`-body surgery; single dead-result trimming (`remove_result`, below); the owning pass driver and quarantine boundary; and the pure derive/install/verify split described under
@@ -2141,7 +2145,8 @@ individual action:
 2. Rewrite
    - after each match, run the rule's rewrite body in place through
      Rewriter, then push the owner, producers, and users of each statement
-     it changed, replaced, or inserted onto the worklist;
+     it changed, replaced, created, or newly placed under the root onto the
+     worklist;
    - keep referential/traversal invariants;
    - allow whole-IR type, dominance, CFG, and dialect validity to be
      temporarily false;

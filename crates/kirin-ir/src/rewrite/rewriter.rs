@@ -934,9 +934,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         // Rewrite the slots, keeping the sites that actually applied — a stale
         // site names a statement or graph that has since been tombstoned.
-        let mut changed_stmts: Vec<Statement> = Vec::new();
-        let mut changed_graphs: Vec<DiGraph> = Vec::new();
-        let mut changed_topologies: Vec<DiGraph> = Vec::new();
+        let mut changed_stmts: IndexSet<Statement, FxBuildHasher> = IndexSet::default();
+        let mut changed_graphs: IndexSet<DiGraph, FxBuildHasher> = IndexSet::default();
+        let mut changed_topologies: IndexSet<DiGraph, FxBuildHasher> = IndexSet::default();
         let mut moved: Vec<Vec<Use>> = Vec::with_capacity(pairs.len());
         for (&(old, new), sites) in pairs.iter().zip(&sites) {
             let mut applied: Vec<Use> = Vec::with_capacity(sites.len());
@@ -951,14 +951,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                             continue;
                         };
                         *slot = new;
-                        if !changed_stmts.contains(&stmt) {
-                            changed_stmts.push(stmt);
-                        }
+                        changed_stmts.insert(stmt);
                         if let Some(StatementParent::DiGraph(graph)) = parent
                             && self.retarget_operand_edge(graph, stmt, old, new)
-                            && !changed_topologies.contains(&graph)
                         {
-                            changed_topologies.push(graph);
+                            changed_topologies.insert(graph);
                         }
                         true
                     }
@@ -968,8 +965,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                             .and_then(|item| item.yields_mut().get_mut(index))
                             .map(|slot| *slot = new)
                             .is_some();
-                        if ok && !changed_graphs.contains(&graph) {
-                            changed_graphs.push(graph);
+                        if ok {
+                            changed_graphs.insert(graph);
                         }
                         ok
                     }

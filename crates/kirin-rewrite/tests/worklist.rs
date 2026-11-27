@@ -397,6 +397,74 @@ specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
         assert_eq!(visits.borrow().get(&p), None);
     }
 
+    /// At an `add` in an `scf.for` body, moves the `add` in front of the
+    /// loop.
+    struct HoistSelf;
+
+    impl StatementRule<L> for HoistSelf {
+        fn apply(
+            &mut self,
+            rewriter: &mut Rewriter<'_, L>,
+            stmt: Statement,
+        ) -> Result<WalkResult, RewriteError> {
+            let stage = rewriter.stage();
+            if !matches!(
+                stmt.expect_info(stage).definition(),
+                L::Arith(Arith::Add { .. })
+            ) {
+                return Ok(WalkResult::Advance);
+            }
+            let Some(owner) = stmt.owner(stage) else {
+                return Ok(WalkResult::Advance);
+            };
+            if matches!(
+                owner.expect_info(stage).definition(),
+                L::Scf(StructuredControlFlow::For(_))
+            ) {
+                rewriter.move_before(stmt, owner)?;
+            }
+            Ok(WalkResult::Advance)
+        }
+    }
+
+    /// `%p` hoists itself out of the root's tree during its own visit: the
+    /// rule after the hoist is not handed it.
+    #[test]
+    fn run_at_stops_visiting_a_statement_its_rule_moves_out_of_the_root() {
+        let visits: Rc<RefCell<HashMap<Statement, usize>>> = Rc::default();
+        let mut rules = RuleSet::<L>::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
+        rules.add_statement_rule("hoist_self", || HoistSelf);
+        let counting = Rc::clone(&visits);
+        rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&counting)));
+        let driver = RewriteDriver::new(&rules);
+
+        let mut program: Program<StageInfo<L>> = Program::new();
+        program.parse(LOOP).expect("the program parses");
+        let stage = program.stage_by_name("arith").expect("the stage exists");
+        let mut p = None;
+        program
+            .run_pass(stage, |rewriter| {
+                let function = rewriter
+                    .stage()
+                    .staged_function_arena()
+                    .iter()
+                    .flat_map(|function| function.specializations())
+                    .map(|specialization| *specialization.definition())
+                    .next()
+                    .expect("the program has a function");
+                let [_, for_stmt, stmt, ..] = PreOrder::schedule(rewriter.stage(), function)[..]
+                else {
+                    panic!("the function has a loop");
+                };
+                p = Some(stmt);
+                driver.run_at(rewriter, for_stmt)
+            })
+            .expect("the pass succeeds");
+
+        let p = p.expect("the pass ran");
+        assert_eq!(visits.borrow().get(&p), None);
+    }
+
     /// [`LOOP`] with a statement `%q` in front of the loop.
     const LOOP_AFTER_Q: &str = "stage @arith fn @f(i64, i64, i64) -> i64;
 specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
@@ -472,5 +540,92 @@ specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
 
         let p = p.expect("the pass ran");
         assert_eq!(visits.borrow().get(&p), None);
+    }
+
+    /// Two functions: `@f` computes a sum, and `@g` returns its first
+    /// argument.
+    const TWO_FUNCTIONS: &str = "stage @arith fn @f(i64, i64) -> i64;
+stage @arith fn @g(i64, i64) -> i64;
+specialize @arith fn @f(i64, i64) -> i64 cfg {
+  ^entry(%a: i64, %b: i64) {
+    %s = add %a, %b -> i64;
+    ret %s;
+  }
+}
+specialize @arith fn @g(i64, i64) -> i64 cfg {
+  ^entry(%c: i64, %d: i64) {
+    ret %c;
+  }
+}
+";
+
+    /// At a function whose body has blocks, moves them all after `anchor`,
+    /// a block of another function.
+    struct SpliceAway {
+        anchor: Block,
+    }
+
+    impl StatementRule<L> for SpliceAway {
+        fn apply(
+            &mut self,
+            rewriter: &mut Rewriter<'_, L>,
+            stmt: Statement,
+        ) -> Result<WalkResult, RewriteError> {
+            let stage = rewriter.stage();
+            let L::Function { body, .. } = *stmt.expect_info(stage).definition() else {
+                return Ok(WalkResult::Advance);
+            };
+            if body.blocks(stage).next().is_some() {
+                rewriter.splice_cfg_after(body, self.anchor)?;
+            }
+            Ok(WalkResult::Advance)
+        }
+    }
+
+    /// `@f` is visited before its body, so the splice moves the body's
+    /// statements into `@g`, out of the root's tree, while they are still in
+    /// the queue: no rule is handed them.
+    #[test]
+    fn run_at_skips_statements_spliced_out_of_its_root() {
+        let visits: Rc<RefCell<HashMap<Statement, usize>>> = Rc::default();
+        let mut program: Program<StageInfo<L>> = Program::new();
+        program.parse(TWO_FUNCTIONS).expect("the program parses");
+        let stage = program.stage_by_name("arith").expect("the stage exists");
+        let mut body = Vec::new();
+        program
+            .run_pass(stage, |rewriter| {
+                let [f, g] = rewriter
+                    .stage()
+                    .staged_function_arena()
+                    .iter()
+                    .flat_map(|function| function.specializations())
+                    .map(|specialization| *specialization.definition())
+                    .collect::<Vec<_>>()[..]
+                else {
+                    panic!("the program has two functions");
+                };
+                let L::Function { body: g_body, .. } =
+                    *g.expect_info(rewriter.stage()).definition()
+                else {
+                    panic!("`@g` is a function");
+                };
+                let anchor = g_body
+                    .blocks(rewriter.stage())
+                    .next()
+                    .expect("`@g` has a block");
+                body = PreOrder::schedule(rewriter.stage(), f)[1..].to_vec();
+
+                let mut rules = RuleSet::<L>::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
+                rules.add_statement_rule("splice_away", move || SpliceAway { anchor });
+                let counting = Rc::clone(&visits);
+                rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&counting)));
+                RewriteDriver::new(&rules).run_at(rewriter, f)
+            })
+            .expect("the pass succeeds");
+
+        assert_eq!(body.len(), 2, "`@f`'s body has an add and a ret");
+        for stmt in body {
+            assert_eq!(visits.borrow().get(&stmt), None);
+        }
     }
 }

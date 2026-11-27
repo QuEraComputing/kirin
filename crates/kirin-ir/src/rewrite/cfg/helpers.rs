@@ -58,14 +58,22 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         out
     }
 
-    /// The set of blocks `block`'s statements may transfer control to.
+    /// The set of blocks `block` may transfer control to: its terminator's
+    /// successors, or none if it has no terminator.
+    ///
+    /// Only a terminator has successors (`verify_derived` reports any other
+    /// statement that does), so the rest of the block is not read: this costs
+    /// the terminator's successors, not the block's size.
     pub(super) fn block_successors(&self, block: Block) -> HashSet<Block> {
-        let mut out = HashSet::new();
-        for stmt in self.block_statements(block) {
-            let definition = &stmt.expect_info(self.stage).definition;
-            out.extend(definition.successors().map(|successor| successor.target()));
-        }
-        out
+        let Some(terminator) = block.get_info(self.stage).and_then(|info| info.terminator) else {
+            return HashSet::new();
+        };
+        terminator
+            .expect_info(self.stage)
+            .definition
+            .successors()
+            .map(|successor| successor.target())
+            .collect()
     }
 
     /// Bring the predecessor mirror in line after `source`'s successor set

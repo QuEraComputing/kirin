@@ -2,15 +2,17 @@ use std::collections::{HashSet, VecDeque};
 
 use kirin_ir::walk::WalkOrder;
 use kirin_ir::{
-    Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, StatementParent, Use,
+    Dialect, GetInfo, MutationEvent, SSAValue, StageInfo, Statement, StatementParent, Use,
 };
+
+use crate::rule::producer;
 
 /// The statements a driver sweep still has to visit, in order.
 ///
 /// Only statements under the sweep's root are ever added: those of the walk
-/// it starts from, and those inserted under one of them. A statement is in
-/// the queue at most once: pushing one already in it does nothing, so it
-/// keeps its place. Once popped, it can be pushed again.
+/// it starts from, and those created or placed under one of them. A
+/// statement is in the queue at most once: pushing one already in it does
+/// nothing, so it keeps its place. Once popped, it can be pushed again.
 ///
 /// One worklist serves every sweep of a run, and every root of
 /// [`RewriteDriver::run`](super::RewriteDriver::run): each statement's
@@ -26,8 +28,8 @@ pub(super) struct Worklist {
     /// The statements added since the sweep began, after the rest of
     /// `snapshot`.
     queue: VecDeque<Statement>,
-    /// The statements inserted under the root during the sweep.
-    inserted: Vec<Statement>,
+    /// The statements created or placed under the root during the sweep.
+    adopted: Vec<Statement>,
     /// Each statement's status.
     status: Statuses,
     /// The sweep's root.
@@ -48,9 +50,9 @@ enum Status {
     OutsideRoot,
     /// In the queue, to be visited.
     InQueue,
-    /// Under the root but not in the queue: visited already, or inserted
+    /// Under the root but not in the queue: visited already, or adopted
     /// and not added yet.
-    VisitedOrInserted,
+    VisitedOrAdopted,
 }
 
 /// Each statement's [`Status`], at its arena index. A statement past the
@@ -86,13 +88,13 @@ impl Worklist {
         root: Statement,
         native_rules_present: bool,
     ) {
-        for &stmt in self.snapshot.iter().chain(&self.inserted) {
+        for &stmt in self.snapshot.iter().chain(&self.adopted) {
             self.status.set(stmt, Status::OutsideRoot);
         }
         self.snapshot = O::schedule(stage, root);
         self.next = 0;
         self.queue.clear();
-        self.inserted.clear();
+        self.adopted.clear();
         for &stmt in &self.snapshot {
             self.status.set(stmt, Status::InQueue);
         }
@@ -107,6 +109,16 @@ impl Worklist {
         self.move_occurred
     }
 
+    /// Whether `events` include a move of existing statements: a statement
+    /// that was already under the root placed somewhere, or a `CFG` splice.
+    pub(super) fn moves_existing_statements(&self, events: &[MutationEvent]) -> bool {
+        events.iter().any(|event| match *event {
+            MutationEvent::PlacedStatement { stmt } => self.status.get(stmt) != Status::OutsideRoot,
+            MutationEvent::SplicedCfg { .. } => true,
+            _ => false,
+        })
+    }
+
     /// The next statement to visit, or `None` once the worklist is empty.
     pub(super) fn pop(&mut self) -> Option<Statement> {
         let stmt = match self.snapshot.get(self.next) {
@@ -116,14 +128,14 @@ impl Worklist {
             }
             None => self.queue.pop_front()?,
         };
-        self.status.set(stmt, Status::VisitedOrInserted);
+        self.status.set(stmt, Status::VisitedOrAdopted);
         Some(stmt)
     }
 
     /// Add `stmt` at the back of the queue, unless it is already in it or is
     /// not under the root.
     pub(super) fn push(&mut self, stmt: Statement) {
-        if self.status.get(stmt) == Status::VisitedOrInserted {
+        if self.status.get(stmt) == Status::VisitedOrAdopted {
             self.status.set(stmt, Status::InQueue);
             self.queue.push_back(stmt);
         }
@@ -141,8 +153,8 @@ impl Worklist {
     /// [`move_occurred`](Self::move_occurred)) only if it took statements out
     /// of the root's tree, checked once per destination: a splice, split or
     /// merge costs one walk up from the block it moved statements into, not
-    /// one per statement.
-    /// Other events add nothing; the next sweep visits what they changed.
+    /// one per statement. Other events add nothing; the next sweep visits
+    /// what they changed.
     pub(super) fn push_affected<L: Dialect>(
         &mut self,
         stage: &StageInfo<L>,
@@ -211,14 +223,14 @@ impl Worklist {
         }
     }
 
-    /// Count the inserted `stmt` under the root if its owner is.
+    /// Count the created or placed `stmt` under the root if its owner is.
     fn adopt<L: Dialect>(&mut self, stage: &StageInfo<L>, stmt: Statement) {
         if let Some(owner) = stmt.owner(stage)
             && self.status.get(owner) != Status::OutsideRoot
             && self.status.get(stmt) == Status::OutsideRoot
         {
-            self.status.set(stmt, Status::VisitedOrInserted);
-            self.inserted.push(stmt);
+            self.status.set(stmt, Status::VisitedOrAdopted);
+            self.adopted.push(stmt);
         }
     }
 
@@ -244,9 +256,7 @@ impl Worklist {
                 self.push(owner);
             }
             for &operand in definition.arguments() {
-                if let Some(SSAKind::Result(producer, _)) =
-                    operand.get_info(stage).map(|v| *v.kind())
-                {
+                if let Some(producer) = producer(stage, operand) {
                     self.push(producer);
                 }
             }
