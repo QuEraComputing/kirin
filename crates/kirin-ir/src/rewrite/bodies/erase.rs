@@ -32,7 +32,8 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// - a block outside it branches to one of its blocks
     ///   ([`RewriteError::BlockHasPredecessors`]); retarget those edges first.
     ///   Branches between its own blocks, such as a self-loop, are fine;
-    /// - a value it defines is used outside it
+    /// - a value it defines at top level is used outside it (values in nested
+    ///   bodies are not checked; `verify_derived` catches those)
     ///   ([`RewriteError::BlockArgumentInUse`] /
     ///   [`RewriteError::StatementResultsInUse`] /
     ///   [`RewriteError::PortInUse`]); replace those uses first.
