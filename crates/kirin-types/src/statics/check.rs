@@ -1,6 +1,6 @@
 use crate::SortError;
 
-use super::{BaseSort, IndexSort, Sort, StaticSig, StaticTerm, StaticTermId, Statics};
+use super::{BaseSort, IndexSort, Sort, StaticSig, StaticTerm, StaticTermId, Statics, TypeSig};
 
 impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
     /// The sort of the locally closed `term`.
@@ -8,6 +8,32 @@ impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
     /// corresponding enclosing binder.
     pub fn check_sort(&self, term: StaticTermId) -> Result<Sort<B>, SortError<B>> {
         self.sort_under(term, &mut Vec::new())
+    }
+
+    /// Checks that `sig` is well-formed: every guard and assert has sort
+    /// `bool`, and every argument and result has sort `type` or `[type]`.
+    /// Guards and arguments are checked under the quantifiers; asserts and
+    /// results under the quantifiers and then the existentials.
+    ///
+    /// The signature must be in prenex form: no argument or result may
+    /// contain a `∀`, `∃`, `⊃` or `∧` anywhere; those belong in the
+    /// signature's own fields.
+    pub fn check_sig(&self, sig: &TypeSig<B>) -> Result<(), SortError<B>> {
+        let context = &mut sig.quantifiers.clone();
+        for guard in &sig.guards {
+            self.expect(*guard, BaseSort::Bool.into(), context)?;
+        }
+        for arg in &sig.args {
+            self.expect_entry(*arg, context)?;
+        }
+        context.extend(sig.existentials.iter().copied());
+        for assert in &sig.asserts {
+            self.expect(*assert, BaseSort::Bool.into(), context)?;
+        }
+        for result in &sig.results {
+            self.expect_entry(*result, context)?;
+        }
+        Ok(())
     }
 
     /// The sort of `term` under `context` of bound variables.
@@ -66,6 +92,48 @@ impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
                 checked?;
                 Ok(BaseSort::Type.into())
             }
+        }
+    }
+
+    /// Checks that `entry`, an argument or result of a [`TypeSig`], has sort
+    /// `type` (one value) or `[type]` (a list of values), and that it contains
+    /// no binder or proposition.
+    fn expect_entry(
+        &self,
+        entry: StaticTermId,
+        context: &mut Vec<Sort<B>>,
+    ) -> Result<(), SortError<B>> {
+        let found = self.sort_under(entry, context)?;
+        if !matches!(
+            found,
+            Sort::Base(BaseSort::Type) | Sort::Seq(BaseSort::Type)
+        ) {
+            return Err(SortError::SortMismatch {
+                term: entry,
+                shown: self.display(entry, context.len()).to_string(),
+                expected: BaseSort::Type.into(),
+                found,
+            });
+        }
+
+        match self.find_binder(entry) {
+            // The outermost binder found has no binder above it in `entry`,
+            // so it is displayed under `context` alone.
+            Some(binder) => Err(SortError::NotPrenex {
+                term: binder,
+                shown: self.display(binder, context.len()).to_string(),
+            }),
+            None => Ok(()),
+        }
+    }
+
+    /// The first `∀`, `∃`, `⊃` or `∧` in `term`, searching outermost first.
+    fn find_binder(&self, term: StaticTermId) -> Option<StaticTermId> {
+        use StaticTerm::*;
+        match &*self.terms[term] {
+            Forall(..) | Exists(..) | Guard(..) | Assert(..) => Some(term),
+            Bound(_) | Free(_) | Lit(_) => None,
+            Constructor(_, args) | Seq(_, args) => args.iter().find_map(|a| self.find_binder(*a)),
         }
     }
 

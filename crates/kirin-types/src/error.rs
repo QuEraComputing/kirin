@@ -29,6 +29,11 @@ pub enum SortError<B> {
         found: Sort<B>,
     },
     #[error(
+        "a signature's argument or result contains `{shown}`, which is quantified, guarded or \
+         asserting; move that into the signature's own quantifiers, guards, existentials or asserts"
+    )]
+    NotPrenex { term: StaticTermId, shown: String },
+    #[error(
         "`{shown}` evaluates to a value of sort `{found}`, but its signature's result is `{expected}`"
     )]
     EvalSort {

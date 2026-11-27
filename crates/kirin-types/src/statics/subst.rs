@@ -6,9 +6,11 @@ impl<B: IndexSort, C: Clone> Statics<B, C> {
     /// Apply static arguments to a binder term's body. For example,
     ///   - `∀x:σ. T': Static argument `a` substitutes for `x` in `T`
     ///   - `∃x:σ. T': Static argument `a` substitutes for `x` in `T`
-    ///   - [`DynSig`](crate::DynSig): Static arguments from
-    ///     [`DynTerm::Constructor`](crate::DynTerm::Constructor) substitute
-    ///     for the quantifiers in the signature's guards, arguments, and results.
+    ///   - [`TypeSig`](crate::TypeSig): A statement's static arguments
+    ///     substitute for the quantifiers in the signature's guards and
+    ///     arguments. Its asserts and results are also under the
+    ///     existentials, so they take the static arguments followed by the
+    ///     existentials' witnesses.
     ///
     ///
     /// The caller is expected to remove the binder term itself(e.g.
@@ -20,7 +22,7 @@ impl<B: IndexSort, C: Clone> Statics<B, C> {
     ///     back in `args`,
     ///  2. Shifts all other bound variables by the number of arguments
     ///     i.e. 1 in the case of Forall/Exists, and args.len() in the case of
-    ///     a `DynSig`'s quantifiers.
+    ///     a `TypeSig`'s quantifiers.
     pub fn instantiate(&mut self, term: StaticTermId, args: &[StaticTermId]) -> StaticTermId {
         let k = args.len();
 

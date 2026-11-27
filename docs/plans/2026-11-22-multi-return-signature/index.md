@@ -183,6 +183,37 @@ live specialization's definition still exists and still refines its interface.
 
 Changes to the type system framework, to be agreed with its author.
 
+**Status:** 3a and the list-sort half of 3b are implemented in
+`kirin-types` on `planza/type-system-framework`, with these differences from
+the text below:
+
+- Lists exist for every base sort, not only types: `Sort` is
+  `Base(BaseSort) | Seq(BaseSort)`, so `[type]` is the `types` sort and
+  `∀n̄:[int]` is allowed too.
+- `StaticTerm::Seq` stores its element sort, so `[]` has a sort. There is no
+  splicing: every item of a list is one element, and a list variable stands
+  alone wherever a list is expected, so `instantiate` replaces it whole.
+  The one-sequence-variable rule below is therefore unnecessary for terms.
+- `TypeSig` is in prenex form on both sides:
+  `∀ā:σ̄. B̄ ⊃ T̄ ⇒ ∃b̄:ρ̄. C̄ ∧ Ū`. The `existentials` and `asserts` fields
+  relate results to each other, e.g.
+  `split : ∀a n. [vec[a,n]] ⇒ ∃k j. [k + j = n] ∧ [vec[a,k], vec[a,j]]`.
+- `args` and `results` are `Vec`s with one entry per operand or result field
+  of the statement. An entry has sort `type`, or `[type]` for a
+  `Vec<SSAValue>` field. Any number of entries may be lists, since the IR
+  gives each field's length; whether a callable signature should allow only
+  a last list entry is left to the matching work.
+  Binders and propositions still wrap only `type`. `Statics::check_sig`
+  checks a signature, and rejects an entry that contains a `∀`, `∃`, `⊃` or
+  `∧` anywhere.
+- `StaticTerm::Function` and `StaticTerm::Unit` are gone. Function types
+  and `unit` are dialect constructors (`FnStaticCon`:
+  `Fn : ([type], [type]) ⇒ type`, for `kirin-function`; `UnitStaticCon`:
+  `unit : () ⇒ type`), as tuples are. Body and block types are `TypeSig`s,
+  not function types.
+- Not done yet: matching and unification, the call rule, conversion to and
+  from `Signature`, and 3c.
+
 **3a. Ground sequences**
 
 - Add `Sort::Types`.
