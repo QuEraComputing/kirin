@@ -1,15 +1,10 @@
-#[cfg(test)]
-mod analysis_clients;
-mod interpreter;
-mod language;
-mod stage;
-
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::ProgramPrintExt;
 use kirin_interpreter::ProgramPoint;
 
-use stage::Stage;
+use toy_lang::interpreter;
+use toy_lang::stage::Stage;
 
 #[derive(Parser)]
 #[command(name = "toy-lang")]

@@ -8,12 +8,13 @@ use kirin_constant::Constant;
 use kirin_demand::{Demand, DemandAnalysis, DemandCallCtx};
 use kirin_interpreter::{AnalysisResults, Callee, InterpreterError, LinkTarget, StrongDemand};
 use kirin_rewrite::{
-    Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, PatternRule, RewriteDriver,
-    RuleSet, StatementRule,
+    Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, PatternRule, RuleSet,
+    StatementRule,
 };
 use rustc_hash::FxHashSet;
 
-use super::common::{helper_result, new_database, printed, roots};
+use super::common::roots;
+use super::log;
 use crate::language::LowLevel;
 use crate::stage::Stage;
 
@@ -22,11 +23,15 @@ type DemandResults = AnalysisResults<(LinkTarget, DemandCallCtx), SSAValue, Dema
 
 /// Demand over a whole stage, rooting every function with all its outputs
 /// demanded, so every function counts as an entry point.
-struct DemandFacts;
+pub struct DemandFacts;
+
+impl DemandFacts {
+    pub const NAME: &str = "demand";
+}
 
 /// The values of a stage that some function's demand result demands,
 /// collected when the analysis finishes, so a read is one lookup.
-struct StageDemand(FxHashSet<SSAValue>);
+pub struct StageDemand(FxHashSet<SSAValue>);
 
 impl StageDemand {
     /// Add the values `results` demands at `stage`.
@@ -52,7 +57,7 @@ impl StageDemand {
     /// Whether any function's result demands `value`. `Dead` is the lattice's
     /// bottom and is not stored, so a value the analysis saw but nothing
     /// demands has no fact.
-    fn is_demanded(&self, value: SSAValue) -> bool {
+    pub fn is_demanded(&self, value: SSAValue) -> bool {
         self.0.contains(&value)
     }
 }
@@ -70,13 +75,17 @@ impl Analysis<Stage> for DemandFacts {
             Stage::Lowered(info) => roots(info),
         };
         let mut demanded = StageDemand(FxHashSet::default());
+        let mut run = log::Run::start(Self::NAME);
         for (specialization, _) in roots {
+            let root = run.root(specialization);
             // Toy functions return one value.
             let analyzed = DemandAnalysis::<Stage, InterpreterError>::new(program)
                 .analyze(*stage, Callee::Specialized(specialization), [Demand::Live])
                 .map_err(AnalysisError::failed::<Self>)?;
             demanded.add(*stage, &analyzed);
+            run.end_root(root);
         }
+        run.finish();
         Ok(demanded)
     }
 }
@@ -88,7 +97,7 @@ impl Analysis<Stage> for DemandFacts {
 ///
 /// Every `arith` statement existed when [`DemandFacts`] ran, since this pass
 /// creates none, so a missing fact means not demanded.
-struct FreeUndemanded {
+pub struct FreeUndemanded {
     demand: Arc<StageDemand>,
 }
 
@@ -104,7 +113,7 @@ impl StatementRule<LowLevel> for FreeUndemanded {
         }
         let result: SSAValue = (*definition.results().next().expect("arith has a result")).into();
         let has_uses = !result.expect_info(rewriter.stage()).uses().is_empty();
-        if !has_uses || self.demand.is_demanded(result) {
+        if !has_uses || log::lookup(|| self.demand.is_demanded(result)) {
             return Ok(WalkResult::Advance);
         }
         let placeholder = rewriter.new_result(ArithType::I64);
@@ -123,7 +132,7 @@ impl StatementRule<LowLevel> for FreeUndemanded {
 
 /// A rule set with `free_undemanded`, which reads [`DemandFacts`] for
 /// `stage`.
-fn free_undemanded(stage: CompileStage) -> RuleSet<LowLevel> {
+pub fn free_undemanded(stage: CompileStage) -> RuleSet<LowLevel> {
     let mut rules = RuleSet::build(|_| Vec::<PatternRule<LowLevel>>::new())
         .expect("an empty rule set is valid");
     rules
@@ -136,24 +145,35 @@ fn free_undemanded(stage: CompileStage) -> RuleSet<LowLevel> {
     rules
 }
 
-/// Run `free_undemanded` over `stage` as one pass.
-fn free(db: &mut Database<Stage>, stage: CompileStage) {
-    let rules = free_undemanded(stage);
-    db.run_pass(stage, rules.required(), |rewriter, cache| {
-        RewriteDriver::new(&rules).with_cache(cache).run(rewriter)
-    })
-    .expect("the pass succeeds");
-}
+#[cfg(test)]
+mod tests {
+    use kirin::prelude::*;
+    use kirin_demand::{Demand, DemandAnalysis};
+    use kirin_interpreter::{Callee, InterpreterError};
+    use kirin_rewrite::{Database, RewriteDriver};
 
-fn demand_database(input: &str) -> (Database<Stage>, CompileStage) {
-    let (mut db, stage) = new_database(input);
-    db.register::<DemandFacts>();
-    (db, stage)
-}
+    use super::super::common::{helper_result, new_database, printed};
+    use super::{DemandFacts, free_undemanded};
+    use crate::stage::Stage;
 
-/// `@first` never reads `%q`, so `%x` is not demanded, though the call uses
-/// it.
-const DEAD_ARGUMENT: &str = "stage @lowered fn @main(i64) -> i64;
+    /// Run `free_undemanded` over `stage` as one pass.
+    fn free(db: &mut Database<Stage>, stage: CompileStage) {
+        let rules = free_undemanded(stage);
+        db.run_pass(stage, rules.required(), |rewriter, cache| {
+            RewriteDriver::new(&rules).with_cache(cache).run(rewriter)
+        })
+        .expect("the pass succeeds");
+    }
+
+    fn demand_database(input: &str) -> (Database<Stage>, CompileStage) {
+        let (mut db, stage) = new_database(input);
+        db.register::<DemandFacts>();
+        (db, stage)
+    }
+
+    /// `@first` never reads `%q`, so `%x` is not demanded, though the call uses
+    /// it.
+    const DEAD_ARGUMENT: &str = "stage @lowered fn @main(i64) -> i64;
 stage @lowered fn @first(i64, i64) -> i64;
 specialize @lowered fn @main(i64) -> i64 cfg {
   ^entry(%a: i64) {
@@ -169,9 +189,9 @@ specialize @lowered fn @first(i64, i64) -> i64 cfg {
 }
 ";
 
-/// [`DEAD_ARGUMENT`] with the call reading a placeholder and the `mul`
-/// erased. The placeholder has no name, so it prints as its SSA id, `%5`.
-const DEAD_ARGUMENT_FREED: &str = "stage @lowered fn @main(i64) -> i64;
+    /// [`DEAD_ARGUMENT`] with the call reading a placeholder and the `mul`
+    /// erased. The placeholder has no name, so it prints as its SSA id, `%5`.
+    const DEAD_ARGUMENT_FREED: &str = "stage @lowered fn @main(i64) -> i64;
 stage @lowered fn @first(i64, i64) -> i64;
 specialize @lowered fn @main(i64) -> i64 cfg {
   ^entry(%a: i64) {
@@ -187,15 +207,15 @@ specialize @lowered fn @first(i64, i64) -> i64 cfg {
 }
 ";
 
-#[test]
-fn an_undemanded_value_with_a_use_is_freed_and_erased() {
-    let (mut db, stage) = demand_database(DEAD_ARGUMENT);
-    free(&mut db, stage);
-    assert_eq!(db.program().sprint(), printed(DEAD_ARGUMENT_FREED));
-}
+    #[test]
+    fn an_undemanded_value_with_a_use_is_freed_and_erased() {
+        let (mut db, stage) = demand_database(DEAD_ARGUMENT);
+        free(&mut db, stage);
+        assert_eq!(db.program().sprint(), printed(DEAD_ARGUMENT_FREED));
+    }
 
-/// `main` ignores what `helper` returns.
-const IGNORES_HELPER: &str = "stage @lowered fn @main(i64) -> i64;
+    /// `main` ignores what `helper` returns.
+    const IGNORES_HELPER: &str = "stage @lowered fn @main(i64) -> i64;
 stage @lowered fn @helper(i64) -> i64;
 specialize @lowered fn @main(i64) -> i64 cfg {
   ^entry(%a: i64) {
@@ -212,29 +232,29 @@ specialize @lowered fn @helper(i64) -> i64 cfg {
 }
 ";
 
-#[test]
-fn a_function_other_code_may_call_keeps_what_it_returns() {
-    let (mut db, stage) = demand_database(IGNORES_HELPER);
+    #[test]
+    fn a_function_other_code_may_call_keeps_what_it_returns() {
+        let (mut db, stage) = demand_database(IGNORES_HELPER);
 
-    // Rooted at `main` only, nothing demands `helper`'s `%z`.
-    let program = db.program();
-    let main = Callee::Function(program.lookup_function_by_name("main").unwrap());
-    let from_main = DemandAnalysis::<Stage, InterpreterError>::new(program)
-        .analyze(stage, main, [Demand::Live])
-        .unwrap();
-    let z = helper_result(program, stage);
-    assert_ne!(from_main.joined_fact_at(stage, z), Some(Demand::Live));
+        // Rooted at `main` only, nothing demands `helper`'s `%z`.
+        let program = db.program();
+        let main = Callee::Function(program.lookup_function_by_name("main").unwrap());
+        let from_main = DemandAnalysis::<Stage, InterpreterError>::new(program)
+            .analyze(stage, main, [Demand::Live])
+            .unwrap();
+        let z = helper_result(program, stage);
+        assert_ne!(from_main.joined_fact_at(stage, z), Some(Demand::Live));
 
-    // The stage-wide analysis also roots `helper` with its output demanded,
-    // so `%z` is demanded and the pass leaves it.
-    let before = db.program().sprint();
-    free(&mut db, stage);
-    assert_eq!(db.program().sprint(), before);
-}
+        // The stage-wide analysis also roots `helper` with its output demanded,
+        // so `%z` is demanded and the pass leaves it.
+        let before = db.program().sprint();
+        free(&mut db, stage);
+        assert_eq!(db.program().sprint(), before);
+    }
 
-#[test]
-fn a_demanded_value_is_left_alone() {
-    let input = "stage @lowered fn @f(i64) -> i64;
+    #[test]
+    fn a_demanded_value_is_left_alone() {
+        let input = "stage @lowered fn @f(i64) -> i64;
 specialize @lowered fn @f(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %y = add %x, %x -> i64;
@@ -242,7 +262,8 @@ specialize @lowered fn @f(i64) -> i64 cfg {
   }
 }
 ";
-    let (mut db, stage) = demand_database(input);
-    free(&mut db, stage);
-    assert_eq!(db.program().sprint(), printed(input));
+        let (mut db, stage) = demand_database(input);
+        free(&mut db, stage);
+        assert_eq!(db.program().sprint(), printed(input));
+    }
 }

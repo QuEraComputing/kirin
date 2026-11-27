@@ -100,7 +100,7 @@ pub(crate) type ToyDenseLiveness<'ir, Lk = SameStageLinker> = DenseLiveness<
 
 /// What [`ToyDenseLiveness`] returns: the live set at each program point of
 /// the one analyzed callable.
-pub(crate) type ToyLiveness = AnalysisResults<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>;
+pub type ToyLiveness = AnalysisResults<LinkTarget, ProgramPoint, LiveSet, ClassicLiveness>;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
 /// language boundaries.

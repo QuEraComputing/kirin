@@ -4,6 +4,9 @@ name = "toy-lang"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "toy-lang"
 path = "src/main.rs"
@@ -27,8 +30,14 @@ clap = { workspace = true }
 anyhow = { workspace = true }
 smallvec = { workspace = true }
 rustc-hash = "2.1.2"
+kirin-rewrite = { workspace = true }
 
 [dev-dependencies]
-kirin-rewrite = { workspace = true }
+serde_json = "1.0"
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
+
+[[bench]]
+name = "incremental"
+path = "benches/incremental/main.rs"
+harness = false
