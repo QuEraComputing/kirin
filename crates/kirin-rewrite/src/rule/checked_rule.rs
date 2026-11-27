@@ -134,6 +134,7 @@ impl<L: Dialect> CheckedRule<L> {
         root: Statement,
     ) -> Result<HashSet<Statement>, RuleError> {
         let error = |kind| RuleError::new(name, kind);
+        let position = |stmt: Statement| body.iter().position(|&s| s == stmt).unwrap_or_default();
         let mut matched = HashSet::new();
         let mut pending = vec![root];
         while let Some(stmt) = pending.pop() {
@@ -150,7 +151,7 @@ impl<L: Dialect> CheckedRule<L> {
                 || op.successors().next().is_some();
             if owns_bodies {
                 return Err(error(RuleErrorKind::OpWithBodies {
-                    position: position(body, stmt),
+                    position: position(stmt),
                 }));
             }
             for &operand in op.arguments() {
@@ -159,7 +160,7 @@ impl<L: Dialect> CheckedRule<L> {
                     Some((producer, PatternLanguage::Op(_))) => pending.push(producer),
                     _ => {
                         return Err(error(RuleErrorKind::UnsupportedOperand {
-                            position: position(body, stmt),
+                            position: position(stmt),
                         }));
                     }
                 }
@@ -308,11 +309,6 @@ impl<L: Dialect> CheckedRule<L> {
         }
         Ok(walk_result)
     }
-}
-
-/// Where `stmt` is in the pattern body `body`, counting from 0, for errors.
-fn position(body: &[Statement], stmt: Statement) -> usize {
-    body.iter().position(|&s| s == stmt).unwrap_or_default()
 }
 
 /// The `native_call` a [`Step::Native`] runs.
