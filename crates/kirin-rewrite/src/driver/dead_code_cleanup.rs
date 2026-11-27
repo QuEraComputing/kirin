@@ -11,9 +11,9 @@ impl<L: Dialect, O: WalkOrder> RewriteDriver<'_, L, O> {
     /// were erased.
     ///
     /// A rule that replaces its root's results without erasing the root
-    /// leaves it, and often its producers, behind with no uses. Erasing them after each sweep keeps later sweeps from walking
-    /// and matching them again. This also removes dead statements no rule
-    /// touched.
+    /// leaves it, and often its producers, behind with no uses. Erasing them
+    /// after each sweep keeps later sweeps from walking and matching them
+    /// again. This also removes dead statements no rule touched.
     ///
     /// A statement is dead if it is pure, is not a terminator, and none of
     /// its results is used. Bodies nested in a statement are cleaned before

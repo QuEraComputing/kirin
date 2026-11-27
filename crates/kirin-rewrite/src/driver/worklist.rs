@@ -141,8 +141,8 @@ impl Worklist {
     /// [`move_occurred`](Self::move_occurred)) only if it took statements out
     /// of the root's tree, checked once per destination: a splice, split or
     /// merge costs one walk up from the block it moved statements into, not
-    /// one per statement.
-    /// Other events add nothing; the next sweep visits what they changed.
+    /// one per statement. Other events add nothing; the next sweep visits
+    /// what they changed.
     pub(super) fn push_affected<L: Dialect>(
         &mut self,
         stage: &StageInfo<L>,

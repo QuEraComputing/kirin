@@ -89,11 +89,12 @@ impl std::ops::AddAssign for RewriteSummary {
 /// Graph bodies are not handed to it. The blocks are listed when its turn
 /// comes, so it sees the edits of the rules before it at that statement. A
 /// statement visited again, such as the owner of a block whose statements an
-/// edit changed, hands its blocks to the rule again. A listed block an earlier copy erased
-/// or merged away is skipped. For every block, the driver builds a fresh
-/// copy of the rule with the recipe given to [`RuleSet::add_block_rule`],
-/// and each block whose run edits the IR counts as one application. An
-/// `interrupt` ends the sweep at once, leaving the remaining blocks unrun.
+/// edit changed, hands its blocks to the rule again. A listed block an
+/// earlier copy erased or merged away is skipped. For every block, the driver
+/// builds a fresh copy of the rule with the recipe given to
+/// [`RuleSet::add_block_rule`], and each block whose run edits the IR counts
+/// as one application. An `interrupt` ends the sweep at once, leaving the
+/// remaining blocks unrun.
 ///
 /// Rules that keep undoing each other never reach a fixpoint. As safety
 /// nets, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps

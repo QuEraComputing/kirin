@@ -53,7 +53,7 @@ impl Match {
             })
     }
 
-    /// The IR statement matched pattern statement `stmt` matched.
+    /// The IR statement that pattern statement `stmt` matched.
     pub(crate) fn statement(&self, stmt: Statement) -> Option<Statement> {
         self.statements.get(&stmt).copied()
     }

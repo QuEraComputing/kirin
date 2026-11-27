@@ -68,7 +68,7 @@ impl Match {
                 .ok_or_else(|| DriverError::NotAWalkResult {
                     rule: rule.name().to_string(),
                 }),
-            _ => unreachable!("RewriteRule::new rejects other rewrite-body terminators"),
+            _ => unreachable!("CheckedRule::new rejects other rewrite-body terminators"),
         }
     }
 
