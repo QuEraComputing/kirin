@@ -3,13 +3,13 @@
 
 mod common;
 
-use common::{BuilderDialect, new_stage};
+use common::{BuilderDialect, EventCursor, new_stage};
 use kirin_ir::*;
 
 /// The statements and blocks of a small stage, by name.
 struct Fixture {
     stage: StageInfo<BuilderDialect>,
-    /// `owner = own_blocks { then_nop } { else_nop }`, in `outer`.
+    /// `owner = own_blocks { then_nop } { else_nop }`, in a block `outer`.
     owner: Statement,
     then_block: Block,
     then_nop: Statement,
@@ -18,11 +18,9 @@ struct Fixture {
     /// `other = own_blocks { .. } { .. }`, also in `outer`.
     other: Statement,
     other_block: Block,
-    /// A block nothing owns, holding `spare_nop`.
+    /// A block the builder left owned by nothing, holding a `nop`. A
+    /// `Rewriter` did not create it, so it cannot be adopted.
     spare: Block,
-    spare_nop: Statement,
-    /// The unowned block `owner` and `other` sit in.
-    outer: Block,
 }
 
 fn fixture() -> Fixture {
@@ -45,7 +43,8 @@ fn fixture() -> Fixture {
 
     let spare_nop = stage.statement().definition(BuilderDialect::Nop).new();
     let spare = stage.block().stmt(spare_nop).new();
-    let outer = stage.block().stmt(owner).stmt(other).new();
+    // The block `owner` and `other` sit in.
+    let _outer = stage.block().stmt(owner).stmt(other).new();
 
     Fixture {
         stage: stage.finalize().unwrap(),
@@ -57,8 +56,6 @@ fn fixture() -> Fixture {
         other,
         other_block,
         spare,
-        spare_nop,
-        outer,
     }
 }
 
@@ -98,12 +95,18 @@ fn swapping_the_bodies_keeps_them() {
 #[test]
 fn a_dropped_body_is_erased_and_a_gained_one_adopted() {
     let mut f = fixture();
-    let events = {
+    let (gained, gained_ret, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
-        rewriter
-            .replace_statement(f.owner, BuilderDialect::OwnBlocks(f.then_block, f.spare))
+        let gained = rewriter.new_block([]);
+        let gained_ret = rewriter
+            .create(InsertionPoint::Terminator(gained), BuilderDialect::Return)
             .unwrap();
-        rewriter.events().to_vec()
+        let mut cursor = EventCursor::default();
+        cursor.advance(&rewriter);
+        rewriter
+            .replace_statement(f.owner, BuilderDialect::OwnBlocks(f.then_block, gained))
+            .unwrap();
+        (gained, gained_ret, cursor.read_and_advance(&rewriter))
     };
     assert_eq!(
         events,
@@ -116,12 +119,12 @@ fn a_dropped_body_is_erased_and_a_gained_one_adopted() {
     // The else-block went with what was in it.
     assert!(f.else_block.get_info(&f.stage).is_none());
     assert!(f.else_nop.get_info(&f.stage).is_none());
-    // The spare block now belongs to `owner`.
+    // The gained block now belongs to `owner`.
     assert_eq!(
-        parent(&f.stage, f.spare),
+        parent(&f.stage, gained),
         Some(BlockParent::Statement(f.owner))
     );
-    assert!(f.spare_nop.get_info(&f.stage).is_some());
+    assert!(gained_ret.get_info(&f.stage).is_some());
     assert_eq!(verify_derived(&f.stage), Ok(()));
 }
 
@@ -172,11 +175,32 @@ fn a_body_named_twice_is_rejected() {
 #[test]
 fn a_body_enclosing_the_statement_is_rejected() {
     let mut f = fixture();
-    let (then_block, outer) = (f.then_block, f.outer);
+    let mut rewriter = Rewriter::new(&mut f.stage);
+    // `nop` sits in `host`, so `host` cannot become one of its bodies.
+    let host = rewriter.new_block([]);
+    let ret = rewriter
+        .create(InsertionPoint::Terminator(host), BuilderDialect::Return)
+        .unwrap();
+    let nop = rewriter
+        .create(InsertionPoint::Before(ret), BuilderDialect::Nop)
+        .unwrap();
+    let other = rewriter.new_block([]);
+    let events_before = rewriter.events().len();
+    assert_eq!(
+        rewriter.replace_statement(nop, BuilderDialect::OwnBlocks(host, other)),
+        Err(RewriteError::BodyEnclosesOwner(Body::Block(host)))
+    );
+    assert_eq!(rewriter.events().len(), events_before);
+}
+
+#[test]
+fn a_body_the_builder_left_unowned_is_rejected() {
+    let mut f = fixture();
+    let (then_block, spare) = (f.then_block, f.spare);
     assert_rejected(
         &mut f,
-        BuilderDialect::OwnBlocks(then_block, outer),
-        RewriteError::BodyEnclosesOwner(Body::Block(outer)),
+        BuilderDialect::OwnBlocks(then_block, spare),
+        RewriteError::BodyNotDetached(Body::Block(spare)),
     );
 }
 

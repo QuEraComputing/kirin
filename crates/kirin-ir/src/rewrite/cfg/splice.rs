@@ -17,7 +17,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects, leaving the stage untouched, if `source` is unknown
     /// ([`RewriteError::UnknownCfg`]), if `anchor` is unknown
     /// ([`RewriteError::UnknownBlock`]) or not in a CFG
-    /// ([`RewriteError::NotInCfgBody`]), or if `anchor` is in `source` or
+    /// ([`RewriteError::BlockNotInCfg`]), or if `anchor` is in `source` or
     /// nested in one of its blocks ([`RewriteError::CfgSplicedIntoItself`]).
     ///
     /// Records [`MutationEvent::ChangedBlockList`] for `source`, then for the

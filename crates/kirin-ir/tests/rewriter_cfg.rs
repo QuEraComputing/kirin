@@ -116,7 +116,7 @@ fn append_and_insert_blocks_reject_unknown_and_non_cfg_anchors() {
     );
     assert_eq!(
         rw.insert_block_after(lone, []),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     assert_eq!(
         rw.insert_block_before(dead_block, []),
@@ -126,7 +126,7 @@ fn append_and_insert_blocks_reject_unknown_and_non_cfg_anchors() {
 }
 
 #[test]
-fn erase_block_tombstones_contents_and_maintains_mirrors() {
+fn erase_body_tombstones_contents_and_maintains_mirrors() {
     let mut stage = new_stage();
 
     // entry(y) -> exit, and an unreachable `dead` block that reads y and
@@ -161,7 +161,7 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
 
     let events = {
         let mut rw = Rewriter::new(&mut stage);
-        rw.erase_block(dead).unwrap();
+        rw.erase_body(dead).unwrap();
         rw.events().to_vec()
     };
     assert_eq!(
@@ -187,7 +187,7 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
 }
 
 #[test]
-fn erase_block_rejects_incoming_edges_until_retargeted() {
+fn erase_body_rejects_incoming_edges_until_retargeted() {
     let mut stage = new_stage();
 
     // entry -> middle -> exit
@@ -208,7 +208,7 @@ fn erase_block_rejects_incoming_edges_until_retargeted() {
 
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        rw.erase_block(middle),
+        rw.erase_body(middle),
         Err(RewriteError::BlockHasPredecessors {
             block: middle,
             pred: entry,
@@ -221,7 +221,7 @@ fn erase_block_rejects_incoming_edges_until_retargeted() {
 
     // Once the edge is retargeted the erase goes through.
     rw.retarget_successor(entry_br, middle, exit).unwrap();
-    rw.erase_block(middle).unwrap();
+    rw.erase_body(middle).unwrap();
     assert_eq!(
         cfg.blocks(rw.stage()).collect::<Vec<_>>(),
         vec![entry, exit]
@@ -231,7 +231,7 @@ fn erase_block_rejects_incoming_edges_until_retargeted() {
 }
 
 #[test]
-fn erase_block_allows_self_loop() {
+fn erase_body_allows_self_loop() {
     let mut stage = new_stage();
 
     let entry = stage.block().new();
@@ -245,13 +245,13 @@ fn erase_block_allows_self_loop() {
         .unwrap();
     assert_eq!(preds(&stage, lp), HashSet::from([lp]));
 
-    Rewriter::new(&mut stage).erase_block(lp).unwrap();
+    Rewriter::new(&mut stage).erase_body(lp).unwrap();
     assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![entry]);
     verify_derived(&stage).unwrap();
 }
 
 #[test]
-fn erase_block_at_cfg_ends_updates_head_and_tail() {
+fn erase_body_at_cfg_ends_updates_head_and_tail() {
     let mut stage = new_stage();
 
     let first = stage.block().new();
@@ -267,19 +267,19 @@ fn erase_block_at_cfg_ends_updates_head_and_tail() {
     let mut stage = stage.finalize().unwrap();
 
     // Erasing the head makes the next block the head.
-    Rewriter::new(&mut stage).erase_block(first).unwrap();
+    Rewriter::new(&mut stage).erase_body(first).unwrap();
     assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![middle, last]);
     verify_derived(&stage).unwrap();
 
     // Erasing the tail makes the previous block the tail.
-    Rewriter::new(&mut stage).erase_block(last).unwrap();
+    Rewriter::new(&mut stage).erase_body(last).unwrap();
     assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![middle]);
     assert_eq!(cfg.blocks(&stage).rev().collect::<Vec<_>>(), vec![middle]);
     verify_derived(&stage).unwrap();
 }
 
 #[test]
-fn erase_block_rejects_values_used_outside_without_mutating() {
+fn erase_body_rejects_values_used_outside_without_mutating() {
     let mut log = EventCursor::default();
     let mut stage = new_stage();
 
@@ -303,7 +303,7 @@ fn erase_block_rejects_values_used_outside_without_mutating() {
     let mut rw = Rewriter::new(&mut stage);
     // A result read by a statement in another block.
     assert_eq!(
-        rw.erase_block(middle),
+        rw.erase_body(middle),
         Err(RewriteError::StatementResultsInUse(split))
     );
 
@@ -311,7 +311,7 @@ fn erase_block_rejects_values_used_outside_without_mutating() {
     rw.replace_operand(use_r0, 0, y).unwrap();
     log.advance(&rw);
     assert_eq!(
-        rw.erase_block(middle),
+        rw.erase_body(middle),
         Err(RewriteError::BlockArgumentInUse {
             block: middle,
             index: 0,
@@ -328,7 +328,7 @@ fn erase_block_rejects_values_used_outside_without_mutating() {
 }
 
 #[test]
-fn erase_block_allows_uses_nested_inside_it() {
+fn erase_body_allows_uses_nested_inside_it() {
     let mut stage = new_stage();
 
     // host { split -> r0; owner { inner { use r0 } } }: r0's only use is
@@ -346,7 +346,7 @@ fn erase_block_allows_uses_nested_inside_it() {
     let cfg = stage.cfg().add_block(entry).add_block(host).new();
 
     let mut stage = stage.finalize().unwrap();
-    Rewriter::new(&mut stage).erase_block(host).unwrap();
+    Rewriter::new(&mut stage).erase_body(host).unwrap();
 
     assert!(inner_use.get_info(&stage).is_none());
     assert!(split.get_info(&stage).is_none());
@@ -357,7 +357,7 @@ fn erase_block_allows_uses_nested_inside_it() {
 }
 
 #[test]
-fn erase_block_tombstones_nested_bodies() {
+fn erase_body_tombstones_nested_bodies() {
     let mut stage = new_stage();
 
     // `host` holds a statement that owns an inner CFG with one block.
@@ -376,7 +376,7 @@ fn erase_block_tombstones_nested_bodies() {
     let _cfg = stage.cfg().add_block(entry).add_block(host).new();
 
     let mut stage = stage.finalize().unwrap();
-    Rewriter::new(&mut stage).erase_block(host).unwrap();
+    Rewriter::new(&mut stage).erase_body(host).unwrap();
 
     // Everything reachable from the erased block is tombstoned, not just
     // its direct statements.
@@ -525,7 +525,7 @@ fn split_block_rejects_unknown_and_non_cfg_statements() {
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
         rw.split_block(lone_nop),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     assert_eq!(
         rw.split_block(dead_stmt),
@@ -898,7 +898,7 @@ fn merge_blocks_rejects_illegal_merges() {
     );
     assert_eq!(
         rw.merge_blocks(lone, succ, &[real_arg]),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     assert!(rw.events().is_empty());
     assert!(succ.get_info(rw.stage()).is_some());
@@ -1449,7 +1449,7 @@ fn splice_cfg_rejects_illegal_splices_leaving_the_stage_untouched() {
     );
     assert_eq!(
         rw.splice_cfg_after(callee, lone),
-        Err(RewriteError::NotInCfgBody(lone))
+        Err(RewriteError::BlockNotInCfg(lone))
     );
     // The anchor is in the source.
     assert_eq!(

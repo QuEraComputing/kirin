@@ -308,6 +308,63 @@ fn replace_yield_moves_the_yield_use() {
 }
 
 #[test]
+fn set_yields_replaces_the_list_and_moves_the_yield_uses() {
+    let mut stage = new_stage();
+
+    let (split, x, _) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (p, rp) = make_compute(&mut stage, x);
+    let dg = stage.digraph().node(p).yield_value(rp).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let dead_graph = DiGraph::from(Id::from(TestSSAValue(9_999)));
+    let mut rw = Rewriter::new(&mut stage);
+
+    assert_eq!(
+        rw.set_yields(dead_graph, [x]),
+        Err(RewriteError::UnknownDiGraph(dead_graph))
+    );
+    assert_eq!(
+        rw.set_yields(dg, [x, dead_value()]),
+        Err(RewriteError::UnknownValue(dead_value()))
+    );
+    assert_eq!(
+        dg.expect_info(rw.stage()).yields(),
+        [rp],
+        "rejections change nothing"
+    );
+    assert!(rw.events().is_empty());
+
+    // Grow: a value may be yielded twice.
+    rw.set_yields(dg, [x, rp, x]).unwrap();
+    assert_eq!(dg.expect_info(rw.stage()).yields(), [x, rp, x]);
+    assert_eq!(
+        uses_set(rw.stage(), x),
+        HashSet::from([so(p, 0), dgy(dg, 0), dgy(dg, 2)])
+    );
+    assert_eq!(uses_set(rw.stage(), rp), HashSet::from([dgy(dg, 1)]));
+    // Setting the list already there records nothing.
+    rw.set_yields(dg, [x, rp, x]).unwrap();
+    // Shrink to nothing.
+    rw.set_yields(dg, Vec::<SSAValue>::new()).unwrap();
+    assert_eq!(
+        rw.events().to_vec(),
+        vec![
+            MutationEvent::ChangedDiGraphYields { graph: dg },
+            MutationEvent::ChangedDiGraphYields { graph: dg },
+        ]
+    );
+    // No longer yielded, `p` can be erased.
+    rw.erase_statement(p).unwrap();
+    drop(rw);
+
+    assert_eq!(dg.expect_info(&stage).yields(), []);
+    assert_eq!(uses_set(&stage, x), HashSet::new());
+    assert_members(&stage, dg, &[]);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
 fn erase_statement_tombstones_owned_digraph() {
     let mut stage = new_stage();
 
