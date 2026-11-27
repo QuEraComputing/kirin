@@ -11,6 +11,7 @@ use kirin_rewrite::{
     Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, PatternRule, RewriteDriver,
     RuleSet, StatementRule,
 };
+use rustc_hash::FxHashSet;
 
 use super::common::{helper_result, new_database, printed, roots};
 use crate::language::LowLevel;
@@ -23,17 +24,36 @@ type DemandResults = AnalysisResults<(LinkTarget, DemandCallCtx), SSAValue, Dema
 /// demanded, so every function counts as an entry point.
 struct DemandFacts;
 
-/// The demand result of each function of a stage.
-struct StageDemand(Vec<DemandResults>);
+/// The values of a stage that some function's demand result demands,
+/// collected when the analysis finishes, so a read is one lookup.
+struct StageDemand(FxHashSet<SSAValue>);
 
 impl StageDemand {
-    /// Whether any function's result demands `value` at `stage`. `Dead` is the
-    /// lattice's bottom and is not stored, so a value the analysis saw but
-    /// nothing demands has no fact.
-    fn is_demanded(&self, stage: CompileStage, value: SSAValue) -> bool {
-        self.0
-            .iter()
-            .any(|results| results.joined_fact_at(stage, value) == Some(Demand::Live))
+    /// Add the values `results` demands at `stage`.
+    fn add(&mut self, stage: CompileStage, results: &DemandResults) {
+        for context in results.contexts() {
+            // Keep only `stage`'s contexts: SSA ids are per stage.
+            if results
+                .callable_of(context)
+                .is_none_or(|target| target.stage != stage)
+            {
+                continue;
+            }
+            // A value is demanded if any root or context demands it.
+            self.0.extend(
+                results
+                    .facts(context)
+                    .filter(|(_, fact)| **fact == Demand::Live)
+                    .map(|(value, _)| value),
+            );
+        }
+    }
+
+    /// Whether any function's result demands `value`. `Dead` is the lattice's
+    /// bottom and is not stored, so a value the analysis saw but nothing
+    /// demands has no fact.
+    fn is_demanded(&self, value: SSAValue) -> bool {
+        self.0.contains(&value)
     }
 }
 
@@ -49,15 +69,15 @@ impl Analysis<Stage> for DemandFacts {
             Stage::Source(info) => roots(info),
             Stage::Lowered(info) => roots(info),
         };
-        let mut results = Vec::new();
+        let mut demanded = StageDemand(FxHashSet::default());
         for (specialization, _) in roots {
             // Toy functions return one value.
             let analyzed = DemandAnalysis::<Stage, InterpreterError>::new(program)
                 .analyze(*stage, Callee::Specialized(specialization), [Demand::Live])
                 .map_err(AnalysisError::failed::<Self>)?;
-            results.push(analyzed);
+            demanded.add(*stage, &analyzed);
         }
-        Ok(StageDemand(results))
+        Ok(demanded)
     }
 }
 
@@ -69,7 +89,6 @@ impl Analysis<Stage> for DemandFacts {
 /// Every `arith` statement existed when [`DemandFacts`] ran, since this pass
 /// creates none, so a missing fact means not demanded.
 struct FreeUndemanded {
-    stage: CompileStage,
     demand: Arc<StageDemand>,
 }
 
@@ -85,7 +104,7 @@ impl StatementRule<LowLevel> for FreeUndemanded {
         }
         let result: SSAValue = (*definition.results().next().expect("arith has a result")).into();
         let has_uses = !result.expect_info(rewriter.stage()).uses().is_empty();
-        if !has_uses || self.demand.is_demanded(self.stage, result) {
+        if !has_uses || self.demand.is_demanded(result) {
             return Ok(WalkResult::Advance);
         }
         let placeholder = rewriter.new_result(ArithType::I64);
@@ -110,7 +129,6 @@ fn free_undemanded(stage: CompileStage) -> RuleSet<LowLevel> {
     rules
         .add_statement_rule("free_undemanded", move |cache: &AnalysisCache| {
             FreeUndemanded {
-                stage,
                 demand: cache.get::<DemandFacts>(&stage).expect("declared"),
             }
         })

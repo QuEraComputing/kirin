@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::collections::hash_map::Entry;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -12,6 +13,7 @@ use kirin_rewrite::{
     Analysis, AnalysisCache, AnalysisError, AnalysisKind, Database, PatternRule, RewriteDriver,
     RuleSet, StatementRule,
 };
+use rustc_hash::FxHashMap;
 
 use super::common::{helper_result, new_database, printed, roots};
 use crate::interpreter::ToyConstProp;
@@ -31,17 +33,42 @@ thread_local! {
 /// arguments, so every function counts as an entry point.
 struct ConstPropFacts;
 
-/// The constprop result of each function of a stage.
-struct StageConstants(Vec<Results>);
+/// Each value's constprop fact at a stage, joined over every function's
+/// result when the analysis finishes, so a read is one lookup.
+struct StageConstants(FxHashMap<SSAValue, Value>);
 
 impl StageConstants {
-    /// The join of `value`'s fact at `stage` over every function's result.
-    /// `None` means no result reached `value`.
-    fn value_at(&self, stage: CompileStage, value: SSAValue) -> Option<Value> {
-        self.0
-            .iter()
-            .filter_map(|results| results.joined_fact_at(stage, value))
-            .reduce(|joined, fact| joined.join(&fact))
+    /// Join the facts of `results`' contexts at `stage` into `self`.
+    fn add(&mut self, stage: CompileStage, results: &Results) {
+        for context in results.contexts() {
+            // Calls may cross into another stage, whose SSA ids say nothing
+            // about this one's.
+            if results
+                .callable_of(context)
+                .is_none_or(|target| target.stage != stage)
+            {
+                continue;
+            }
+            // A value reached from several roots or contexts gets the join of
+            // its facts.
+            for (value, fact) in results.facts(context) {
+                match self.0.entry(value) {
+                    Entry::Occupied(mut entry) => {
+                        let joined = entry.get().join(fact);
+                        entry.insert(joined);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(fact.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    /// `value`'s fact joined over every function's result. `None` means no
+    /// result reached `value`.
+    fn value_at(&self, value: SSAValue) -> Option<Value> {
+        self.0.get(&value).cloned()
     }
 }
 
@@ -58,7 +85,7 @@ impl Analysis<Stage> for ConstPropFacts {
             Stage::Source(info) => roots(info),
             Stage::Lowered(info) => roots(info),
         };
-        let mut results = Vec::new();
+        let mut constants = StageConstants(FxHashMap::default());
         for (specialization, arity) in roots {
             let engine: ToyConstProp<'_, i64> =
                 ToyConstProp::new(program).with_linker(CrossStageLinker);
@@ -69,9 +96,9 @@ impl Analysis<Stage> for ConstPropFacts {
                     (0..arity).map(|_| Value::Top),
                 )
                 .map_err(AnalysisError::failed::<Self>)?;
-            results.push(analyzed);
+            constants.add(*stage, &analyzed);
         }
-        Ok(StageConstants(results))
+        Ok(constants)
     }
 }
 
@@ -79,7 +106,6 @@ impl Analysis<Stage> for ConstPropFacts {
 /// with a new `constant` inserted before it. The driver's dead-code cleanup
 /// then erases the statement.
 struct FoldConstants {
-    stage: CompileStage,
     facts: Arc<StageConstants>,
 }
 
@@ -99,7 +125,7 @@ impl StatementRule<LowLevel> for FoldConstants {
         if *result.expect_info(rewriter.stage()).ty() != ArithType::I64 {
             return Ok(WalkResult::Advance);
         }
-        let Some(ConstPropValue::Const(c)) = self.facts.value_at(self.stage, result) else {
+        let Some(ConstPropValue::Const(c)) = self.facts.value_at(result) else {
             return Ok(WalkResult::Advance);
         };
         let constant = rewriter.new_result(ArithType::I64);
@@ -124,7 +150,6 @@ fn fold_constants(stage: CompileStage) -> RuleSet<LowLevel> {
     rules
         .add_statement_rule("fold_constants", move |cache: &AnalysisCache| {
             FoldConstants {
-                stage,
                 facts: cache.get::<ConstPropFacts>(&stage).expect("declared"),
             }
         })
