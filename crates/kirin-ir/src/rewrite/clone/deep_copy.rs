@@ -30,8 +30,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is a
     /// terminator ([`RewriteError::UnexpectedTerminator`]: it could not be
     /// inserted), or if `map` replaces a value from outside the copy with one
-    /// that is not live ([`RewriteError::UnknownValue`]). Records no event:
-    /// nothing reachable changes until the insert.
+    /// that is not live ([`RewriteError::UnknownValue`]). Records
+    /// [`MutationEvent::CreatedStatement`](crate::MutationEvent::CreatedStatement)
+    /// for the copy and each statement copied into its bodies, outer
+    /// statements first. Inserting the copy records
+    /// [`MutationEvent::PlacedStatement`](crate::MutationEvent::PlacedStatement);
+    /// a copy never placed is erased when the rewrite ends (see
+    /// [`Rewriter::into_events`]). Cloning is therefore an edit even if the
+    /// copy is abandoned: a rule should decide it applies before cloning.
     pub fn clone_statement(
         &mut self,
         stmt: Statement,
@@ -69,7 +75,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects, leaving the stage untouched, if `source` is unknown
     /// ([`RewriteError::UnknownCfg`]), or if `map` replaces a value from
     /// outside the copy with one that is not live
-    /// ([`RewriteError::UnknownValue`]). Records no event.
+    /// ([`RewriteError::UnknownValue`]). Records
+    /// [`MutationEvent::CreatedStatement`](crate::MutationEvent::CreatedStatement)
+    /// for each statement copied, outer statements first, so cloning is an
+    /// edit even if the copy is abandoned (see
+    /// [`Rewriter::clone_statement`]).
     pub fn clone_cfg(&mut self, source: CFG, map: &mut IRMap) -> Result<CFG, RewriteError> {
         if source.get_info(self.stage).is_none() {
             return Err(RewriteError::UnknownCfg(source));

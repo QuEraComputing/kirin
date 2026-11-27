@@ -24,7 +24,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::UnexpectedTerminator`]), or if `anchor` is nested in
     /// `stmt`'s own bodies ([`RewriteError::MovedIntoItself`]).
     ///
-    /// Records [`MutationEvent::MovedStatement`]. A walk visiting `stmt`
+    /// Records [`MutationEvent::PlacedStatement`]. A walk visiting `stmt`
     /// reports the move (see [`crate::walk`]).
     pub fn move_before(&mut self, stmt: Statement, anchor: Statement) -> Result<(), RewriteError> {
         self.move_relative(stmt, anchor, Side::Before)
@@ -74,7 +74,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .slot_at(anchor, side)
             .expect("the anchor was checked above and moving `stmt` does not touch it");
         self.link(LinkedList::single(stmt), block, prev, next);
-        self.events.push(MutationEvent::MovedStatement { stmt });
+        self.events.push(MutationEvent::PlacedStatement { stmt });
         Ok(())
     }
 
@@ -99,11 +99,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// not live ([`RewriteError::UnknownValue`]).
     ///
     /// Records the [`Rewriter::replace_all_uses`] events for the argument
-    /// redirection, then [`MutationEvent::SplicedBlock`]. A walk visiting a
-    /// statement of `source` reports the splice (see [`crate::walk`]). If
-    /// `source` has no statements besides its terminator, nothing moves and
-    /// only the redirection events are recorded; splicing it again with the
-    /// same replacements records no event.
+    /// redirection, then one [`MutationEvent::PlacedStatement`] per moved
+    /// statement, in order, then [`MutationEvent::SplicedBlock`]. A walk
+    /// visiting a statement of `source` reports the splice (see
+    /// [`crate::walk`]). If `source` has no statements besides its terminator,
+    /// nothing moves and only the redirection events are recorded; splicing it
+    /// again with the same replacements records no event.
     pub fn splice_block_before(
         &mut self,
         source: Block,
@@ -181,7 +182,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if chain.is_empty() {
             return Ok(());
         }
-        self.link(chain, dest, prev, next);
+        self.link_and_record(chain, dest, prev, next);
         self.events
             .push(MutationEvent::SplicedBlock { source, dest });
         Ok(())

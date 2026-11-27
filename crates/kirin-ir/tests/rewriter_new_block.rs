@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{BuilderDialect, EventCursor, TestType, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, erased_in, new_stage};
 use kirin_ir::*;
 
 /// `owner = own_blocks { } { }` in `outer`, whose argument `x` the new blocks
@@ -173,8 +173,8 @@ fn inserted_statement_adopts_new_blocks() {
 
     assert_eq!(
         events,
-        [MutationEvent::InsertedStatement { stmt: new_owner }],
-        "the insertion covers the bodies the statement gains"
+        [MutationEvent::CreatedStatement { stmt: new_owner }],
+        "the creation covers the bodies the statement gains"
     );
     for block in [then_block, else_block] {
         assert_eq!(
@@ -219,7 +219,7 @@ fn insert_rejects_a_body_owned_elsewhere() {
         ),
         Err(RewriteError::BodyOwnedElsewhere(Body::Block(f.old_then)))
     );
-    assert_eq!(rewriter.events(), [], "nothing was inserted");
+    assert_eq!(rewriter.events(), [], "nothing was created");
     assert_eq!(parent(rewriter.stage(), fresh), None, "nothing was adopted");
 }
 
@@ -305,19 +305,50 @@ fn insert_rejects_a_graph_member_owning_its_graph() {
 }
 
 #[test]
+fn an_unowned_new_block_records_its_erasure_when_the_rewrite_ends() {
+    let mut f = fixture();
+    let (block, used, ret, events) = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        let block = rewriter.new_block([TestType::I32]);
+        let used = fill(&mut rewriter, block, f.x);
+        let ret = block.terminator(rewriter.stage()).unwrap();
+        (block, used, ret, rewriter.into_events())
+    };
+
+    // `fill` created the terminator, then `used` before it; ending the
+    // rewrite erases the block's chain, then its terminator.
+    assert_eq!(
+        events,
+        [
+            MutationEvent::CreatedStatement { stmt: ret },
+            MutationEvent::ChangedTerminator { block },
+            MutationEvent::CreatedStatement { stmt: used },
+            erased_in(used, block),
+            erased_in(ret, block),
+        ]
+    );
+    assert!(block.get_info(&f.stage).is_none());
+    assert!(f.x.expect_info(&f.stage).uses().is_empty());
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
 fn erase_block_discards_an_unowned_new_block() {
     let mut f = fixture();
-    let (block, used, events) = {
+    let (block, used, ret, events) = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         let mut cursor = EventCursor::default();
         let block = rewriter.new_block([TestType::I32]);
         let used = fill(&mut rewriter, block, f.x);
+        let ret = block.terminator(rewriter.stage()).unwrap();
         cursor.advance(&rewriter);
         rewriter.erase_block(block).unwrap();
-        (block, used, cursor.read_and_advance(&rewriter))
+        (block, used, ret, cursor.read_and_advance(&rewriter))
     };
 
-    assert_eq!(events, [], "the block was never part of the IR");
+    // Filling the block recorded its statements' insertion, so their erasure
+    // is recorded too; the block was in no CFG, so no CFG event.
+    assert_eq!(events, [erased_in(used, block), erased_in(ret, block),]);
     assert!(block.get_info(&f.stage).is_none());
     assert!(used.get_info(&f.stage).is_none());
     assert!(

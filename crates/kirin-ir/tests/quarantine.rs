@@ -61,10 +61,13 @@ fn cause_and_events_are_retained() {
     ));
     // The edit made before the failure survives into the artifact.
     assert_eq!(f.quarantine.events().len(), 1);
-    assert_eq!(
+    assert!(matches!(
         f.quarantine.events()[0],
-        MutationEvent::ErasedStatement { stmt: f.nop }
-    );
+        MutationEvent::ErasedStatement {
+            stmt,
+            parent: Some(StatementParent::Block(_)),
+        } if stmt == f.nop
+    ));
 }
 
 #[test]
@@ -80,7 +83,7 @@ fn report_dumps_every_arena_and_the_event_log() {
     //   `SSAKind` shapes render without the `Id(..)` wrapper, and the builder
     //   placeholders discarded at finalize show as tombstoned rows.
     // - mutation events: the erase names the same id the statement table
-    //   flagged.
+    //   flagged, and the block it was in.
     insta::assert_snapshot!(panicked().report(), @r"
     == statements (4 ids) ==
        id  del  parent        definition
@@ -103,7 +106,7 @@ fn report_dumps_every_arena_and_the_event_log() {
         5       BlockArgument(Block(0), 1)      [StatementOperand { stmt: Statement(0), index: 1 }]
 
     == mutation events (1) ==
-        0  ErasedStatement { stmt: Statement(1) }
+        0  ErasedStatement { stmt: Statement(1), parent: Some(Block(0)) }
     ");
 }
 

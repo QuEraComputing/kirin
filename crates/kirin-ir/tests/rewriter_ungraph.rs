@@ -7,7 +7,8 @@ mod common;
 use std::collections::HashMap;
 
 use common::{
-    BuilderDialect, EventCursor, TestType, cannot_insert, make_split, make_wire, new_stage,
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased, erased_in, make_split, make_wire,
+    new_stage,
 };
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
@@ -181,15 +182,15 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: a },
+            MutationEvent::CreatedStatement { stmt: a },
             topology,
-            MutationEvent::InsertedStatement { stmt: b },
+            MutationEvent::CreatedStatement { stmt: b },
             topology,
-            MutationEvent::InsertedStatement { stmt: c },
+            MutationEvent::CreatedStatement { stmt: c },
             topology,
-            MutationEvent::ErasedStatement { stmt: c },
+            erased(c, StatementParent::UnGraph(ug)),
             topology,
-            MutationEvent::InsertedStatement { stmt: d },
+            MutationEvent::CreatedStatement { stmt: d },
             topology,
         ]
     );
@@ -259,11 +260,11 @@ fn insert_ungraph_edge_adds_a_wire_nodes_can_read() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: e },
+            MutationEvent::CreatedStatement { stmt: e },
             topology,
-            MutationEvent::InsertedStatement { stmt: n1 },
+            MutationEvent::CreatedStatement { stmt: n1 },
             topology,
-            MutationEvent::InsertedStatement { stmt: n2 },
+            MutationEvent::CreatedStatement { stmt: n2 },
             topology,
         ]
     );
@@ -393,7 +394,7 @@ fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
     assert_eq!(
         log.read_and_advance(&rw),
         vec![
-            MutationEvent::ErasedStatement { stmt: a },
+            erased(a, StatementParent::UnGraph(ug)),
             MutationEvent::ChangedUnGraphTopology { graph: ug },
         ]
     );
@@ -476,7 +477,7 @@ fn erase_edge_statement_once_no_node_reads_its_wire() {
     assert_eq!(
         log.read_and_advance(&rw),
         vec![
-            MutationEvent::ErasedStatement { stmt: w_stmt },
+            erased(w_stmt, StatementParent::UnGraph(ug)),
             MutationEvent::ChangedUnGraphTopology { graph: ug },
         ]
     );
@@ -528,9 +529,15 @@ fn erase_statement_tombstones_owned_ungraph() {
     {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
+        // Members in member order, then the owner.
         assert_eq!(
             rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: owner }]
+            vec![
+                erased(wire_stmt, StatementParent::UnGraph(ug)),
+                erased(n0, StatementParent::UnGraph(ug)),
+                erased(n1, StatementParent::UnGraph(ug)),
+                erased_in(owner, outer),
+            ]
         );
     }
 

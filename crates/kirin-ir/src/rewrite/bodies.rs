@@ -24,12 +24,16 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// elimination keeps it, and [`Rewriter::replace_all_uses`] rewrites those
     /// uses too. To abandon the block early, call [`Rewriter::erase_block`].
     ///
-    /// A block no statement owns when the `Rewriter` is dropped is tombstoned
-    /// together with everything it holds, unless the drop follows a panic, in
-    /// which case it is left for inspection. Unlike [`Rewriter::erase_block`],
-    /// the drop does not check that nothing outside still refers to the block:
-    /// a branch to it, or a use of a value it defines, is left dangling. When
-    /// a pass run by [`Program::run_pass`](crate::Program::run_pass) succeeds,
+    /// A block no statement owns by the time [`Rewriter::into_events`] is
+    /// called is tombstoned together with everything it holds, recording
+    /// [`MutationEvent::ErasedStatement`](crate::MutationEvent::ErasedStatement)
+    /// for each statement. A `Rewriter` dropped without `into_events`
+    /// tombstones it too, but records nothing anyone can read. After a panic
+    /// it is left for inspection instead.
+    /// Unlike [`Rewriter::erase_block`], this cleanup does not check that
+    /// nothing outside still refers to the block: a branch to it, or a use of
+    /// a value it defines, is left dangling. When a pass run by
+    /// [`Program::run_pass`](crate::Program::run_pass) succeeds,
     /// [`verify_derived`](crate::verify_derived) then finds it and the stage is
     /// quarantined. When the pass fails, or the `Rewriter` is used directly,
     /// nothing reports it.
@@ -37,7 +41,7 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// Records no event: a block owned by nothing is not part of the IR yet.
     /// Edits inside it record their usual events. The statement that adopts it
     /// records
-    /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
+    /// [`MutationEvent::CreatedStatement`](crate::MutationEvent::CreatedStatement)
     /// or [`MutationEvent::ChangedBodyNesting`](crate::MutationEvent::ChangedBodyNesting).
     pub fn new_block(&mut self, arg_types: impl IntoIterator<Item = L::Type>) -> Block {
         let block = self.alloc_block(None, arg_types);

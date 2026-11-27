@@ -7,7 +7,8 @@ mod common;
 use std::collections::{HashMap, HashSet};
 
 use common::{
-    BuilderDialect, EventCursor, TestType, cannot_insert, make_compute, make_split, new_stage,
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased, erased_in, make_compute,
+    make_split, new_stage,
 };
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
@@ -100,11 +101,11 @@ fn insert_node_adds_operand_edges_and_binds_results() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: n1 },
+            MutationEvent::CreatedStatement { stmt: n1 },
             topology,
-            MutationEvent::InsertedStatement { stmt: n2 },
+            MutationEvent::CreatedStatement { stmt: n2 },
             topology,
-            MutationEvent::InsertedStatement { stmt: n3 },
+            MutationEvent::CreatedStatement { stmt: n3 },
             topology,
         ]
     );
@@ -243,9 +244,9 @@ fn erase_statement_removes_digraph_member_and_its_edges() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: u },
+            erased(u, StatementParent::DiGraph(dg)),
             topology,
-            MutationEvent::ErasedStatement { stmt: q },
+            erased(q, StatementParent::DiGraph(dg)),
             topology,
         ]
     );
@@ -336,7 +337,10 @@ fn erase_statement_tombstones_owned_digraph() {
         rw.erase_statement(owner).unwrap();
         assert_eq!(
             rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: owner }]
+            vec![
+                erased(p, StatementParent::DiGraph(dg)),
+                erased_in(owner, outer),
+            ]
         );
     }
 

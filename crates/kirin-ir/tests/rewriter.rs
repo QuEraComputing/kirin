@@ -6,7 +6,8 @@ mod common;
 use std::collections::HashSet;
 
 use common::{
-    BuilderDialect, EventCursor, TestType, cannot_insert, make_split, make_wire, new_stage,
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased_in, make_split, make_wire,
+    new_stage,
 };
 use kirin_ir::*;
 
@@ -313,10 +314,7 @@ fn erase_statement_unlinks_and_maintains_index() {
     {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(s1).unwrap();
-        assert_eq!(
-            rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: s1 }]
-        );
+        assert_eq!(rw.events().to_vec(), vec![erased_in(s1, block)]);
     }
 
     // s1 is tombstoned; the block now reads [s0, s2]; x lost the {s1,0} use.
@@ -352,9 +350,16 @@ fn erase_statement_tombstones_nested_bodies() {
     {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
+        // Each nested statement is recorded, before the statement holding it.
         assert_eq!(
             rw.events().to_vec(),
-            vec![MutationEvent::ErasedStatement { stmt: owner }]
+            vec![
+                // The nested ones name the block dying with them; `owner`
+                // names the live block it was in.
+                erased_in(inner_use, inner_block),
+                erased_in(inner_ret, inner_block),
+                erased_in(owner, outer),
+            ]
         );
     }
 
@@ -406,7 +411,7 @@ fn erase_statement_erases_a_terminator_and_its_edges() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: jump },
+            erased_in(jump, entry),
             MutationEvent::ChangedTerminator { block: entry },
         ]
     );
@@ -493,8 +498,8 @@ fn insert_before_and_after_splice_and_maintain_index() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: n0 },
-            MutationEvent::InsertedStatement { stmt: n1 },
+            MutationEvent::CreatedStatement { stmt: n0 },
+            MutationEvent::CreatedStatement { stmt: n1 },
         ]
     );
     // Operand uses for the inserted statements are recorded.
@@ -658,9 +663,9 @@ fn insert_binds_fresh_results() {
     assert_eq!(
         rw.events().to_vec(),
         vec![
-            MutationEvent::InsertedStatement { stmt: split },
-            MutationEvent::InsertedStatement { stmt: user },
-            MutationEvent::InsertedStatement { stmt: wire },
+            MutationEvent::CreatedStatement { stmt: split },
+            MutationEvent::CreatedStatement { stmt: user },
+            MutationEvent::CreatedStatement { stmt: wire },
         ]
     );
     drop(rw);
@@ -690,7 +695,7 @@ fn insert_before_terminator_fills_a_terminator_only_block() {
         (n0, rw.events().to_vec())
     };
 
-    assert_eq!(events, vec![MutationEvent::InsertedStatement { stmt: n0 }]);
+    assert_eq!(events, vec![MutationEvent::CreatedStatement { stmt: n0 }]);
     // The new statement is both ends of the chain: walking from `head` and
     // from `tail` each finds it alone.
     assert_eq!(block.statements(&stage).collect::<Vec<_>>(), vec![n0]);
@@ -1087,7 +1092,7 @@ fn replace_results_rejects_bad_arity_and_dead_ids() {
     let (split, a, b) = make_split(&mut stage);
     let nop = stage.statement().definition(BuilderDialect::Nop).new();
     let consumer = stage.statement().definition(BuilderDialect::Use(a)).new();
-    let _block = stage.block().stmt(split).stmt(nop).stmt(consumer).new();
+    let block = stage.block().stmt(split).stmt(nop).stmt(consumer).new();
 
     let mut stage = stage.finalize().unwrap();
     let before = (uses_set(&stage, a), uses_set(&stage, b));
@@ -1138,7 +1143,7 @@ fn replace_results_rejects_bad_arity_and_dead_ids() {
     };
 
     // Only the erase recorded anything; no rejected call moved a use list.
-    assert_eq!(events, vec![MutationEvent::ErasedStatement { stmt: nop }]);
+    assert_eq!(events, vec![erased_in(nop, block)]);
     assert_eq!((uses_set(&stage, a), uses_set(&stage, b)), before);
 }
 
@@ -1547,10 +1552,10 @@ fn move_before_and_after_reorder_a_block() {
     assert_eq!(
         rewriter.events().to_vec(),
         vec![
-            MutationEvent::MovedStatement { stmt: p },
-            MutationEvent::MovedStatement { stmt: owner },
-            MutationEvent::MovedStatement { stmt: q },
-            MutationEvent::MovedStatement { stmt: owner },
+            MutationEvent::PlacedStatement { stmt: p },
+            MutationEvent::PlacedStatement { stmt: owner },
+            MutationEvent::PlacedStatement { stmt: q },
+            MutationEvent::PlacedStatement { stmt: owner },
         ]
     );
     drop(rewriter);
@@ -1790,6 +1795,8 @@ fn splice_block_before_moves_statements_and_redirects_arguments() {
         vec![
             MutationEvent::ChangedOperands { stmt: u },
             MutationEvent::ReplacedUses { old: t, new: x },
+            MutationEvent::PlacedStatement { stmt: u },
+            MutationEvent::PlacedStatement { stmt: w },
             MutationEvent::SplicedBlock {
                 source: arm,
                 dest: entry,
@@ -1858,10 +1865,14 @@ fn splice_block_may_keep_its_own_arguments() {
     assert_eq!(uses_set(rewriter.stage(), t), HashSet::from([so(u, 0)]));
     assert_eq!(
         rewriter.events().to_vec(),
-        vec![MutationEvent::SplicedBlock {
-            source: arm,
-            dest: entry,
-        }],
+        vec![
+            MutationEvent::PlacedStatement { stmt: u },
+            MutationEvent::PlacedStatement { stmt: w },
+            MutationEvent::SplicedBlock {
+                source: arm,
+                dest: entry,
+            },
+        ],
         "nothing to redirect"
     );
 }

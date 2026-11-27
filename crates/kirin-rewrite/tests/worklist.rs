@@ -396,4 +396,81 @@ specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
         let p = p.expect("the pass ran");
         assert_eq!(visits.borrow().get(&p), None);
     }
+
+    /// [`LOOP`] with a statement `%q` in front of the loop.
+    const LOOP_AFTER_Q: &str = "stage @arith fn @f(i64, i64, i64) -> i64;
+specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %q = add %lo, %lo -> i64;
+    %r = for %lo in %lo..%hi step %s iter_args() do block ^body(%i: i64) {
+      %p = add %lo, %hi -> i64;
+      yield %i;
+    } -> i64;
+    ret %r;
+  }
+}
+";
+
+    /// At an `scf.for`, first moves the loop in front of the statement before
+    /// it, then applies [`Hoist`].
+    struct ReorderThenHoist;
+
+    impl StatementRule<L> for ReorderThenHoist {
+        fn apply(
+            &mut self,
+            rewriter: &mut Rewriter<'_, L>,
+            stmt: Statement,
+        ) -> Result<WalkResult, RewriteError> {
+            let stage = rewriter.stage();
+            if !matches!(
+                stmt.expect_info(stage).definition(),
+                L::Scf(StructuredControlFlow::For(_))
+            ) {
+                return Ok(WalkResult::Advance);
+            }
+            if let Some(prev) = *stmt.prev(stage) {
+                rewriter.move_before(stmt, prev)?;
+            }
+            Hoist.apply(rewriter, stmt)
+        }
+    }
+
+    /// Moving the root puts its own block among the move destinations; the
+    /// hoist then moves `%p` into that block. `%p` has still left the root's
+    /// tree: no rule is handed it.
+    #[test]
+    fn run_at_skips_a_statement_moved_beside_its_moved_root() {
+        let visits: Rc<RefCell<HashMap<Statement, usize>>> = Rc::default();
+        let mut rules = RuleSet::<L>::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
+        rules.add_statement_rule("reorder_then_hoist", || ReorderThenHoist);
+        let counting = Rc::clone(&visits);
+        rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&counting)));
+        let driver = RewriteDriver::new(&rules);
+
+        let mut program: Program<StageInfo<L>> = Program::new();
+        program.parse(LOOP_AFTER_Q).expect("the program parses");
+        let stage = program.stage_by_name("arith").expect("the stage exists");
+        let mut p = None;
+        program
+            .run_pass(stage, |rewriter| {
+                let function = rewriter
+                    .stage()
+                    .staged_function_arena()
+                    .iter()
+                    .flat_map(|function| function.specializations())
+                    .map(|specialization| *specialization.definition())
+                    .next()
+                    .expect("the program has a function");
+                let [_, _, for_stmt, stmt, ..] = PreOrder::schedule(rewriter.stage(), function)[..]
+                else {
+                    panic!("the function has a loop");
+                };
+                p = Some(stmt);
+                driver.run_at(rewriter, for_stmt)
+            })
+            .expect("the pass succeeds");
+
+        let p = p.expect("the pass ran");
+        assert_eq!(visits.borrow().get(&p), None);
+    }
 }

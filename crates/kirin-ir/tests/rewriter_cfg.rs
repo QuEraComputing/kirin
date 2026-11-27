@@ -6,7 +6,9 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, EventCursor, TestType, cannot_insert, make_split, new_stage};
+use common::{
+    BuilderDialect, EventCursor, TestType, cannot_insert, erased_in, make_split, new_stage,
+};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -167,6 +169,9 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
     assert_eq!(
         events,
         vec![
+            // `dead` dies too; the live container is `cfg`, named next.
+            erased_in(use_x, dead),
+            erased_in(dead_br, dead),
             MutationEvent::ChangedBlockList { cfg },
             MutationEvent::ChangedCfg { cfg },
         ]
@@ -373,10 +378,27 @@ fn erase_block_tombstones_nested_bodies() {
     let host = stage.block().stmt(owner).terminator(host_ret).new();
     let entry_ret = stage.statement().definition(BuilderDialect::Return).new();
     let entry = stage.block().terminator(entry_ret).new();
-    let _cfg = stage.cfg().add_block(entry).add_block(host).new();
+    let cfg = stage.cfg().add_block(entry).add_block(host).new();
 
     let mut stage = stage.finalize().unwrap();
-    Rewriter::new(&mut stage).erase_block(host).unwrap();
+    let events = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.erase_block(host).unwrap();
+        rw.events().to_vec()
+    };
+    // Every statement that died is recorded, innermost first, across both
+    // levels of nesting.
+    assert_eq!(
+        events,
+        vec![
+            erased_in(inner_nop, inner_block),
+            erased_in(inner_ret, inner_block),
+            erased_in(owner, host),
+            erased_in(host_ret, host),
+            MutationEvent::ChangedBlockList { cfg },
+            MutationEvent::ChangedCfg { cfg },
+        ]
+    );
 
     // Everything reachable from the erased block is tombstoned, not just
     // its direct statements.
@@ -423,6 +445,10 @@ fn split_block_moves_suffix_and_leaves_original_unterminated() {
         events,
         vec![
             MutationEvent::ChangedBlockList { cfg },
+            // The cut chain, then the terminator, now in the new block.
+            MutationEvent::PlacedStatement { stmt: s1 },
+            MutationEvent::PlacedStatement { stmt: s2 },
+            MutationEvent::PlacedStatement { stmt: entry_br },
             MutationEvent::ChangedCfg { cfg },
         ]
     );
@@ -565,7 +591,7 @@ fn insert_terminator_wires_operands_and_edges() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::InsertedStatement { stmt: jump },
+            MutationEvent::CreatedStatement { stmt: jump },
             MutationEvent::ChangedTerminator { block: entry },
         ]
     );
@@ -725,13 +751,16 @@ fn merge_blocks_splices_successor_and_redirects_arguments() {
     assert_eq!(
         events,
         vec![
-            MutationEvent::ErasedStatement { stmt: jump },
+            erased_in(jump, entry),
             MutationEvent::ChangedTerminator { block: entry },
             MutationEvent::ChangedOperands { stmt: use_x },
             MutationEvent::ReplacedUses {
                 old: real_x,
                 new: real_a,
             },
+            // `succ`'s chain, then its terminator, now in `entry`.
+            MutationEvent::PlacedStatement { stmt: use_x },
+            MutationEvent::PlacedStatement { stmt: succ_br },
             MutationEvent::ChangedBlockList { cfg },
             MutationEvent::ChangedCfg { cfg },
         ]

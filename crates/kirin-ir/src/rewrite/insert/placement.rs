@@ -120,14 +120,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
-    /// Place the detached `stmt` as `placement` says, and record the events.
+    /// Place the detached `stmt` as `placement` says, and record the events
+    /// the placement implies. The caller records `stmt`'s own event first.
     pub(super) fn place(&mut self, stmt: Statement, placement: Placement) {
         self.detached.remove(&stmt);
         let parent = placement.parent();
         if let Some(info) = stmt.get_info_mut(self.stage) {
             info.parent = Some(parent);
         }
-        self.events.push(MutationEvent::InsertedStatement { stmt });
 
         match placement {
             Placement::Chain { block, prev, next } => {

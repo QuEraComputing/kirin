@@ -111,11 +111,17 @@ use crate::{
 /// analyses can subscribe to the event kinds that invalidate them, and
 /// worklist drivers can re-enqueue the statements named in the events.
 ///
-/// Edits to detached code, such as a [`Rewriter::new_block`] block no
-/// statement owns yet, record events like any other edit. Creating detached
-/// code records nothing, and neither does tombstoning it when the `Rewriter`
-/// drops; the statement that attaches it records its usual event. An id an
-/// event names may therefore be dead by the time the log is read.
+/// Every statement this `Rewriter` makes records one
+/// [`MutationEvent::CreatedStatement`]; every statement that dies records one
+/// [`MutationEvent::ErasedStatement`], so in the log
+/// [`Rewriter::into_events`] returns, each created statement is either still
+/// alive or erased. Edits to detached code, such as a [`Rewriter::new_block`]
+/// block no statement owns yet, record events like any other edit. Detached
+/// code nothing placed is erased by `into_events`, which records the erasure
+/// of its statements; a `Rewriter` dropped without `into_events` tombstones
+/// that code too, but the log is dropped with it, so those erasures are never
+/// seen. An id an event names may therefore be dead by the time the log is
+/// read.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum MutationEvent {
     /// One or more operand slots of `stmt` were rewritten in place.
@@ -125,21 +131,39 @@ pub enum MutationEvent {
     /// Emitted once per [`Rewriter::replace_all_uses`] call, after the
     /// per-statement [`MutationEvent::ChangedOperands`] events it implies.
     ReplacedUses { old: SSAValue, new: SSAValue },
-    /// A new statement was spliced into a block's statement list or added to a
-    /// graph: a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
-    /// statement.
+    /// A new statement was made: [`Rewriter::create`] made it in a block or
+    /// graph (a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
+    /// statement), or [`Rewriter::clone_statement`] or
+    /// [`Rewriter::clone_cfg`] copied it.
+    ///
+    /// Recorded once for every statement, so each is paired with the
+    /// [`MutationEvent::ErasedStatement`] recorded when it dies. The copy
+    /// [`Rewriter::clone_statement`] returns has no parent until
+    /// [`Rewriter::insert`] places it, which records
+    /// [`MutationEvent::PlacedStatement`]. The bodies of a copy record no
+    /// [`MutationEvent::ChangedBlockList`],
+    /// [`MutationEvent::ChangedDiGraphTopology`], or
+    /// [`MutationEvent::ChangedUnGraphTopology`] of their own.
     ///
     /// Covers the bodies it names, which now have `stmt` as their parent; no
     /// separate [`MutationEvent::ChangedBodyNesting`] is recorded for them.
-    InsertedStatement { stmt: Statement },
+    CreatedStatement { stmt: Statement },
     /// A statement was tombstoned and removed from its block or graph.
     ///
-    /// Covers everything nested in it: the statement-owned blocks, `CFG`s,
-    /// `DiGraph`s, and `UnGraph`s it held were tombstoned with it, and no
-    /// separate [`MutationEvent::ChangedBlockList`],
+    /// Recorded once for every statement that dies: one erased directly, each
+    /// statement nested in it, each statement of an erased block, and each
+    /// statement of a body that [`Rewriter::replace_statement`] drops. A
+    /// statement nested in another is recorded before it. The bodies that die
+    /// with them record no [`MutationEvent::ChangedBlockList`],
     /// [`MutationEvent::ChangedCfg`], [`MutationEvent::ChangedDiGraphTopology`],
-    /// or [`MutationEvent::ChangedUnGraphTopology`] is recorded for them.
-    ErasedStatement { stmt: Statement },
+    /// or [`MutationEvent::ChangedUnGraphTopology`] of their own.
+    ///
+    /// `parent` is where `stmt` was when it died: the block or graph that
+    /// held it, or `None` if it had none, such as detached code never placed.
+    ErasedStatement {
+        stmt: Statement,
+        parent: Option<StatementParent>,
+    },
     /// A statement's definition was swapped in place (same id and results).
     ReplacedStatement { stmt: Statement },
     /// Blocks were added to, removed from, or moved within `cfg`'s block list.
@@ -159,14 +183,22 @@ pub enum MutationEvent {
     /// at most once per graph per [`Rewriter`] call.
     ChangedUnGraphTopology { graph: UnGraph },
     /// `owner`'s definition was replaced with one naming different bodies:
-    /// the bodies it dropped were tombstoned with everything nested in them,
+    /// the bodies it dropped were tombstoned with everything nested in them
+    /// (each statement in them records [`MutationEvent::ErasedStatement`]),
     /// and the bodies it gained now have `owner` as their parent.
     ChangedBodyNesting { owner: Statement },
-    /// `stmt` was moved to another place in a block body, keeping its id,
-    /// results, uses and nested bodies.
-    MovedStatement { stmt: Statement },
+    /// `stmt`, a statement that already existed, was put at a new place,
+    /// keeping its id, results, uses and nested bodies:
+    /// [`Rewriter::move_before`] or [`Rewriter::move_after`] moved it within
+    /// block bodies; [`Rewriter::splice_block_before`],
+    /// [`Rewriter::splice_block_after`], [`Rewriter::split_block`] or
+    /// [`Rewriter::merge_blocks`] moved it to another block, recording one
+    /// per moved statement; or [`Rewriter::insert`] placed it, detached until
+    /// then, in a block or graph.
+    PlacedStatement { stmt: Statement },
     /// Every statement of `source`, except its terminator, was moved into
-    /// `dest`, keeping their ids, results, uses and nested bodies.
+    /// `dest`, keeping their ids, results, uses and nested bodies. Recorded
+    /// after one [`MutationEvent::PlacedStatement`] per moved statement.
     SplicedBlock { source: Block, dest: Block },
     /// Every block of `source` was moved into `dest`, keeping their ids,
     /// arguments, statements and edges. Recorded after the
@@ -587,7 +619,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// End the rewrite and return every event it recorded, in application
     /// order. The log only grows while the `Rewriter` lives, so a position in
     /// [`events`](Self::events) stays valid until then.
+    ///
+    /// First tombstones the detached code nothing placed: statements no
+    /// [`Rewriter::insert`] placed, [`Rewriter::new_block`] blocks no
+    /// statement owns, and detached CFGs such as an unadopted
+    /// [`Rewriter::clone_cfg`] copy. The log then ends with an
+    /// [`MutationEvent::ErasedStatement`] for each statement in that code.
+    /// After a panic the pass boundary caught, the detached code is left in
+    /// place for inspection instead, and nothing is recorded for it.
     pub fn into_events(mut self) -> Vec<MutationEvent> {
+        self.tombstone_detached();
         std::mem::take(&mut self.events)
     }
 
@@ -1017,8 +1058,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects — leaving the stage untouched — if `stmt` is unknown, is owned
     /// by nothing, or still has results that are used elsewhere (a `DiGraph`
     /// yield counts as a use, and so does a node reading an `UnGraph` edge
-    /// statement's wire). Records [`MutationEvent::ErasedStatement`], followed
-    /// by [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator,
+    /// statement's wire). Records [`MutationEvent::ErasedStatement`] for each
+    /// statement nested in `stmt` and then for `stmt`, followed by
+    /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator,
     /// [`MutationEvent::ChangedDiGraphTopology`] when it was a `DiGraph`
     /// member, or [`MutationEvent::ChangedUnGraphTopology`] when it was an
     /// `UnGraph` member.
@@ -1086,7 +1128,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         let _ = self.stage.statement_arena_mut().delete(stmt);
 
-        self.events.push(MutationEvent::ErasedStatement { stmt });
+        self.events.push(MutationEvent::ErasedStatement {
+            stmt,
+            parent: Some(StatementParent::Block(block)),
+        });
         if is_terminator {
             self.events.push(MutationEvent::ChangedTerminator { block });
         }
@@ -1147,11 +1192,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// The per-statement step of [`Rewriter::tombstone_block`] and graph
     /// tombstoning: drop `stmt`'s uses and, for a block member, its outgoing
     /// edges from `block`; erase its nested bodies; then tombstone its results
-    /// and itself.
+    /// and itself, and record [`MutationEvent::ErasedStatement`].
     pub(super) fn tombstone_statement(&mut self, stmt: Statement, block: Option<Block>) {
-        let (operands, results, successors) = {
-            let definition = &stmt.expect_info(self.stage).definition;
+        let (parent, operands, results, successors) = {
+            let item = stmt.expect_info(self.stage);
+            let definition = &item.definition;
             (
+                item.parent,
                 definition
                     .arguments()
                     .copied()
@@ -1179,6 +1226,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let _ = self.stage.ssas.delete(result);
         }
         let _ = self.stage.statement_arena_mut().delete(stmt);
+        self.events
+            .push(MutationEvent::ErasedStatement { stmt, parent });
     }
 
     /// Tombstone the statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s
@@ -1260,7 +1309,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::BodyListedTwice`]), or encloses `stmt`
     /// ([`RewriteError::BodyEnclosesOwner`]).
     ///
-    /// Records [`MutationEvent::ReplacedStatement`], then
+    /// Records [`MutationEvent::ErasedStatement`] for each statement in a
+    /// dropped body, then [`MutationEvent::ReplacedStatement`], then
     /// [`MutationEvent::ChangedBodyNesting`] if the bodies changed, followed by
     /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator, or by
     /// [`MutationEvent::ChangedDiGraphTopology`] /

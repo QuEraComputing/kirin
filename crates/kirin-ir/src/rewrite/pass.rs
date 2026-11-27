@@ -43,10 +43,11 @@ where
         // rewriter must not panic again outside `catch_unwind`.
         rewriter.keep_detached_on_drop();
     }
-    // Taking the events drops the rewriter, tombstoning the results the pass
-    // never bound and the `new_block` blocks no statement owns, and ending the
-    // borrow of `stage` before it is verified, so the check sees any reference
-    // the pass left to those blocks.
+    // Taking the events first tombstones the detached code the pass never
+    // placed and records its erasures. It then drops the rewriter, which
+    // tombstones the results the pass never bound. Dropping it also ends the
+    // borrow of `stage` before verification, so the check sees any reference
+    // the pass left to that code.
     let events = rewriter.into_events();
 
     let pass_result = match panic_or_result {

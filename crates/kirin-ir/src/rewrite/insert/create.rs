@@ -6,7 +6,7 @@ use crate::arena::GetInfo;
 use crate::{Block, BlockParent, DiGraph, Dialect, Statement, UnGraph};
 
 use crate::rewrite::bodies::bodies_of;
-use crate::rewrite::rewriter::{RewriteError, Rewriter};
+use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
 
 /// Where [`Rewriter::create`] or [`Rewriter::insert`] places a statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,7 +67,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// wrapped in [`RewriteError::CannotInsert`]).
     ///
     /// Rejects, leaving the stage untouched, if a check fails. Records
-    /// [`MutationEvent::InsertedStatement`](crate::MutationEvent::InsertedStatement)
+    /// [`MutationEvent::CreatedStatement`](crate::MutationEvent::CreatedStatement)
     /// (covering the adopted bodies), then for a terminator
     /// [`MutationEvent::ChangedTerminator`](crate::MutationEvent::ChangedTerminator)
     /// and for a graph member
@@ -91,6 +91,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 reason => reason,
             })?;
         let stmt = self.build_statement(definition)?;
+        self.events.push(MutationEvent::CreatedStatement { stmt });
         self.place(stmt, placement);
         Ok(stmt)
     }
@@ -112,8 +113,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// detached statement of this `Rewriter` ([`RewriteError::NotDetached`]),
     /// or does not fit `insertion_pt`. `insertion_pt` must not be nested in
     /// `stmt`'s own bodies ([`RewriteError::InsertedIntoItself`], wrapped in
-    /// [`RewriteError::CannotInsert`]). Records the events of
-    /// [`Rewriter::create`].
+    /// [`RewriteError::CannotInsert`]). Records
+    /// [`MutationEvent::PlacedStatement`](crate::MutationEvent::PlacedStatement),
+    /// since `stmt` was recorded when it was made, then the events that
+    /// follow it in [`Rewriter::create`].
     pub fn insert(
         &mut self,
         insertion_pt: InsertionPoint,
@@ -130,6 +133,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 reason: Box::new(RewriteError::InsertedIntoItself(stmt)),
             });
         }
+        self.events.push(MutationEvent::PlacedStatement { stmt });
         self.place(stmt, placement);
         Ok(())
     }

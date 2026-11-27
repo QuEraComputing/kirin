@@ -17,8 +17,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects, leaving the stage untouched, if `at` is unknown or not in a
     /// CFG block.
     ///
-    /// Records [`MutationEvent::ChangedBlockList`] then
-    /// [`MutationEvent::ChangedCfg`].
+    /// Records [`MutationEvent::ChangedBlockList`], then one
+    /// [`MutationEvent::PlacedStatement`] per moved statement, in order and
+    /// the terminator last, then [`MutationEvent::ChangedCfg`].
     pub fn split_block(&mut self, at: Statement) -> Result<Block, RewriteError> {
         let (block, at_is_terminator) = {
             let item = self.live_statement(at)?;
@@ -42,12 +43,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         } else {
             self.split_off(block, at)
         };
-
         // Give the cut statements and the terminator to a new block right
         // after the original.
         let new_block = self.create_block(cfg, Some(block), next_block, []);
-        self.link(moved, new_block, None, None);
+        self.link_and_record(moved, new_block, None, None);
         self.set_terminator(new_block, terminator);
+        self.events
+            .extend(terminator.map(|stmt| MutationEvent::PlacedStatement { stmt }));
         self.set_terminator(block, None);
 
         // The moved edges now leave from the new block; whatever stays in the

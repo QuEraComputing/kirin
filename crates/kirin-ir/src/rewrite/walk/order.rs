@@ -103,7 +103,7 @@ fn check_not_moved_since<L: Dialect>(
     }
     let moved = VisitedPlace::of(stage, visited) != place
         || rewriter.events()[seen..].iter().any(
-            |event| matches!(*event, MutationEvent::MovedStatement { stmt } if stmt == visited),
+            |event| matches!(*event, MutationEvent::PlacedStatement { stmt } if stmt == visited),
         );
     if moved {
         Err(WalkError::VisitedMoved(visited))

@@ -23,8 +23,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Records the [`Rewriter::erase_statement`] events for `pred`'s terminator
     /// (if any), the [`Rewriter::replace_all_uses`] events for the argument
-    /// redirection, then [`MutationEvent::ChangedBlockList`] and
-    /// [`MutationEvent::ChangedCfg`].
+    /// redirection, then one [`MutationEvent::PlacedStatement`] per statement
+    /// moved from `succ`, in order and the terminator last, then
+    /// [`MutationEvent::ChangedBlockList`] and [`MutationEvent::ChangedCfg`].
     pub fn merge_blocks(
         &mut self,
         pred: Block,
@@ -90,8 +91,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             None => (LinkedList::new(), None),
         };
         let pred_tail = pred.expect_info(self.stage).statements.tail;
-        self.link(succ_chain, pred, pred_tail, None);
+        self.link_and_record(succ_chain, pred, pred_tail, None);
         self.set_terminator(pred, succ_terminator);
+        self.events
+            .extend(succ_terminator.map(|stmt| MutationEvent::PlacedStatement { stmt }));
 
         // succ is now empty: tombstoning it only removes the block and its
         // (already redirected) arguments.

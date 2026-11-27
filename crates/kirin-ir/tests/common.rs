@@ -432,3 +432,18 @@ pub fn cannot_insert(insertion_pt: InsertionPoint, reason: RewriteError) -> Rewr
         reason: Box::new(reason),
     }
 }
+
+/// The [`MutationEvent::ErasedStatement`] of `stmt`, which died in `parent`.
+#[allow(dead_code)]
+pub fn erased(stmt: Statement, parent: StatementParent) -> MutationEvent {
+    MutationEvent::ErasedStatement {
+        stmt,
+        parent: Some(parent),
+    }
+}
+
+/// The [`MutationEvent::ErasedStatement`] of `stmt`, which died in `block`.
+#[allow(dead_code)]
+pub fn erased_in(stmt: Statement, block: Block) -> MutationEvent {
+    erased(stmt, StatementParent::Block(block))
+}

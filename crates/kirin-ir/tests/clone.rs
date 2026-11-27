@@ -4,7 +4,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use common::{BuilderDialect, TestType, make_compute, make_split, make_wire, new_stage};
+use common::{BuilderDialect, TestType, erased_in, make_compute, make_split, make_wire, new_stage};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -22,6 +22,26 @@ fn so(stmt: Statement, index: usize) -> Use {
 
 fn order(stage: &StageInfo<BuilderDialect>, block: Block) -> Vec<Statement> {
     block.statements(stage).collect()
+}
+
+/// `blocks`' statements, terminators included, in order: the order a copy
+/// records them in.
+fn with_terminators(stage: &StageInfo<BuilderDialect>, blocks: &[Block]) -> Vec<Statement> {
+    blocks
+        .iter()
+        .flat_map(|&block| {
+            order(stage, block)
+                .into_iter()
+                .chain(block.terminator(stage))
+        })
+        .collect()
+}
+
+fn created(stmts: Vec<Statement>) -> Vec<MutationEvent> {
+    stmts
+        .into_iter()
+        .map(|stmt| MutationEvent::CreatedStatement { stmt })
+        .collect()
 }
 
 fn preds(stage: &StageInfo<BuilderDialect>, block: Block) -> HashSet<Block> {
@@ -104,15 +124,21 @@ fn clone_statement_copies_nested_bodies_with_fresh_ids() {
     let mut map = IRMap::default();
     let copy = rw.clone_statement(owner, &mut map).unwrap();
 
-    // Detached until inserted, and nothing reachable changed.
+    // The clone records each statement it makes, outer first: `copy`, then
+    // the statements copied into its two blocks. `copy` has no parent until
+    // it is inserted, which records it being placed.
     assert_eq!(*copy.parent(rw.stage()), None);
-    assert!(rw.events().is_empty());
+    let BuilderDialect::OwnBlocks(then_arm, else_arm) = *definition(rw.stage(), copy) else {
+        panic!("the copy keeps the original's definition");
+    };
+    let mut made = vec![copy];
+    made.extend(with_terminators(rw.stage(), &[then_arm, else_arm]));
+    let mut expected = created(made);
+    assert_eq!(rw.events().to_vec(), expected);
     rw.insert(InsertionPoint::After(owner), copy).unwrap();
     assert_eq!(order(rw.stage(), entry)[1..], [owner, copy]);
-    assert_eq!(
-        rw.events().to_vec(),
-        vec![MutationEvent::InsertedStatement { stmt: copy }]
-    );
+    expected.push(MutationEvent::PlacedStatement { stmt: copy });
+    assert_eq!(rw.events().to_vec(), expected);
 
     // The copy owns copies of the arms, which hold copies of the statements.
     assert_eq!(map.statement(owner), Some(copy));
@@ -154,12 +180,39 @@ fn a_clone_never_inserted_is_tombstoned_with_the_rewriter() {
         ..
     } = if_like();
     let uses_before = uses_set(&stage, x);
-    let (copy, compute_copy) = {
+    let (copy, compute_copy, inner, events) = {
         let mut rw = Rewriter::new(&mut stage);
         let mut map = IRMap::default();
         let copy = rw.clone_statement(owner, &mut map).unwrap();
-        (copy, map.statement(compute).unwrap())
+        let compute_copy = map.statement(compute).unwrap();
+        // `copy` owns two blocks, its then and else arms. Each statement
+        // copied into them, paired with its block, read while they live.
+        let BuilderDialect::OwnBlocks(then_arm, else_arm) = *definition(rw.stage(), copy) else {
+            panic!("the copy keeps the original's definition");
+        };
+        let inner: Vec<(Statement, Block)> = [then_arm, else_arm]
+            .into_iter()
+            .flat_map(|arm| {
+                with_terminators(rw.stage(), &[arm])
+                    .into_iter()
+                    .map(move |stmt| (stmt, arm))
+            })
+            .collect();
+        (copy, compute_copy, inner, rw.into_events())
     };
+    // The clone records `copy` and then its contents. Ending the rewrite
+    // erases them in the opposite nesting order: the contents, then `copy`.
+    let mut expected = vec![MutationEvent::CreatedStatement { stmt: copy }];
+    expected.extend(created(inner.iter().map(|&(stmt, _)| stmt).collect()));
+    // Each statement inside the copy records the block it was in, here one of
+    // the two arms. `copy` itself was never inserted anywhere, so its parent
+    // is `None`.
+    expected.extend(inner.iter().map(|&(stmt, arm)| erased_in(stmt, arm)));
+    expected.push(MutationEvent::ErasedStatement {
+        stmt: copy,
+        parent: None,
+    });
+    assert_eq!(events, expected);
     assert!(copy.get_info(&stage).is_none());
     assert!(compute_copy.get_info(&stage).is_none());
     assert_eq!(uses_set(&stage, x), uses_before);
@@ -177,6 +230,7 @@ fn a_clone_cannot_be_inserted_inside_itself() {
     let mut rw = Rewriter::new(&mut stage);
     let mut map = IRMap::default();
     let copy = rw.clone_statement(owner, &mut map).unwrap();
+    let cloned = rw.events().len();
     // The copy of `use_t` sits in a body of `copy`.
     let inside = map.statement(use_t).unwrap();
     let insertion_pt = InsertionPoint::Before(inside);
@@ -187,7 +241,11 @@ fn a_clone_cannot_be_inserted_inside_itself() {
             reason: Box::new(RewriteError::InsertedIntoItself(copy)),
         })
     );
-    assert!(rw.events().is_empty());
+    assert_eq!(
+        rw.events().len(),
+        cloned,
+        "the rejected insert records nothing"
+    );
 }
 
 /// ```text
@@ -261,10 +319,14 @@ fn clone_cfg_maps_forward_branches_and_values_from_later_blocks() {
     let mut rw = Rewriter::new(&mut stage);
     let mut map = IRMap::default();
     let copy = rw.clone_cfg(body, &mut map).unwrap();
-    assert!(rw.events().is_empty());
 
     let [a2, b2, c2] = [a, b, c].map(|block| map.block(block).unwrap());
     assert_eq!(copy.blocks(rw.stage()).collect::<Vec<_>>(), [a2, b2, c2]);
+    // Each copied statement is recorded, block by block.
+    assert_eq!(
+        rw.events().to_vec(),
+        created(with_terminators(rw.stage(), &[a2, b2, c2]))
+    );
     // Branches point at the copies, and the predecessor mirror follows.
     assert_eq!(preds(rw.stage(), c2), HashSet::from([a2]));
     assert_eq!(preds(rw.stage(), b2), HashSet::from([c2]));
@@ -443,6 +505,7 @@ fn create_adopts_only_unowned_bodies() {
     );
     let mut map = IRMap::default();
     let copy = rw.clone_cfg(body, &mut map).unwrap();
+    let cloned = rw.events().len();
     // A body cannot hold its own owner.
     let inside = map.statement(u).unwrap();
     assert_eq!(
@@ -458,7 +521,11 @@ fn create_adopts_only_unowned_bodies() {
         rw.create(InsertionPoint::After(f), BuilderDialect::OwnBlocks(b2, b2)),
         Err(RewriteError::BodyOwnedElsewhere(Body::Block(b2)))
     );
-    assert!(rw.events().is_empty());
+    assert_eq!(
+        rw.events().len(),
+        cloned,
+        "the rejected creates record nothing"
+    );
 }
 
 #[test]
