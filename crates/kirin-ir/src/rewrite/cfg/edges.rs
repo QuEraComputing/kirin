@@ -69,7 +69,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// by [`Rewriter::replace_statement`] before any edit is made. Returns the
     /// new argument.
     ///
-    /// Costs the incoming edges, not the size of the predecessor blocks.
+    /// Reads only the predecessors' terminators, not the rest of their blocks.
     ///
     /// Rejects, leaving the stage untouched, if `index` is past the end of the
     /// argument list, an incoming edge has no editable operand list
@@ -121,7 +121,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// argument is still used, an incoming edge has no editable operand list,
     /// or an edge's operand list has no operand at `index`.
     ///
-    /// Costs the incoming edges, not the size of the predecessor blocks.
+    /// Reads only the predecessors' terminators, not the rest of their blocks.
     ///
     /// Records, per rewritten terminator, [`MutationEvent::ReplacedStatement`]
     /// then [`MutationEvent::ChangedTerminator`] for its block, then
