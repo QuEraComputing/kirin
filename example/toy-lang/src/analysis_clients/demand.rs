@@ -69,20 +69,27 @@ impl AnalysisKind for DemandFacts {
 
 impl Analysis<Stage> for DemandFacts {
     fn run(db: &Database<Stage>, stage: &CompileStage) -> Result<StageDemand, AnalysisError> {
-        let program = db.program();
-        let roots = match program.stage(*stage).ok_or(AnalysisError::UnknownStage)? {
+        StageDemand::compute(db.program(), *stage)
+    }
+}
+
+impl StageDemand {
+    /// Analyze every function of `stage` as a root and collect what is
+    /// demanded.
+    pub fn compute(program: &Program<Stage>, stage: CompileStage) -> Result<Self, AnalysisError> {
+        let roots = match program.stage(stage).ok_or(AnalysisError::UnknownStage)? {
             Stage::Source(info) => roots(info),
             Stage::Lowered(info) => roots(info),
         };
         let mut demanded = StageDemand(FxHashSet::default());
-        let mut run = log::Run::start(Self::NAME);
+        let mut run = log::Run::start(DemandFacts::NAME);
         for (specialization, _) in roots {
             let root = run.root(specialization);
             // Toy functions return one value.
             let analyzed = DemandAnalysis::<Stage, InterpreterError>::new(program)
-                .analyze(*stage, Callee::Specialized(specialization), [Demand::Live])
-                .map_err(AnalysisError::failed::<Self>)?;
-            demanded.add(*stage, &analyzed);
+                .analyze(stage, Callee::Specialized(specialization), [Demand::Live])
+                .map_err(AnalysisError::failed::<DemandFacts>)?;
+            demanded.add(stage, &analyzed);
             run.end_root(root);
         }
         run.finish();
@@ -142,6 +149,17 @@ pub fn free_undemanded(stage: CompileStage) -> RuleSet<LowLevel> {
             }
         })
         .requires::<DemandFacts>(stage);
+    rules
+}
+
+/// A rule set with `free_undemanded` reading `demand`, computed by the caller
+/// rather than the database.
+pub fn free_undemanded_with(demand: Arc<StageDemand>) -> RuleSet<LowLevel> {
+    let mut rules = RuleSet::build(|_| Vec::<PatternRule<LowLevel>>::new())
+        .expect("an empty rule set is valid");
+    rules.add_statement_rule("free_undemanded", move |_: &AnalysisCache| FreeUndemanded {
+        demand: Arc::clone(&demand),
+    });
     rules
 }
 

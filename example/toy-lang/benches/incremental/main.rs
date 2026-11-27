@@ -3,15 +3,20 @@
 use std::collections::HashSet;
 use std::hint::black_box;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::Parser;
 use kirin::prelude::*;
 use kirin_interpreter::{Body, Callee, Linker, SameStageLinker};
-use kirin_rewrite::{Database, RewriteDriver, RewriteSummary, RuleSet};
+use kirin_rewrite::{AnalysisCache, Database, DriverError, RewriteDriver, RewriteSummary, RuleSet};
 use serde_json::{Value, json};
-use toy_lang::analysis_clients::constprop::{ConstPropFacts, fold_constants};
-use toy_lang::analysis_clients::demand::{DemandFacts, free_undemanded};
+use toy_lang::analysis_clients::constprop::{
+    ConstPropFacts, StageConstants, fold_constants, fold_constants_with,
+};
+use toy_lang::analysis_clients::demand::{
+    DemandFacts, StageDemand, free_undemanded, free_undemanded_with,
+};
 use toy_lang::analysis_clients::log;
 use toy_lang::interpreter::run_i64;
 use toy_lang::language::LowLevel;
@@ -30,8 +35,11 @@ struct Args {
     /// Three-statement units per function.
     #[arg(long, default_value_t = 8)]
     units: usize,
-    #[arg(long, num_args = 1.., default_values = ["cold", "edit_first", "edit_last"])]
+    #[arg(long, num_args = 1.., default_values = ["cold", "edit_first", "edit_last", "clean"])]
     cases: Vec<String>,
+    /// Rounds of `fold` then `free`; the last must edit nothing.
+    #[arg(long, default_value_t = 3)]
+    rounds: usize,
     #[arg(long, default_value_t = 10)]
     repeats: usize,
     #[arg(long, default_value_t = 2)]
@@ -47,21 +55,100 @@ struct Args {
     bench: bool,
 }
 
-/// How analyses are kept between passes.
+/// Run `rules` to a fixpoint, recording the driver's time and whether it
+/// edited in `timed`.
+fn drive(
+    rules: &RuleSet<LowLevel>,
+    rewriter: &mut Rewriter<'_, LowLevel>,
+    cache: &AnalysisCache,
+    timed: &mut (Duration, bool),
+) -> Result<RewriteSummary, DriverError> {
+    let start = Instant::now();
+    let summary = RewriteDriver::new(rules).with_cache(cache).run(rewriter);
+    *timed = (start.elapsed(), rewriter.edited());
+    summary
+}
+
+/// How analyses reach the passes.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
-    /// The database: a result lives until a pass edits the program.
+    /// `Database::run_pass`: a result is reused until a pass edits the
+    /// program.
     Database,
-    /// No cache: every result is dropped before every pass.
-    Recompute,
+    /// `Program::run_pass` with no database: every pass computes its analysis
+    /// first, with no revision and no cache.
+    Direct,
 }
 
 impl Mode {
     fn name(self) -> &'static str {
         match self {
             Self::Database => "database",
-            Self::Recompute => "recompute",
+            Self::Direct => "direct",
         }
+    }
+}
+
+/// The program being compiled, in the form `Mode` runs passes on.
+enum Compiler {
+    Database(Database<Stage>),
+    Direct(Program<Stage>),
+}
+
+impl Compiler {
+    fn new(text: &str, mode: Mode) -> (Self, CompileStage) {
+        let mut program: Program<Stage> = Program::new();
+        ParseProgramText::parse(&mut program, text).expect("the workload parses");
+        let stage = program.stage_by_name("lowered").expect("the stage exists");
+        let compiler = match mode {
+            Mode::Database => {
+                let mut db = Database::new(program);
+                db.register::<ConstPropFacts>().register::<DemandFacts>();
+                Self::Database(db)
+            }
+            Mode::Direct => Self::Direct(program),
+        };
+        (compiler, stage)
+    }
+
+    fn program(&self) -> &Program<Stage> {
+        match self {
+            Self::Database(db) => db.program(),
+            Self::Direct(program) => program,
+        }
+    }
+
+    /// Run `kind` on `stage`: its summary, the driver's time, and whether it
+    /// edited the program.
+    fn run(&mut self, stage: CompileStage, kind: PassKind) -> (RewriteSummary, Duration, bool) {
+        let mut timed = (Duration::ZERO, false);
+        let summary = match self {
+            Self::Database(db) => {
+                let rules = kind.rules(stage);
+                db.run_pass(stage, rules.required(), |rewriter, cache| {
+                    drive(&rules, rewriter, cache, &mut timed)
+                })
+                .expect("the pass succeeds")
+            }
+            Self::Direct(program) => {
+                let rules = match kind {
+                    PassKind::Fold => fold_constants_with(Arc::new(
+                        StageConstants::compute(program, stage).expect("constprop runs"),
+                    )),
+                    PassKind::Free => free_undemanded_with(Arc::new(
+                        StageDemand::compute(program, stage).expect("demand runs"),
+                    )),
+                };
+                let empty = AnalysisCache::default();
+                program
+                    .run_pass(stage, |rewriter| {
+                        drive(&rules, rewriter, &empty, &mut timed)
+                    })
+                    .expect("the pass succeeds")
+            }
+        };
+        let (driver, edited) = timed;
+        (summary, driver, edited)
     }
 }
 
@@ -102,69 +189,52 @@ struct PassRecord {
     /// Time the rules spent reading analysis results, inside `driver`.
     lookup: Duration,
     lookups: usize,
-    /// The whole `Database::run_pass`.
+    /// The whole pass: its analyses, building its rule set, and `run_pass`.
     run_pass: Duration,
     summary: RewriteSummary,
     edited: bool,
 }
 
 impl PassRecord {
-    /// `run_pass` minus the analyses and the driver: taking the stage out and
-    /// back, and the post-pass `verify_derived`.
+    /// `run_pass` minus the analyses and the driver: building the rule set,
+    /// taking the stage out and back, and the post-pass `verify_derived`.
     fn overhead(&self) -> Duration {
         self.run_pass.saturating_sub(self.analysis + self.driver)
     }
 }
 
-const MAX_ROUNDS: usize = 100;
-
-/// Run `fold` then `free` until a round edits nothing.
+/// `rounds` rounds of `fold` then `free`, and whether the last edited
+/// nothing.
 fn pipeline(
-    db: &mut Database<Stage>,
+    compiler: &mut Compiler,
     stage: CompileStage,
-    mode: Mode,
+    rounds: usize,
     affected: &HashSet<SpecializedFunction>,
-) -> Vec<PassRecord> {
+) -> (Vec<PassRecord>, bool) {
     let mut records = Vec::new();
-    for _ in 0..MAX_ROUNDS {
+    let mut converged = false;
+    for _ in 0..rounds {
         let mut edited = false;
         for kind in [PassKind::Fold, PassKind::Free] {
-            let record = run_one(db, stage, mode, kind, affected);
+            let record = run_one(compiler, stage, kind, affected);
             edited |= record.edited;
             records.push(record);
         }
-        if !edited {
-            return records;
-        }
+        converged = !edited;
     }
-    panic!("no fixpoint after {MAX_ROUNDS} rounds");
+    (records, converged)
 }
 
 fn run_one(
-    db: &mut Database<Stage>,
+    compiler: &mut Compiler,
     stage: CompileStage,
-    mode: Mode,
     kind: PassKind,
     affected: &HashSet<SpecializedFunction>,
 ) -> PassRecord {
-    // Building the rule set stays outside the timer.
-    let rules = kind.rules(stage);
-    if mode == Mode::Recompute {
-        db.program_mut();
-    }
-    let revision = db.revision();
     log::take();
     log::take_lookups();
-    let mut driver = Duration::ZERO;
     let start = Instant::now();
-    let summary = db
-        .run_pass(stage, rules.required(), |rewriter, cache| {
-            let start = Instant::now();
-            let summary = RewriteDriver::new(&rules).with_cache(cache).run(rewriter);
-            driver = start.elapsed();
-            summary
-        })
-        .expect("the pass succeeds");
+    let (summary, driver, edited) = compiler.run(stage, kind);
     let run_pass = start.elapsed();
     let runs = log::take();
     let lookups = log::take_lookups();
@@ -184,17 +254,8 @@ fn run_one(
         lookups: lookups.count,
         run_pass,
         summary,
-        edited: db.revision() != revision,
+        edited,
     }
-}
-
-fn parse(text: &str) -> (Database<Stage>, CompileStage) {
-    let mut program: Program<Stage> = Program::new();
-    ParseProgramText::parse(&mut program, text).expect("the workload parses");
-    let stage = program.stage_by_name("lowered").expect("the stage exists");
-    let mut db = Database::new(program);
-    db.register::<ConstPropFacts>().register::<DemandFacts>();
-    (db, stage)
 }
 
 fn specialization(
@@ -292,28 +353,31 @@ fn summary_json(records: &[PassRecord]) -> Value {
 /// One (shape, size, case, mode): check the first run, then time samples.
 fn measure(args: &Args, shape: Shape, size: usize, case: Case, mode: Mode) -> Value {
     let text = workload::text(shape, case, size, args.units);
-    let affected_of = |db: &Database<Stage>, stage| -> HashSet<SpecializedFunction> {
+    let affected_of = |program: &Program<Stage>, stage| -> HashSet<SpecializedFunction> {
         match case.edited(size) {
             Some(edited) => shape
                 .affected(edited)
                 .iter()
-                .map(|name| specialization(db.program(), stage, name))
+                .map(|name| specialization(program, stage, name))
                 .collect(),
             None => HashSet::new(),
         }
     };
 
     // Check.
-    let (mut db, stage) = parse(&text);
-    let before = statements(db.program(), stage, size);
-    let values_before = evaluate(db.program());
-    let affected = affected_of(&db, stage);
-    let records = pipeline(&mut db, stage, mode, &affected);
-    let after = statements(db.program(), stage, size);
-    let values_after = evaluate(db.program());
+    let (mut compiler, stage) = Compiler::new(&text, mode);
+    let before = statements(compiler.program(), stage, size);
+    let values_before = evaluate(compiler.program());
+    let affected = affected_of(compiler.program(), stage);
+    let (records, converged) = pipeline(&mut compiler, stage, args.rounds, &affected);
+    let after = statements(compiler.program(), stage, size);
+    let values_after = evaluate(compiler.program());
     let dirty = (0..size).filter(|&i| case.is_dirty(size, i)).count();
     let summary = summary_json(&records);
     let mut failures = Vec::new();
+    if !converged {
+        failures.push(format!("round {} still edited", args.rounds));
+    }
     if values_before != values_after {
         failures.push(format!("values {values_before:?} became {values_after:?}"));
     }
@@ -335,14 +399,14 @@ fn measure(args: &Args, shape: Shape, size: usize, case: Case, mode: Mode) -> Va
             summary["applied_by_pass"]["free"]
         ));
     }
-    drop(db);
+    drop(compiler);
 
     // Time.
     let sample = || {
-        let (mut db, stage) = parse(&text);
-        let affected = affected_of(&db, stage);
-        let records = black_box(pipeline(&mut db, stage, mode, &affected));
-        drop(db);
+        let (mut compiler, stage) = Compiler::new(&text, mode);
+        let affected = affected_of(compiler.program(), stage);
+        let (records, _) = black_box(pipeline(&mut compiler, stage, args.rounds, &affected));
+        drop(compiler);
         records
     };
     for _ in 0..args.warmups {
@@ -494,7 +558,7 @@ fn main() {
     for shape in args.shapes.iter().map(|s| Shape::parse(s)) {
         for &size in &args.sizes {
             for case in args.cases.iter().map(|c| Case::parse(c)) {
-                for mode in [Mode::Database, Mode::Recompute] {
+                for mode in [Mode::Database, Mode::Direct] {
                     let row = measure(&args, shape, size, case, mode);
                     failed |= !row["check"]["failures"].as_array().unwrap().is_empty();
                     print_row(&row, args.per_pass);

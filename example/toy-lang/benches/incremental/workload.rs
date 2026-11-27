@@ -44,6 +44,8 @@ pub enum Case {
     EditFirst,
     /// Only the last `@fi`.
     EditLast,
+    /// None: a recompile with nothing to do.
+    Clean,
 }
 
 impl Case {
@@ -52,6 +54,7 @@ impl Case {
             "cold" => Self::Cold,
             "edit_first" => Self::EditFirst,
             "edit_last" => Self::EditLast,
+            "clean" => Self::Clean,
             _ => panic!("unknown case {name}"),
         }
     }
@@ -61,20 +64,25 @@ impl Case {
             Self::Cold => "cold",
             Self::EditFirst => "edit_first",
             Self::EditLast => "edit_last",
+            Self::Clean => "clean",
         }
     }
 
     /// The one edited function, if only one holds work.
     pub fn edited(self, size: usize) -> Option<usize> {
         match self {
-            Self::Cold => None,
+            Self::Cold | Self::Clean => None,
             Self::EditFirst => Some(0),
             Self::EditLast => Some(size - 1),
         }
     }
 
     pub fn is_dirty(self, size: usize, i: usize) -> bool {
-        self.edited(size).is_none_or(|edited| edited == i)
+        match self {
+            Self::Cold => true,
+            Self::Clean => false,
+            _ => self.edited(size) == Some(i),
+        }
     }
 }
 

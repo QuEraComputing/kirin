@@ -78,25 +78,31 @@ impl AnalysisKind for ConstPropFacts {
 
 impl Analysis<Stage> for ConstPropFacts {
     fn run(db: &Database<Stage>, stage: &CompileStage) -> Result<StageConstants, AnalysisError> {
-        let program = db.program();
-        let roots = match program.stage(*stage).ok_or(AnalysisError::UnknownStage)? {
+        StageConstants::compute(db.program(), *stage)
+    }
+}
+
+impl StageConstants {
+    /// Analyze every function of `stage` as a root and join the facts.
+    pub fn compute(program: &Program<Stage>, stage: CompileStage) -> Result<Self, AnalysisError> {
+        let roots = match program.stage(stage).ok_or(AnalysisError::UnknownStage)? {
             Stage::Source(info) => roots(info),
             Stage::Lowered(info) => roots(info),
         };
         let mut constants = StageConstants(FxHashMap::default());
-        let mut run = log::Run::start(Self::NAME);
+        let mut run = log::Run::start(ConstPropFacts::NAME);
         for (specialization, arity) in roots {
             let root = run.root(specialization);
             let engine: ToyConstProp<'_, i64> =
                 ToyConstProp::new(program).with_linker(CrossStageLinker);
             let analyzed = engine
                 .analyze(
-                    *stage,
+                    stage,
                     Callee::Specialized(specialization),
                     (0..arity).map(|_| Value::Top),
                 )
-                .map_err(AnalysisError::failed::<Self>)?;
-            constants.add(*stage, &analyzed);
+                .map_err(AnalysisError::failed::<ConstPropFacts>)?;
+            constants.add(stage, &analyzed);
             run.end_root(root);
         }
         run.finish();
@@ -156,6 +162,17 @@ pub fn fold_constants(stage: CompileStage) -> RuleSet<LowLevel> {
             }
         })
         .requires::<ConstPropFacts>(stage);
+    rules
+}
+
+/// A rule set with `fold_constants` reading `facts`, computed by the caller
+/// rather than the database.
+pub fn fold_constants_with(facts: Arc<StageConstants>) -> RuleSet<LowLevel> {
+    let mut rules = RuleSet::build(|_| Vec::<PatternRule<LowLevel>>::new())
+        .expect("an empty rule set is valid");
+    rules.add_statement_rule("fold_constants", move |_: &AnalysisCache| FoldConstants {
+        facts: Arc::clone(&facts),
+    });
     rules
 }
 
