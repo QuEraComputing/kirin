@@ -473,4 +473,91 @@ specialize @arith fn @f(i64, i64, i64) -> i64 cfg {
         let p = p.expect("the pass ran");
         assert_eq!(visits.borrow().get(&p), None);
     }
+
+    /// Two functions: `@f` computes a sum, and `@g` returns its first
+    /// argument.
+    const TWO_FUNCTIONS: &str = "stage @arith fn @f(i64, i64) -> i64;
+stage @arith fn @g(i64, i64) -> i64;
+specialize @arith fn @f(i64, i64) -> i64 cfg {
+  ^entry(%a: i64, %b: i64) {
+    %s = add %a, %b -> i64;
+    ret %s;
+  }
+}
+specialize @arith fn @g(i64, i64) -> i64 cfg {
+  ^entry(%c: i64, %d: i64) {
+    ret %c;
+  }
+}
+";
+
+    /// At a function whose body has blocks, moves them all after `anchor`,
+    /// a block of another function.
+    struct SpliceAway {
+        anchor: Block,
+    }
+
+    impl StatementRule<L> for SpliceAway {
+        fn apply(
+            &mut self,
+            rewriter: &mut Rewriter<'_, L>,
+            stmt: Statement,
+        ) -> Result<WalkResult, RewriteError> {
+            let stage = rewriter.stage();
+            let L::Function { body, .. } = *stmt.expect_info(stage).definition() else {
+                return Ok(WalkResult::Advance);
+            };
+            if body.blocks(stage).next().is_some() {
+                rewriter.splice_cfg_after(body, self.anchor)?;
+            }
+            Ok(WalkResult::Advance)
+        }
+    }
+
+    /// `@f` is visited before its body, so the splice moves the body's
+    /// statements into `@g`, out of the root's tree, while they are still in
+    /// the queue: no rule is handed them.
+    #[test]
+    fn run_at_skips_statements_spliced_out_of_its_root() {
+        let visits: Rc<RefCell<HashMap<Statement, usize>>> = Rc::default();
+        let mut program: Program<StageInfo<L>> = Program::new();
+        program.parse(TWO_FUNCTIONS).expect("the program parses");
+        let stage = program.stage_by_name("arith").expect("the stage exists");
+        let mut body = Vec::new();
+        program
+            .run_pass(stage, |rewriter| {
+                let [f, g] = rewriter
+                    .stage()
+                    .staged_function_arena()
+                    .iter()
+                    .flat_map(|function| function.specializations())
+                    .map(|specialization| *specialization.definition())
+                    .collect::<Vec<_>>()[..]
+                else {
+                    panic!("the program has two functions");
+                };
+                let L::Function { body: g_body, .. } =
+                    *g.expect_info(rewriter.stage()).definition()
+                else {
+                    panic!("`@g` is a function");
+                };
+                let anchor = g_body
+                    .blocks(rewriter.stage())
+                    .next()
+                    .expect("`@g` has a block");
+                body = PreOrder::schedule(rewriter.stage(), f)[1..].to_vec();
+
+                let mut rules = RuleSet::<L>::build(|_| Vec::<PatternRule<L>>::new()).unwrap();
+                rules.add_statement_rule("splice_away", move || SpliceAway { anchor });
+                let counting = Rc::clone(&visits);
+                rules.add_statement_rule("count_visits", move || CountVisits(Rc::clone(&counting)));
+                RewriteDriver::new(&rules).run_at(rewriter, f)
+            })
+            .expect("the pass succeeds");
+
+        assert_eq!(body.len(), 2, "`@f`'s body has an add and a ret");
+        for stmt in body {
+            assert_eq!(visits.borrow().get(&stmt), None);
+        }
+    }
 }
